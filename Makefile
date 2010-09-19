@@ -21,18 +21,12 @@
 PROGS = library_complexity complexity_plot simulate_library
 
 LIBS = -lgsl -lgslcblas
-LIBDIR = $(RMAP)/lib
-INCLUDEDIR = $(RMAP)/include
+INCLUDEDIR = smithlab_cpp/include
 CXX = g++
 CFLAGS = -Wall -fPIC -fmessage-length=50
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-COMMON_DIR = $(RMAP)/src/common/
-TEST_DIR = $(RMAP)/test
-
-ifndef RMAP
-$(error must define RMAP variable)
-endif
+COMMON_DIR = smithlab_cpp/
 
 ifeq "$(shell uname)" "Darwin"
 CFLAGS += -arch x86_64
