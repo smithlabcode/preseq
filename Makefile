@@ -21,12 +21,13 @@
 PROGS = library_complexity complexity_plot simulate_library
 
 LIBS = -lgsl -lgslcblas
-INCLUDEDIR = smithlab_cpp/include
+LIBDIR = $(SMITHLAB_CPP)/
+INCLUDEDIR = $(SMITHLAB_CPP)/
 CXX = g++
 CFLAGS = -Wall -fPIC -fmessage-length=50
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-COMMON_DIR = smithlab_cpp/
+COMMON_DIR = $(SMITHLAB_CPP)/
 
 ifeq "$(shell uname)" "Darwin"
 CFLAGS += -arch x86_64
