@@ -18,7 +18,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-PROGS = library_complexity complexity_plot
+PROGS = library_complexity complexity_plot simulate_library
 
 LIBS = -lgsl -lgslcblas
 LIBDIR = $(RMAP)/lib
@@ -51,7 +51,7 @@ all:	$(PROGS)
 %.o: %.cpp %.hpp
 	$(CXX) $(CFLAGS) -c -o $@ $< -I$(COMMON_DIR)
 
-complexity_plot library_complexity: \
+complexity_plot library_complexity simulate_library: \
 	$(addprefix $(COMMON_DIR), GenomicRegion.o rmap_os.o \
 	rmap_utils.o OptionParser.o)
 
