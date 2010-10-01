@@ -49,22 +49,22 @@ class Poiss{
 public:
   Poiss(const double l_): lambda(l_) {};
   double get_lambda() const {return(lambda);};
-  double get_pdf(unsigned int val) const {
+  double get_pdf(size_t val) const {
     return(gsl_ran_poisson_pdf(val, lambda));};
 
-  double get_log_pdf(unsigned int val) const {
+  double get_log_pdf(size_t val) const {
     return(log(gsl_ran_poisson_pdf(val,lambda)));};
 
-  double get_nonzero_pdf(unsigned int val) const {
+  double get_nonzero_pdf(size_t val) const {
     return(gsl_ran_poisson_pdf(val, lambda)/(1-exp(-lambda)));};
 
-  double get_nonzero_log_pdf(unsigned int val) const {
+  double get_nonzero_log_pdf(size_t val) const {
     return(log(gsl_ran_poisson_pdf(val,lambda))-
 	       log(1 - exp(-lambda)));};
 
-  void estim_param(const vector<unsigned int> &values, 
+  void estim_param(const vector<size_t> &values, 
                    const vector<double> &probs);
-  void estim_param(const vector<unsigned int> &values);
+  void estim_param(const vector<size_t> &values);
   void estim_nonzero_param_bisec(const double mean);
   void estim_nonzero_param_newton(const double mean);
   string tostring() const {return toa(lambda);}
@@ -86,7 +86,7 @@ const double Poiss::tolerance = 1e-10;
 
 
 static double
-compute_weighted_mean(const vector<unsigned int> &values,
+compute_weighted_mean(const vector<size_t> &values,
              const vector<double> &probs){
   return(std::inner_product(probs.begin(), probs.end(), 
 			    values.begin(), 0.0)/
@@ -94,14 +94,14 @@ compute_weighted_mean(const vector<unsigned int> &values,
 }
 
 void 
-Poiss::estim_param(const vector<unsigned int> &values){
+Poiss::estim_param(const vector<size_t> &values){
   lambda = accumulate(values.begin(), values.end(), 0.0)/
              static_cast<double>(values.size());
   assert(finite(lambda));
 }
 
 void 
-Poiss::estim_param(const vector<unsigned int> &values, 
+Poiss::estim_param(const vector<size_t> &values, 
                    const vector<double> &probs){
   lambda = compute_weighted_mean(values,probs);
 
@@ -168,7 +168,7 @@ Poiss::estim_nonzero_param_newton(const double mean){
 static double
 general_expectation_step(const vector<Poiss> &distros, 
                          const vector<double> &mixing,
-                         const vector<unsigned int> &values, 
+                         const vector<size_t> &values, 
                          vector< vector<double> > &probs){
   double score = 0.0;
 
@@ -195,7 +195,7 @@ general_expectation_step(const vector<Poiss> &distros,
 
 
 static void 
-calculate_mixing(const vector<unsigned int> &values, 
+calculate_mixing(const vector<size_t> &values, 
                  const vector< vector<double> > &probs,
                  vector<double> &mixing){
 
@@ -219,7 +219,7 @@ calculate_mixing(const vector<unsigned int> &values,
 }
 
 static void
-general_maximization_step(vector<unsigned int> &values,  
+general_maximization_step(vector<size_t> &values,  
                           const vector< vector<double> > &probs, 
                           vector<double> &mixing, 
                           vector<Poiss> &distros){
@@ -233,7 +233,7 @@ general_maximization_step(vector<unsigned int> &values,
 // recalculate parameters, lambda and mixing_j = average(probs[j]) //
 
 static double 
-general_log_l(const vector<unsigned int> &values, 
+general_log_l(const vector<size_t> &values, 
               const vector<Poiss> &distros,
               const vector<double> &mixing){
 
@@ -255,7 +255,7 @@ general_log_l(const vector<unsigned int> &values,
 
 
 static double
-complete_log_l(const vector<unsigned int> &values, 
+complete_log_l(const vector<size_t> &values, 
               const vector<Poiss> &distros,
               const vector< vector<double> > &probs){
   
@@ -280,7 +280,7 @@ complete_log_l(const vector<unsigned int> &values,
 double
 general_state_resolve(const double &tol, 
                       const size_t &max_itr,
-                      vector<unsigned int> &values, 
+                      vector<size_t> &values, 
                       vector<Poiss> &distros, 
                       vector<double> &mixing){
 
@@ -326,7 +326,7 @@ general_state_resolve(const double &tol,
 static double
 general_nonzero_expectation_step(const vector<Poiss> &distros, 
                                  const vector<double> &mixing,
-                                 const vector<unsigned int> &values, 
+                                 const vector<size_t> &values, 
                                  vector< vector<double> > &probs){
   double score = 0.0;
 
@@ -351,7 +351,7 @@ general_nonzero_expectation_step(const vector<Poiss> &distros,
 }
 
 static void
-general_nonzero_maximization_step(vector<unsigned int> &values,  
+general_nonzero_maximization_step(vector<size_t> &values,  
                                   const vector< vector<double> > &probs, 
                                   vector<double> &mixing, 
                                   vector<Poiss> &distros){
@@ -367,7 +367,7 @@ general_nonzero_maximization_step(vector<unsigned int> &values,
 // recalculate parameters, lambda and mixing_j = average(probs[j]) //
 
 static double 
-general_nonzero_log_l(const vector<unsigned int> &values, 
+general_nonzero_log_l(const vector<size_t> &values, 
                       const vector<Poiss> &distros,
                       const vector<double> &mixing){
 
@@ -390,7 +390,7 @@ general_nonzero_log_l(const vector<unsigned int> &values,
 
 
 static double
-complete_nonzero_log_l(const vector<unsigned int> &values, 
+complete_nonzero_log_l(const vector<size_t> &values, 
                        const vector<Poiss> &distros,
                        const vector< vector<double> > &probs){
   
@@ -415,7 +415,7 @@ complete_nonzero_log_l(const vector<unsigned int> &values,
 double
 general_nonzero_state_resolve(const double &tol, 
                               const size_t &max_itr,
-                              vector<unsigned int> &values, 
+                              vector<size_t> &values, 
                               vector<Poiss> &distros, 
                               vector<double> &mixing){
 
@@ -502,7 +502,7 @@ int main(int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     /**********************************************************************/
 
-    vector<unsigned int> values;
+    vector<size_t> values;
     std::ifstream in(input_file_name.c_str());
     if (!in) 
       throw BEDFileException("cannot open input file " + input_file_name);
@@ -563,11 +563,11 @@ int main(int argc, const char **argv) {
 
     ostream* out = (outfile.empty()) ? 
       &std::cout : new std::ofstream(outfile.c_str());
-    *out << "lambdas" << endl;
+    *out << values.size() << endl;
     for(size_t j = 0; j < distros.size(); j++){
       *out << distros[j].get_lambda() << endl;
     } 
-    *out << "mixings" << endl;
+ 
     for(size_t j = 0; j < mixing.size(); j++){
       *out << mixing[j] << endl;
     }
