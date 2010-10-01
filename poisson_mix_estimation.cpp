@@ -55,16 +55,18 @@ public:
   double get_log_pdf(unsigned int val) const {
     return(log(gsl_ran_poisson_pdf(val,lambda)));};
 
-  double get_trun_pdf(unsigned int val) const {
+  double get_nonzero_pdf(unsigned int val) const {
     return(gsl_ran_poisson_pdf(val, lambda)/(1-exp(-lambda)));};
 
-  double get_trun_log_pdf(unsigned int val) const {
-    return(val*log(lambda) - lambda - gsl_sf_lnfact(val) 
-           - log(1-exp(-lambda)));};
+  double get_nonzero_log_pdf(unsigned int val) const {
+    return(log(gsl_ran_poisson_pdf(val,lambda))-
+	       log(1 - exp(-lambda)));};
 
-  void estim_param(const vector<unsigned int> &values, const vector<double> &probs);
+  void estim_param(const vector<unsigned int> &values, 
+                   const vector<double> &probs);
   void estim_param(const vector<unsigned int> &values);
-  void estim_trun_param(const vector<unsigned int> &values, const vector<double> &probs);
+  void estim_nonzero_param_bisec(const double mean);
+  void estim_nonzero_param_newton(const double mean);
   string tostring() const {return toa(lambda);}
   void set_lambda(double lambda_hat) { lambda = lambda_hat;}
 private:
@@ -80,6 +82,17 @@ const double Poiss::max_allowed_lambda = 10000;
 const double Poiss::min_allowed_lambda = 1e-20;
 const double Poiss::tolerance = 1e-10; 
 
+
+
+
+static double
+compute_weighted_mean(const vector<unsigned int> &values,
+             const vector<double> &probs){
+  return(std::inner_product(probs.begin(), probs.end(), 
+			    values.begin(), 0.0)/
+	 std::accumulate(probs.begin(), probs.end(), 0.0));
+}
+
 void 
 Poiss::estim_param(const vector<unsigned int> &values){
   lambda = accumulate(values.begin(), values.end(), 0.0)/
@@ -90,9 +103,7 @@ Poiss::estim_param(const vector<unsigned int> &values){
 void 
 Poiss::estim_param(const vector<unsigned int> &values, 
                    const vector<double> &probs){
-  lambda =  std::inner_product(probs.begin(), probs.end(), 
-			    values.begin(), 0.0)/
-    std::accumulate(probs.begin(), probs.end(), 0.0);
+  lambda = compute_weighted_mean(values,probs);
 
 }
 // lambda_k = weighted average(P(x_i \in  kth group)*x_i) //
@@ -108,16 +119,11 @@ lambda_score_funct(const double mean, const double lambda){
 }
 
 void
-Poiss::estim_trun_param(const vector<unsigned int> &values,
-                             const vector<double> &probs){
-  
-  double mean = std::inner_product(probs.begin(), probs.end(), 
-			           values.begin(), 0.0)/
-                std::accumulate(probs.begin(), probs.end(), 0.0);
+Poiss::estim_nonzero_param_bisec(const double mean){
 
-  double lambda_low = min_allowed_lambda;
+  double lambda_low = mean-1;
   double lambda_high = mean;
-  double lambda_mid = max_allowed_lambda;
+  double lambda_mid = mean - 0.5;
   
   double diff = numeric_limits<double>::max();
   double prev_val = numeric_limits<double>::max();
@@ -138,6 +144,26 @@ Poiss::estim_trun_param(const vector<unsigned int> &values,
   lambda = lambda_mid;
 }
 
+static double
+lambda_newton_update(const double mean, const double lambda_hat){
+
+  double deriv = 1 - mean*exp(-lambda_hat);
+  return(lambda_hat - 
+	 lambda_score_funct(mean,lambda_hat)/deriv);
+}
+
+void
+Poiss::estim_nonzero_param_newton(const double mean){
+
+  double lambda_hat = mean;
+  double prev_lambda_hat = numeric_limits<double>::max();
+  while(movement(lambda_hat, prev_lambda_hat) > tolerance){
+    prev_lambda_hat = lambda_hat;
+    lambda_hat = lambda_newton_update(mean, lambda_hat);
+  }
+  lambda = lambda_hat;
+}
+    
 
 static double
 general_expectation_step(const vector<Poiss> &distros, 
@@ -171,8 +197,7 @@ general_expectation_step(const vector<Poiss> &distros,
 static void 
 calculate_mixing(const vector<unsigned int> &values, 
                  const vector< vector<double> > &probs,
-                 vector<double> &mixing,
-                 vector<Poiss> &distros){
+                 vector<double> &mixing){
 
   for(size_t i = 0; i < mixing.size(); i++){
     vector<double> log_probs;
@@ -202,7 +227,7 @@ general_maximization_step(vector<unsigned int> &values,
   for(size_t i = 0; i < distros.size(); i++)
     distros[i].estim_param(values, probs[i]);
 
-  calculate_mixing(values, probs, mixing, distros);
+  calculate_mixing(values, probs, mixing);
 
 }
 // recalculate parameters, lambda and mixing_j = average(probs[j]) //
@@ -298,6 +323,134 @@ general_state_resolve(const double &tol,
   return(general_log_l(values, distros, mixing));
 }
 
+static double
+general_nonzero_expectation_step(const vector<Poiss> &distros, 
+                                 const vector<double> &mixing,
+                                 const vector<unsigned int> &values, 
+                                 vector< vector<double> > &probs){
+  double score = 0.0;
+
+  for(size_t i = 0; i < values.size(); i++){ 
+    vector<double> log_denom_vec;
+  
+    for(size_t j = 0; j < distros.size(); j++)
+      log_denom_vec.push_back(log(mixing[j]) + 
+                              distros[j].get_nonzero_log_pdf(values[i]));
+
+    double log_denom = log_sum_log_vec(log_denom_vec, log_denom_vec.size());
+
+    assert(finite(log_denom));
+
+    for(size_t j = 0; j < distros.size(); j++)
+      probs[j][i] = exp(log_denom_vec[j] - log_denom);
+
+    score += log_denom;
+
+  }
+  return(score);   
+}
+
+static void
+general_nonzero_maximization_step(vector<unsigned int> &values,  
+                                  const vector< vector<double> > &probs, 
+                                  vector<double> &mixing, 
+                                  vector<Poiss> &distros){
+
+  for(size_t i = 0; i < distros.size(); i++){
+    double mean = compute_weighted_mean(values, probs[i]);
+    distros[i].estim_nonzero_param_bisec(mean);
+  }
+
+  calculate_mixing(values, probs, mixing);
+
+}
+// recalculate parameters, lambda and mixing_j = average(probs[j]) //
+
+static double 
+general_nonzero_log_l(const vector<unsigned int> &values, 
+                      const vector<Poiss> &distros,
+                      const vector<double> &mixing){
+
+  vector<double> score_vec;
+
+  for(size_t i = 0; i < values.size(); i++){
+    double inner_sum = 0.0;
+    vector<double> workspace_sum(distros.size(), 0.0);
+
+    for(size_t j = 0; j < mixing.size(); j++)
+      workspace_sum[j] = log(mixing[j]) + 
+                           distros[j].get_nonzero_log_pdf(values[i]);
+
+    inner_sum = log_sum_log_vec(workspace_sum, workspace_sum.size());
+    score_vec.push_back(inner_sum);
+  }
+  sort(score_vec.begin(), score_vec.end());
+  return(accumulate(score_vec.begin(), score_vec.end(), 0.0));
+}
+
+
+static double
+complete_nonzero_log_l(const vector<unsigned int> &values, 
+                       const vector<Poiss> &distros,
+                       const vector< vector<double> > &probs){
+  
+  vector<double> score_vec;
+
+  for(size_t i = 0; i < values.size(); i ++){
+    vector<double> log_score;
+
+    for(size_t j = 0; j < distros.size(); j++){
+      if(probs[j][i] > 0){
+        log_score.push_back(log(probs[j][i]) + 
+                            distros[i].get_nonzero_log_pdf(values[i]));
+      }
+    }
+   
+    score_vec.push_back(log_sum_log_vec(log_score, log_score.size()));
+  }
+  
+  return(accumulate(score_vec.begin(), score_vec.end(), 0.0));
+}
+
+double
+general_nonzero_state_resolve(const double &tol, 
+                              const size_t &max_itr,
+                              vector<unsigned int> &values, 
+                              vector<Poiss> &distros, 
+                              vector<double> &mixing){
+
+
+  const size_t number_states = distros.size();
+  double probs_starting_val = 1/static_cast<double>(number_states);
+  vector< vector<double> > probs(number_states, vector<double>(values.size(), 
+                                 probs_starting_val));
+
+  double score = 0.0;
+  double error = std::numeric_limits<double>::max();
+  double prev_score = std::numeric_limits<double>::max();
+
+  for (size_t i = 0; i < max_itr; ++i){
+    cerr << "lambdas = ";
+    for(size_t j = 0; j < distros.size(); j++)
+      cerr << distros[j].get_lambda() << ", ";
+
+    cerr << "\n mixings = ";
+    for(size_t j = 0; j < mixing.size(); j++)
+      cerr << mixing[j] << ", ";
+    cerr << "\n";
+    score = general_nonzero_expectation_step(distros, mixing, values, probs);
+    general_nonzero_maximization_step(values, probs, mixing, distros);
+    error = fabs((score - prev_score)/score);
+    if(error < tol){
+      break;
+    }
+    prev_score = score;
+  }
+
+  return(general_nonzero_log_l(values, distros, mixing));
+}
+
+
 int main(int argc, const char **argv) {
 
   try {
@@ -381,8 +534,7 @@ int main(int argc, const char **argv) {
       for(size_t i = 0; i < number_mixtures; i++){
         double lambda_hat = accumulate(values.begin()+i*step_size,
                               values.begin()+(i+1)*step_size, 0.0)/step_size;
-        if(lambda_hat < 0.05)
-          lambda_hat = lambda_hat + 0.05;
+        lambda_hat = lambda_hat + 0.01;
         Poiss holding_distro(lambda_hat);
         distros.push_back(holding_distro);
       }
@@ -401,7 +553,13 @@ int main(int argc, const char **argv) {
 
     double score = 0.0;
 
-    score = general_state_resolve(tolerance, max_itr, values, distros, mixing);
+    if(zeros == true)
+      score = general_state_resolve(tolerance, max_itr, values, distros, mixing);
+    
+    else
+      score = general_nonzero_state_resolve(tolerance, max_itr, values,
+                                            distros, mixing);
+    
 
     ostream* out = (outfile.empty()) ? 
       &std::cout : new std::ofstream(outfile.c_str());
@@ -411,7 +569,7 @@ int main(int argc, const char **argv) {
     } 
     *out << "mixings" << endl;
     for(size_t j = 0; j < mixing.size(); j++){
-      *out << exp(mixing[j]) << endl;
+      *out << mixing[j] << endl;
     }
     *out << "estimated log likelihood" << "\t" << score << endl;
     *out << "real log likelihood" << "\t" << real_score << endl;
