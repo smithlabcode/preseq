@@ -1,8 +1,8 @@
 #    Copyright (C) 2010 University of Southern California and
 #                       Andrew D. Smith
-#                       Timothy Dailey
+#                       Timothy Daley
 #
-#    Authors: Andrew D. Smith and Timothy Dailey
+#    Authors: Andrew D. Smith and Timothy Daley
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
