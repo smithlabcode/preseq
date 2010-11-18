@@ -17,8 +17,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-PROGS = library_complexity complexity_plot simulate_library
+PROGS = library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation
 
 LIBS = -lgsl -lgslcblas
 LIBDIR = $(SMITHLAB_CPP)/
@@ -41,18 +40,19 @@ ifdef OPT
 CFLAGS += $(OPTFLAGS)
 endif
 
-all:	$(PROGS)
 
-%.o: %.cpp %.hpp
-	$(CXX) $(CFLAGS) -c -o $@ $< -I$(COMMON_DIR)
 
-complexity_plot library_complexity simulate_library: \
-	$(addprefix $(COMMON_DIR), GenomicRegion.o rmap_os.o \
-	rmap_utils.o OptionParser.o)
+library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given_bootstrap: GenomicRegion.o rmap_utils.o OptionParser.o
 
-install: all
-	@mkdir -p $(RMAP)/bin
-	@install -m 755 $(PROGS) $(RMAP)/bin
+GenomicRegion.o: GenomicRegion.cpp GenomicRegion.hpp
+	$(CXX) $(CFLAGS) -c -o $@ $< 
+
+rmap_utils.o: rmap_utils.cpp rmap_utils.hpp
+	$(CXX) $(CFLAGS) -c -o $@ $< 
+
+OptionParser.o: OptionParser.cpp OptionParser.hpp
+	$(CXX) $(CFLAGS) -c -o $@ $< 
+
 
 %: %.cpp
 	$(CXX) $(CFLAGS) -o $@ $^ -I$(COMMON_DIR) -L$(LIBDIR) $(LIBS)
