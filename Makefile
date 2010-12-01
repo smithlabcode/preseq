@@ -42,7 +42,7 @@ endif
 
 
 
-library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given_bootstrap: GenomicRegion.o rmap_utils.o OptionParser.o
+library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given BEDsample combine_mixture: GenomicRegion.o rmap_utils.o OptionParser.o
 
 GenomicRegion.o: GenomicRegion.cpp GenomicRegion.hpp
 	$(CXX) $(CFLAGS) -c -o $@ $< 
