@@ -17,7 +17,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-PROGS = library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation
+PROGS = library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation extrapolate_library_complexity_byexpectation
 
 LIBS = -lgsl -lgslcblas
 LIBDIR = $(SMITHLAB_CPP)/
@@ -42,7 +42,7 @@ endif
 
 
 
-library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given BEDsample combine_mixture: GenomicRegion.o rmap_utils.o OptionParser.o
+library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given BEDsample combine_mixture extrapolate_library_complexity_byexpectation negbin_generator fit_trunc_negbin: GenomicRegion.o rmap_utils.o OptionParser.o
 
 GenomicRegion.o: GenomicRegion.cpp GenomicRegion.hpp
 	$(CXX) $(CFLAGS) -c -o $@ $< 
