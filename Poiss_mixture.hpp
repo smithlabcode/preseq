@@ -196,4 +196,8 @@ private:
   vector< vector<double> > Fisher_info;
 };
 
+double 
+log_sum_log_vec(const vector<double> &vals, size_t limit);
+
+
 #endif
