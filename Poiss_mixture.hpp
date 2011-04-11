@@ -1,4 +1,4 @@
-/*    NBD_mixture:
+/*    Poiss_mixture:
  *
  *    Copyright (C) 2011 University of Southern California and
  *                       Andrew D. Smith
@@ -85,13 +85,13 @@ private:
 
 };
 
-const double Poiss::max_allowed_lambda = 10000;
-const double Poiss::min_allowed_lambda = 1e-20;
-const double Poiss::tolerance = 1e-10; 
 
-class ZTP : public Poiss
-{
+
+class ZTP{
 public:
+  ZTP(const double l_): lambda(l_) {};
+  double get_lambda() const {return(lambda);};
+
   double trunc_pdf(size_t val) const {
     const double lamb = get_lambda();
     return(gsl_ran_poisson_pdf(val, lamb)/(1-exp(-lamb)));};
@@ -107,9 +107,11 @@ public:
   void trunc_estim_param_bisec(const double mean, const double tol);
   double expected_inverse_sum(const size_t sample_size,
 			      const size_t sum);
+  string tostring() const {return toa(lambda);}
+  void set_lambda(double lambda_hat) { lambda = lambda_hat;}
   //computes the expected # summands needed to reach a sum of "sum"
-
-
+private:
+  double lambda;
 };
 
 class Poiss_mixture{
@@ -140,11 +142,13 @@ private:
 class ZTP_mixture{
 public:
   ZTP_mixture(const vector<ZTP> d_,
-	      const vector<double> mix_):
-  distros(d_), mixing(mix_) {;}
+	      const vector<double> mix_,
+	      const vector< vector<double> > Fish_):
+    distros(d_), mixing(mix_), Fisher_info(Fish_) {;}
 
   vector<ZTP> get_distros() const {return distros;}
   vector<double> get_mixing() const {return mixing;}
+  vector< vector<double> > get_Fish_info() const {return Fisher_info;}
   void set_distros(const vector<ZTP> dist) { distros = dist;}
   void set_mixing(const vector<double> mix) {mixing = mix;}
 

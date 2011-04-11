@@ -55,8 +55,6 @@ using std::numeric_limits;
 
 
 
-
-
 double 
 log_sum_log_vec(const vector<double> &vals, size_t limit){
   const size_t max_idx = 
@@ -124,6 +122,12 @@ movement(const double a, const double b) {
 static inline double
 lambda_score_funct(const double mean, const double lambda){
   return(lambda + mean*exp(-lambda) - mean);
+}
+
+double
+ZTP::expected_zeros(const double pseudo_size){
+  const double lamb=get_lambda();
+  return(pseudo_size/(1-exp(-lamb)));
 }
 
 void
