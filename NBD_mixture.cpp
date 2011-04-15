@@ -69,6 +69,10 @@ log_sum_log_vec(const vector<double> &vals, size_t limit){
   return(max_val + log(sum));
 }
 
+const double NBD::max_allowed_alpha = 1000;
+const double NBD::min_allowed_alpha = 1e-20;
+const double NBD::tolerance = 1e-10; 
+
 void
 NBD::set_helpers() {
   n_helper = 1/alpha;
@@ -267,6 +271,10 @@ NBD::log_L(const vector<size_t> &vals_hist){
   return(log_L);
 }
 
+const double ZTNBD::max_allowed_alpha = 1000;
+const double ZTNBD::min_allowed_alpha = 1e-20;
+const double ZTNBD::tolerance = 1e-10; 
+
 double
 ZTNBD::expected_zeros(const double pseudo_size){
   const double alpha = get_alpha();
@@ -288,6 +296,139 @@ ZTNBD::trunc_log_pdf(const size_t val){
     holding_val += gsl_sf_lngamma(val);
   }
   return(holding_val + k*log(w) - log(1-pow(w,k)) + val*log(1-w));
+}
+
+void
+ZTNBD::set_helpers() {
+  n_helper = 1/alpha;
+  p_helper = n_helper/(n_helper + mu);
+  n_log_p_minus_lngamma_n_helper = 
+    n_helper*log(p_helper) - gsl_sf_lngamma(n_helper);
+  log_q_helper = log(1 - p_helper);
+  //TODO: check these!!!!!!!!!!!!!!!!  they are correct.
+}
+
+double 
+ZTNBD::operator()(const int val) const {
+  const double P = (gsl_sf_lngamma(val + n_helper) - 
+		    gsl_sf_lnfact(static_cast<size_t>(val))) + 
+    n_log_p_minus_lngamma_n_helper + val*log_q_helper;
+  if (!finite(P)) return -40;
+  return P;
+}
+
+
+
+
+double
+ZTNBD::score_fun_first_term(const vector<size_t> &vals_hist,
+			  const double a_mid){
+  double sum = 0;
+  for (size_t i = 0; i < vals_hist.size(); ++i)
+    if (vals_hist[i] > 0) {
+      double inner_sum = 0;
+      for (size_t j = 0; j < i; ++j)
+	inner_sum += j/(1 + a_mid*j);
+      sum += vals_hist[i]*inner_sum;
+    }
+  return sum;
+}
+
+double
+ZTNBD::alpha_score_function(const vector<size_t> &vals_hist,
+			  const double mean,
+			  const double a_mid,
+			  const double vals_count){
+  const double one_plus_alpha_mu = 1 + a_mid*mean;
+  return (score_fun_first_term(vals_hist, a_mid)/vals_count + 
+	  (log(one_plus_alpha_mu)/a_mid - mean)/a_mid); 
+}
+
+
+void 
+ZTNBD::estim_params(const vector<size_t> &vals_hist){
+  mu = compute_mean(vals_hist);
+  //mu= (1/n)sum(x), accumulate takes the sum of vals.begin
+  
+  const double vals_size = 
+    static_cast<double>(accumulate(vals_hist.begin(), 
+				   vals_hist.end(), 0));
+  
+  double a_low = min_allowed_alpha;
+  double a_high = max_allowed_alpha;
+  double a_mid = max_allowed_alpha;
+  double mid_val;
+  
+  double diff = numeric_limits<double>::max();
+  double prev_val = numeric_limits<double>::max();
+  
+  while (diff > tolerance && movement(a_high, a_low) > tolerance) {
+    a_mid = (a_low + a_high)/2;
+    mid_val = alpha_score_function(vals_hist, mu, a_mid, vals_size);
+    if (mid_val < 0) a_high = a_mid;
+    else a_low = a_mid;
+    diff = fabs((prev_val - mid_val)/prev_val);
+    prev_val = mid_val;
+  }
+  alpha = a_mid;  //bisection, but what happened to the terms involving the gamma func? See Zhang et al. top of page 7
+  set_helpers();
+}
+
+double
+ZTNBD::score_fun_first_term(const vector<double> &vals_hist,
+			  const double a_mid) {
+  double sum = 0;
+  for (size_t i = 0; i < vals_hist.size(); ++i)
+    if (vals_hist[i] > 0) {
+      double inner_sum = 0;
+      for (size_t j = 0; j < i; ++j)
+	inner_sum += j/(1 + a_mid*j);
+      sum += vals_hist[i]*inner_sum;
+    }
+  return sum; 
+}
+
+double
+ZTNBD::alpha_score_function(const vector<double> &vals_hist, 
+			  const double mean,
+			  const double a_mid,
+			  const double vals_count){
+  const double one_plus_alpha_mu = 1 + a_mid*mean;
+  return (score_fun_first_term(vals_hist, a_mid)/vals_count + 
+	  (log(one_plus_alpha_mu)/a_mid - mean)/a_mid); 
+}
+
+
+void 
+ZTNBD::estim_params(const vector<size_t> &vals_hist,
+		  const vector<double> &probs){
+  vector<double> pseudo_hist(vals_hist.size(), 0.0);
+  for(size_t i = 0; i < vals_hist.size(); i++){
+    pseudo_hist[i] = vals_hist[i]*probs[i];
+  }
+  mu = compute_mean(pseudo_hist);
+  
+  const double pseudo_size = 
+    accumulate(pseudo_hist.begin(), pseudo_hist.end(), 0.0);
+  
+  double a_low = min_allowed_alpha;
+  double a_high = max_allowed_alpha;
+  double a_mid = max_allowed_alpha;
+  double mid_val;
+  
+  double diff = numeric_limits<double>::max();
+  double prev_val = numeric_limits<double>::max();
+  
+  while (diff > tolerance && movement(a_high, a_low) > tolerance) {
+    a_mid = (a_low + a_high)/2;
+    mid_val = alpha_score_function(pseudo_hist,mu, a_mid, pseudo_size);
+    if (mid_val < 0) a_high = a_mid;
+    else a_low = a_mid;
+    diff = fabs((prev_val - mid_val)/prev_val);
+    prev_val = mid_val;
+  }
+  alpha = a_mid;  //bisection, but what happened to the terms involving the gamma func? See Zhang et al. top of page 7
+  set_helpers();
 }
 
 
@@ -439,7 +580,6 @@ NBD_mixture::maximization_step(const vector<size_t> &vals_hist,
 double 
 NBD_mixture::EM_resolve_mix(const vector<size_t> &vals_hist,
 			    const double &tol,const size_t max_iter){
-
   const size_t number_states = distros.size();
   double probs_starting_val = 1/static_cast<double>(number_states);
   vector< vector<double> > probs(number_states, 
@@ -476,6 +616,944 @@ NBD_mixture::EM_resolve_mix(const vector<size_t> &vals_hist,
   return(log_L(vals_hist));
 }
 
+
+
+
+double
+obs_fish_info_2nd_theta(const vector< vector<double> > &probs,
+			const vector<size_t> &vals_hist,
+			const vector<double> &mixing,
+			const size_t indx,
+			const double expected_zeros){
+  vector<double> log_pos_vec;
+  vector<double> log_neg_vec;
+  if(finite(log(probs[indx][0])) && expected_zeros > 0){
+    log_pos_vec.push_back(log(expected_zeros) + 2*log(probs[indx][0])
+			    -2*log(mixing[indx]));
+  }
+  if(finite(log(probs[probs.size()-1][0])) && expected_zeros > 0){
+    log_pos_vec.push_back(2*log(probs[probs.size()-1][0])
+			  +log(expected_zeros)
+			  -2*log(mixing.back()));
+  }
+  if(finite(log(probs[indx][0])) &&
+     finite(log(probs[probs.size()-1][0])) && expected_zeros > 0){
+    log_neg_vec.push_back(log(probs[indx][0])+log(probs[probs.size()-1][0])
+			  +log(expected_zeros)-log(mixing[indx])
+			  -log(mixing.back()));
+  }
+
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      if(finite(log(probs[indx][i]))){
+	log_pos_vec.push_back(log(vals_hist[i]) + 2*log(probs[indx][i])
+				-2*log(mixing[indx]));
+      }
+      if(finite(log(probs[probs.size()-1][i]))){
+	log_pos_vec.push_back(log(vals_hist[i])
+				+2*log(probs[probs.size()-1][i])
+				-2*log(mixing.back()));
+      }
+      if(finite(log(probs[indx][i])) && finite(log(probs[probs.size()-1][i]))){
+	log_neg_vec.push_back(log(vals_hist[i])+log(probs[indx][i])
+			      +log(probs[probs.size()-1][i])
+			      -log(mixing[indx])-log(mixing.back()));
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(log_pos_vec, log_pos_vec.size()))
+	 -exp(log_sum_log_vec(log_neg_vec, log_neg_vec.size())));
+}
+
+double 
+obs_fish_info_mixed_theta(const vector< vector<double> > &probs,
+			  const vector<size_t> &vals_hist,
+			  const vector<double> &mixing,
+			  const double expected_zeros,
+			  const size_t indx1,
+			  const size_t indx2){
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+  if(expected_zeros > 0){
+    if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))){
+      pos_log_vec.push_back(log(expected_zeros) + log(probs[indx1][0])
+			    +log(probs[indx2][0]) -log(mixing[indx1])
+			    -log(mixing[indx2]));
+    }
+    if(finite(log(probs[probs.size()-1][0]))){
+      pos_log_vec.push_back(log(expected_zeros)
+			    +2*log(probs[probs.size()-1][0])
+			    -2*log(mixing.back()));
+    }
+    if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))
+       && finite(log(probs[probs.size()-1][0]))){
+      neg_log_vec.push_back(log(expected_zeros)
+			    +log(probs[probs.size()-1][0])
+			    -log(mixing.back())
+			    +log(probs[indx1][0]/mixing[indx1]
+				 +probs[indx2][0]/mixing[indx2]));
+    }
+  }
+
+  for(size_t i =1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_vals_hist = log(vals_hist[i]);
+      const double log_prob_1 = log(probs[indx1][i]);
+      const double log_prob_2 = log(probs[indx2][i]);
+      const double log_last_prob = log(probs[probs.size()-1][i]);
+      if(finite(log_prob_1) &&
+	 finite(log_prob_2) &&
+	 finite(log_last_prob)){
+	neg_log_vec.push_back(log_vals_hist
+			      +log_last_prob
+			      -log(mixing.back())
+			      +log(probs[indx1][i]/mixing[indx1]
+				   +probs[indx2][i]/mixing[indx2]));
+      }
+      if(finite(log_prob_1) &&
+	 finite(log_prob_2)){
+	pos_log_vec.push_back(log_vals_hist
+			      +log_prob_1
+			      +log_prob_2
+			      -log(mixing[indx1])-log(mixing[indx2]));
+      }
+      if(finite(log_last_prob)){
+	pos_log_vec.push_back(log_vals_hist
+			      +2*log_last_prob
+			      -2*log(mixing.back()));
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+
+double
+obs_fish_info_2nd_mu(const vector< vector<double> > &probs,
+		     const vector<size_t> &vals_hist,
+		     const vector<ZTNBD> &distros,
+		     const double expected_zeros,
+		     const size_t indx){
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+  const double mu = distros[indx].get_mu();
+  const double alpha = distros[indx].get_alpha();
+  const double plus_alpha_mu = 1+alpha*mu;
+  if(expected_zeros > 0 && finite(log(probs[indx][0]))){
+    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
+			  +log(alpha)-2*log(plus_alpha_mu));
+    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
+			  -2*log(plus_alpha_mu));
+    pos_log_vec.push_back(log(expected_zeros)+2*log(probs[indx][0])
+			  -2*log(plus_alpha_mu));
+  }
+  for(size_t i =1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_vals_hist = log(vals_hist[i]);
+      const double log_prob = log(probs[indx][i]);
+      if(finite(log_prob)){
+	pos_log_vec.push_back(log_vals_hist+log_prob+log(i)
+			      -2*log(mu));
+	neg_log_vec.push_back(log_vals_hist+log_prob+log(alpha)
+			      +log(1+alpha*i)-2*log(plus_alpha_mu));
+	neg_log_vec.push_back(log_vals_hist+log_prob+2*log(i)
+			      -2*log(mu));
+	pos_log_vec.push_back(log_vals_hist+log_prob+log(2)
+			      +log(i)+log(1+alpha*i)
+			      -log(mu)-log(plus_alpha_mu));
+	neg_log_vec.push_back(log_vals_hist+log_prob
+			      +2*log(1+alpha*i)-2*log(plus_alpha_mu));
+	pos_log_vec.push_back(log_vals_hist+2*log_prob
+			      +2*log(i)-2*log(mu));
+	pos_log_vec.push_back(log_vals_hist+2*log_prob
+			      +2*log(1+alpha*i)
+			      -2*log(plus_alpha_mu));
+	neg_log_vec.push_back(log_vals_hist+2*log_prob+log(2)
+			      +log(i)+log(1+alpha*i)-log(mu)
+			      -log(plus_alpha_mu));
+      
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+
+double 
+obs_fish_info_mixed_mu(const vector< vector<double> > &probs,
+		       const vector<size_t> &vals_hist,
+		       const vector<ZTNBD> &distros,
+		       const double expected_zeros,
+		       const size_t indx1,
+		       const size_t indx2){
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+  const double mu1 = distros[indx1].get_mu();
+  const double mu2 = distros[indx2].get_mu();
+  const double alpha1 = distros[indx1].get_alpha();
+  const double alpha2 = distros[indx2].get_alpha();
+  if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))){
+    pos_log_vec.push_back(log(expected_zeros)+log(probs[indx1][0])
+			  +log(probs[indx2][0])-log(1+alpha1*mu1)
+			  -log(1+alpha1*mu1));
+  }
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_probs1 = log(probs[indx1][i]);
+      const double log_probs2 = log(probs[indx2][i]);
+      const double log_vals_hist = log(vals_hist[i]);
+      if(finite(log_probs1) && finite(log_probs2)){
+	pos_log_vec.push_back(log_vals_hist+log_probs1+log_probs2
+			      +2*log(i)-log(mu1)-log(mu2));
+	pos_log_vec.push_back(log_vals_hist+log_probs1+log_probs2
+			      +log(1+alpha1*i)+log(1+alpha2*i)
+			      -log(1+alpha1*mu1)-log(1+alpha2*mu2));
+	neg_log_vec.push_back(log_vals_hist+log_probs1+log_probs2
+			      +log(i)-log(mu1)+log(1+alpha2*i)
+			      -log(1+alpha2*mu2));
+	neg_log_vec.push_back(log_vals_hist+log_probs1+log_probs2
+			      +log(i)-log(mu2)+log(1+alpha1*i)
+			      -log(1+alpha1*mu1));
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+
+}
+
+double
+obs_fish_info_2nd_alpha(const vector< vector<double> > &probs,
+			const vector<size_t> &vals_hist,
+			const vector<ZTNBD> &distros,
+			const double expected_zeros,
+			const size_t indx){
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+
+  const double mu = distros[indx].get_mu();
+  const double alpha = distros[indx].get_alpha();
+  for(size_t i = 0; i < vals_hist.size(); i++){
+    const double log_prob = log(probs[indx][i]);
+    const double log_1_minus_prob = log(1-probs[indx][i]);
+    if(i ==0 && finite(log_prob)){
+      if(log(1+alpha*mu) > 0){
+	pos_log_vec.push_back(log(expected_zeros) + log_prob + 
+			      log(2) + log(log(1+alpha*mu)) - 3*log(alpha));
+	if(finite(log_1_minus_prob)){
+	  neg_log_vec.push_back(log(expected_zeros) + log_prob
+				+log_1_minus_prob
+				+2*log(log(1+alpha*mu))-4*log(alpha));
+	  pos_log_vec.push_back(log(expected_zeros)+log_prob
+				+log_1_minus_prob
+				+log(log(1+alpha*mu))+log(mu)
+				-3*log(alpha)-log(1+alpha*mu));
+	}
+      }
+      else if(log(1+alpha*mu) < 0){
+	neg_log_vec.push_back(log(expected_zeros)+log_prob+log(2)
+			      + log(log(1+alpha*mu)) - 3*log(alpha));
+	if(finite(log_1_minus_prob)){
+	  pos_log_vec.push_back(log(expected_zeros) + log_prob
+				+log_1_minus_prob
+				+2*log(log(1+alpha*mu))-4*log(alpha)
+				+2*log(log(1+alpha*mu))-4*log(alpha));
+	  neg_log_vec.push_back(log(expected_zeros)+log_prob
+				+log_1_minus_prob
+				+log(log(1+alpha*mu))+log(mu)
+				-3*log(alpha)-log(1+alpha*mu));
+	}
+      }
+      neg_log_vec.push_back(log(expected_zeros)+log_prob+log(2)
+			    +log(mu)-2*log(alpha)-log(1+alpha*mu)); 
+      if(finite(log_1_minus_prob)){
+	neg_log_vec.push_back(log(expected_zeros)+log_prob+log_1_minus_prob
+			      +2*log(mu)-2*log(alpha)-2*log(1+alpha*mu));
+      }
+    }
+  //not zero case
+    else{
+      if(vals_hist[i] > 0){
+	const double log_vals_hist = log(vals_hist[i]);
+	double first_deriv_sum = 0.0;
+	double second_deriv_sum = 0.0;
+	for(size_t j = 0; j < i; j++){
+	  double holding_val = j/(1+alpha*j);
+	  first_deriv_sum += holding_val;
+	  second_deriv_sum += holding_val*holding_val;
+	}
+
+	if(finite(log_prob)){
+	  pos_log_vec.push_back(log_vals_hist+log_prob+
+				log(second_deriv_sum));
+	  neg_log_vec.push_back(log_vals_hist+log_prob+log(2)
+				+log(mu)-2*log(alpha)-log(1+alpha*mu));
+	  neg_log_vec.push_back(log_vals_hist+log_prob+2*log(mu)
+				+log(1+alpha*i)-log(alpha)
+				-2*log(1+alpha*mu));
+	  if(finite(log_1_minus_prob)){
+	    if(finite(log(first_deriv_sum))){
+	      neg_log_vec.push_back(log_vals_hist+log_prob+log_1_minus_prob
+				    +2*log(first_deriv_sum));
+	      pos_log_vec.push_back(log_vals_hist+log_prob+log_1_minus_prob
+				    +log(first_deriv_sum)+log(mu)
+				    +log(1+alpha*i)-log(alpha)
+				    -log(1+alpha*mu));
+	    }
+	    neg_log_vec.push_back(log_vals_hist+log_prob+log_1_minus_prob
+				  +2*log(mu)+2*log(1+alpha*i)
+				  -2*log(alpha)-2*log(1+alpha*mu));
+	    if(log(1+alpha*mu) > 0){
+	      neg_log_vec.push_back(log_vals_hist+log_prob
+				    +log_1_minus_prob-4*log(alpha)
+				    +log(log(1+alpha*mu)));
+	      if(finite(log(first_deriv_sum))){
+		neg_log_vec.push_back(log_vals_hist+log_prob+log(2)
+				      +log_1_minus_prob+log(first_deriv_sum)
+				      +log(log(1+alpha*mu))-2*log(alpha));
+	      }
+	      pos_log_vec.push_back(log_vals_hist+log_prob+log(2)
+				    +log_1_minus_prob+log(mu)
+				    +log(1+alpha*i)-3*log(alpha)
+				    -log(1+alpha*mu)+log(log(1+alpha*mu)));
+	    }
+	    else if(log(1+alpha*mu) < 0){
+	      pos_log_vec.push_back(log_vals_hist+log_prob
+				    +log_1_minus_prob-4*log(alpha)
+				    +log(log(1+alpha*mu)));
+	      if(finite(log(first_deriv_sum))){
+		pos_log_vec.push_back(log_vals_hist+log_prob+log(2)
+				      +log_1_minus_prob+log(first_deriv_sum)
+				      +log(log(1+alpha*mu))-2*log(alpha));
+	      }
+	      neg_log_vec.push_back(log_vals_hist+log_prob+log(2)
+				    +log_1_minus_prob+log(mu)
+				    +log(1+alpha*i)-3*log(alpha)
+				    -log(1+alpha*mu)+log(log(1+alpha*mu)));
+	    }
+	  }
+	}
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+
+double
+obs_fish_info_mixed_alpha(const vector< vector<double> > &probs,
+			  const vector<size_t> &vals_hist,
+			  const vector<ZTNBD> &distros,
+			  const double expected_zeros,
+			  const double indx1,
+			  const double indx2){
+  vector<double> terms_vec;
+  const double alpha1 = distros[indx1].get_alpha();
+  const double alpha2 = distros[indx2].get_alpha();
+  const double mu1 = distros[indx1].get_mu();
+  const double mu2 = distros[indx2].get_mu();
+  terms_vec.push_back(exp(log(expected_zeros)+log(probs[indx1][0])
+			 +log(probs[indx2][0]))*
+		     (log(1+alpha1*mu1)/(alpha1*alpha1)
+		      -mu1/(alpha1*(1+alpha1*mu1)))*
+		     (log(1+alpha2*mu2)/(alpha2*alpha2)
+		      -mu2/(alpha2*(1+alpha2*mu2))));
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      double first_deriv_sum1 = 0.0;
+      double first_deriv_sum2 = 0.0;
+      for(size_t j = 0; j < i; j++){
+	first_deriv_sum1 += j/(1+alpha1*j);
+	first_deriv_sum2 += j/(1+alpha2*j);
+      }
+      terms_vec.push_back(exp(log(vals_hist[i])+log(probs[indx1][i])
+			      +log(probs[indx2][i]))*
+			  (first_deriv_sum1 + log(1+alpha1*mu1)/(alpha1*alpha1)
+			   -mu1*(1+alpha1*i)/(alpha1*(1+alpha1*mu1)))*
+			  (first_deriv_sum2+log(1+alpha2*mu2)/(alpha2*alpha2)
+			   -mu2*(1+alpha2*i)/(alpha2*(1+alpha2*mu2))));
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+
+double
+obs_fish_info_dtheta_dmu_same_indx(const vector< vector<double> > &probs,
+				   const vector<size_t> &vals_hist,
+				   const vector<ZTNBD> &distros,
+				   const vector<double> &mixing,
+				   const double expected_zeros,
+				   const size_t indx){
+  const double last_mix = mixing.back();
+  const double mix = mixing[indx];
+  const double mu = distros[indx].get_mu();
+  const double alpha = distros[indx].get_alpha();
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+
+  if(finite(log(probs[indx][0])) && expected_zeros > 0){
+    pos_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
+			  -log(1+alpha*mu));
+    neg_log_vec.push_back(log(expected_zeros)+2*log(probs[indx][0])
+			  -log(1+alpha*mu));
+    if(finite(log(probs[probs.size()-1][0]))){
+      pos_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
+			    +log(probs[probs.size()-1][0])
+			    -log(last_mix)-log(1+alpha*mu));
+    }
+  }
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_prob = log(probs[indx][i]);
+      const double log_last_prob = log(probs[probs.size()-1][i]);
+      const double log_vals_hist = log(vals_hist[i]);
+      if(finite(log_prob)){
+	neg_log_vec.push_back(log_vals_hist+log_prob-log(mix)
+			      +log(i)-log(mu));
+	pos_log_vec.push_back(log_vals_hist+log_prob+log(i)
+			      +log(alpha)-log(mix)
+			      -log(1+alpha*mu));
+	pos_log_vec.push_back(log_vals_hist+log_prob-log(mix)
+			      -log(1+alpha*mu));
+	pos_log_vec.push_back(log_vals_hist+2*log_prob+log(i)
+			      -log(mix)-log(mu));
+	neg_log_vec.push_back(log_vals_hist+2*log_prob+log(i)
+			      +log(alpha)-log(mix)
+			      -log(1+alpha*mu));
+	neg_log_vec.push_back(log_vals_hist+2*log_prob-log(mix)
+			      -log(1+alpha*mu));
+	if(finite(log_last_prob)){
+	  neg_log_vec.push_back(log_vals_hist+log_prob+log_last_prob
+				-log(last_mix)+log(i)-log(mu));
+	  pos_log_vec.push_back(log_vals_hist+log_prob+log_last_prob
+				-log(last_mix)+log(i*alpha+1)
+				-log(1+alpha*mu));
+	}
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+
+double
+obs_fish_info_dtheta_dmu_diff_indx(const vector< vector<double> > &probs,
+				   const vector<size_t> &vals_hist,
+				   const vector<ZTNBD> &distros,
+				   const vector<double> &mixing,
+				   const double expected_zeros,
+				   const size_t indx_mix,
+				   const size_t indx_mu){
+  const double mix = mixing[indx_mix];
+  const double last_mix = mixing.back();
+  const double mu = distros[indx_mu].get_mu();
+  const double alpha = distros[indx_mu].get_alpha();
+
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+
+  if(finite(log(probs[indx_mix][0])) && finite(log(probs[indx_mu][0]))
+     && expected_zeros > 0){
+    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx_mix][0])
+			  +log(probs[indx_mu][0])-log(mix)
+			  -log(1+alpha*mu));
+  }
+  if(finite(log(probs[probs.size()-1][0])) && finite(log(probs[indx_mu][0]))
+     && expected_zeros > 0){
+    pos_log_vec.push_back(log(expected_zeros) + log(probs[probs.size()-1][0])
+			  +log(probs[indx_mu][0])-log(last_mix)
+			  -log(1+alpha*mu));
+  }
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_prob_mix = log(probs[indx_mix][i]);
+      const double log_prob_mu = log(probs[indx_mu][i]);
+      const double log_prob_last = log(probs[probs.size()-1][i]);
+      const double log_vals_hist = log(vals_hist[i]);
+      if(finite(log_prob_mix) && finite(log_prob_mu)){
+	pos_log_vec.push_back(log_vals_hist+log_prob_mix+log_prob_mu
+			      -log(mix)+log(i) -log(mu));
+	neg_log_vec.push_back(log_vals_hist+log_prob_mix+log_prob_mu
+			      -log(mix)+log(1+i*alpha)
+			      -log(1+alpha*mu));
+      }
+      if(finite(log_prob_last) && finite(log_prob_mu)){
+	pos_log_vec.push_back(log_vals_hist+log_prob_last+log_prob_mu
+			      -log(last_mix)+log(i) -log(mu));
+	neg_log_vec.push_back(log_vals_hist+log_prob_last+log_prob_mu
+			      -log(last_mix)+log(1+i*alpha)
+			      -log(1+alpha*mu));
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+
+double
+obs_fish_info_dtheta_d_last_mu(const vector< vector<double> > &probs,
+			       const vector<size_t> &vals_hist,
+			       const vector<ZTNBD> &distros,
+			       const vector<double> &mixing,
+			       const double expected_zeros,
+			       const size_t indx){
+  const double mu = distros[distros.size()-1].get_mu();
+  const double alpha = distros[distros.size()-1].get_alpha();
+  const double last_mix = mixing.back();
+  const double mix = mixing[indx];
+
+  vector<double> pos_log_vec;
+  vector<double> neg_log_vec;
+
+  if(finite(log(probs[probs.size()-1][0]))){
+    neg_log_vec.push_back(log(expected_zeros)
+			  +log(probs[probs.size()-1][0])
+			  -log(last_mix)-log(1+alpha*mu));
+    pos_log_vec.push_back(log(expected_zeros)
+			  +2*log(probs[probs.size()-1][0])
+			  -log(last_mix)-log(1+alpha*mu));
+    if(finite(log(probs[indx][0]))){
+      neg_log_vec.push_back(log(expected_zeros)
+			    +log(probs[indx][0])
+			    +log(probs[probs.size()-1][0])
+			    -log(mix)-log(1+alpha*mu));
+    }
+  }
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_last_prob = log(probs[probs.size()-1][i]);
+      const double log_prob = log(probs[indx][i]);
+      const double log_vals_hist = log(vals_hist[i]);
+      if(finite(log_last_prob)){
+	pos_log_vec.push_back(log_vals_hist+log_last_prob
+			      -log(last_mix)+log(i)-log(mu));
+	neg_log_vec.push_back(log_vals_hist+log_last_prob
+			      -log(last_mix)+log(1+alpha*i)
+			      -log(1+alpha*mu));
+	neg_log_vec.push_back(log_vals_hist+2*log_last_prob
+			      -log(last_mix)+log(i)-log(mu));
+	pos_log_vec.push_back(log_vals_hist+2*log_last_prob
+			      -log(last_mix)+log(1+alpha*i)
+			      -log(1+alpha*mu));
+	if(finite(log_prob)){
+	  pos_log_vec.push_back(log_vals_hist+log_prob+log_last_prob
+				-log(mix)+log(i)-log(mu));
+	  neg_log_vec.push_back(log_vals_hist+log_prob+log_last_prob
+				-log(mix)+log(1+alpha*i)
+				-log(1+alpha*mu));
+	}
+      }
+    }
+  }
+  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
+	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+}
+      
+double
+obs_fish_info_dtheta_dalpha_same_indx(const vector< vector<double> > &probs,
+				      const vector<size_t> &vals_hist,
+				      const vector<ZTNBD> &distros,
+				      const vector<double> &mixing,
+				      const double expected_zeros,
+				      const size_t indx){
+  const double mu = distros[indx].get_mu();
+  const double alpha = distros[indx].get_alpha();
+  const double mix = mixing[indx];
+  const double last_mix = mixing.back();
+  vector<double> terms_vec;
+  terms_vec.push_back(-expected_zeros*probs[indx][0]*(1-probs[indx][0])*
+		      (log(1+alpha*mu)/(alpha*alpha)-mu/(alpha*(1+alpha*mu)))
+		      /mix);
+  terms_vec.push_back(-expected_zeros*probs[indx][0]*probs[probs.size()-1][0]*
+		      log(1+alpha*mu)/(alpha*alpha)-
+		      mu/(alpha*(1+alpha*mu))/last_mix);
+  for(size_t i  = 0; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      double inner_sum = 0;
+      for(size_t j = 0; j < i; j++){
+	inner_sum += j/(1+alpha*j);
+      }
+      const double prob = probs[indx][i];
+      const double last_prob = probs[probs.size()-1][i];
+      terms_vec.push_back(-vals_hist[i]*prob*(1-prob)*
+			  (inner_sum+log(1+alpha*mu)/(alpha*alpha)
+			   -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/mix);
+      terms_vec.push_back(-vals_hist[i]*prob*last_prob*
+			  (inner_sum+log(1+alpha*mu)/(alpha*alpha)
+			   -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/last_mix);
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+double
+obs_fish_info_dtheta_dalpha_diff_indx(const vector< vector<double> > &probs,
+				      const vector<size_t> &vals_hist,
+				      const vector<ZTNBD> &distros,
+				      const vector<double> &mixing,
+				      const double expected_zeros,
+				      const size_t indx_mix,
+				      const size_t indx_alpha){
+  const double alpha = distros[indx_alpha].get_alpha();
+  const double mu = distros[indx_alpha].get_mu();
+  const double mix = mixing[indx_mix];
+  const double last_mix = mixing.back();
+
+  vector<double> terms_vec;
+  terms_vec.push_back(expected_zeros*probs[indx_mix][0]*probs[indx_alpha][0]*
+		      (log(1+alpha*mu)/(alpha*alpha)
+		       -mu/(alpha*(1+alpha*mu)))/mix);
+  terms_vec.push_back(-expected_zeros*probs[indx_alpha][0]*
+		      probs[probs.size()-1][0]*
+		      (log(1+alpha*mu)/(alpha*alpha)
+		       -mu/(alpha*(1+alpha*mu)))/last_mix);
+  for(size_t  i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double prob_alpha = probs[indx_alpha][i];
+      const double prob_mix = probs[indx_mix][i];
+      const double prob_last = probs[probs.size()-1][i];
+      double inner_sum =  0.0;
+      for(size_t j =0; j < i; j++){
+	inner_sum += j/(1+alpha*j);
+      }
+      const double hist = static_cast<double>(vals_hist[i]);
+      terms_vec.push_back(hist*prob_mix*prob_alpha*
+			  (inner_sum+ log(1+alpha*mu)/(alpha*alpha)
+			   -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/mix);
+      terms_vec.push_back(-hist*prob_last*prob_alpha*
+			  (inner_sum+ log(1+alpha*mu)/(alpha*alpha)
+			   -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/last_mix);
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+double 
+obs_fish_info_dtheta_d_last_alpha(const vector< vector<double> > &probs,
+				  const vector<size_t> &vals_hist,
+				  const vector<ZTNBD> &distros,
+				  const vector<double> &mixing,
+				  const double expected_zeros,
+				  const size_t indx){
+  const double alpha = distros[distros.size()-1].get_alpha();
+  const double mu = distros[distros.size()-1].get_mu();
+  const double last_mix = mixing.back();
+  const double mix = mixing[indx];
+  double last_prob = probs[probs.size()-1][0];
+  vector<double> terms_vec;
+  terms_vec.push_back(expected_zeros*last_prob*(1-last_prob)*
+		      (log(1+alpha*mu)/(alpha*alpha)
+		       -mu/(alpha*(1+alpha*mu)))/last_mix);
+  terms_vec.push_back(expected_zeros*last_prob*probs[indx][0]*
+		      (log(1+alpha*mu)/(alpha*alpha)
+		       -mu/(alpha*(1+alpha*mu)))/mix);
+  for(size_t  i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      last_prob = probs[probs.size()-1][i];
+      const double prob = probs[indx][i];
+      const double hist = static_cast<double>(vals_hist[i]);
+      double inner_sum = 0.0;
+      for(size_t j = 0; j < i; j++){
+	inner_sum += j/(1+alpha*j);
+      }
+      terms_vec.push_back(hist*last_prob*(1-last_prob)*
+			 (inner_sum+log(1+alpha*mu)/(alpha*alpha)
+			  -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/last_mix);
+      terms_vec.push_back(hist*last_prob*prob*
+			 (inner_sum+log(1+alpha*mu)/(alpha*alpha)
+			  -mu*(1+alpha*i)/(alpha*(1+alpha*mu)))/mix);
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+double
+obs_fish_info_dmu_dalpha_same_indx(const vector< vector<double> > &probs,
+				   const vector<size_t> &vals_hist,
+				   const vector<ZTNBD> &distros,
+				   const double expected_zeros,
+				   const size_t indx){
+  const double alpha = distros[indx].get_alpha();
+  const double mu = distros[indx].get_mu();
+  const double log_mu=log(mu);
+  const double log_alpha = log(alpha);
+  const double log_alpha_mu = log(1+alpha*mu);
+
+  vector<double> terms_vec;
+
+  const double log_prob_zero = log(probs[indx][0]);
+  const double log_1_minus_prob_zero = log(1-probs[indx][0]);
+  const double log_e_zeros = log(expected_zeros);
+  if(finite(log_prob_zero) && expected_zeros > 0){
+    terms_vec.push_back(-exp(log_e_zeros + log_prob_zero + log_mu
+			     -2*log_alpha_mu));
+    terms_vec.push_back(exp(log_e_zeros+log_prob_zero
+			    +log_1_minus_prob_zero-log_alpha_mu
+			    -2*log_alpha));
+    terms_vec.push_back(-exp(log_e_zeros+log_prob_zero
+			     +log_1_minus_prob_zero-log_alpha_mu
+			     +log_mu-log_alpha-log_alpha_mu));
+  }
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_prob = log(probs[indx][i]);
+      const double log_one_minus_prob = log(1-probs[indx][i]);
+      const double log_alpha_i = log(alpha*i+1);
+      const double log_vals_hist = log(vals_hist[i]);
+      if(finite(log_prob)){
+	terms_vec.push_back(exp(log_vals_hist+log_prob+log(i)
+				-log_alpha_mu));
+	terms_vec.push_back(-exp(log_vals_hist+log_prob+log(mu)
+				 +log_alpha_i-2*log_alpha_mu));
+	if(finite(log_one_minus_prob)){
+	  double inner_sum = 0.0;
+	  for(size_t j = 0; j < i; j++)
+	    inner_sum += j/(1+j*alpha);
+
+	  terms_vec.push_back(-exp(log_vals_hist+log_prob
+				   +log_one_minus_prob+log(i)
+				   +log(inner_sum)-log_mu
+				   -log_alpha_mu));
+	  terms_vec.push_back(-exp(log_vals_hist+log_prob
+				   +log_one_minus_prob+log(i)
+				   -log_mu-2*log_alpha)*log_alpha_mu);
+	  terms_vec.push_back(exp(log_vals_hist+log_prob+
+				  log_one_minus_prob+log(i)
+				  -log_alpha-log_alpha_mu+log_alpha_i));
+	  terms_vec.push_back(exp(log_vals_hist+log_prob
+				  +log_one_minus_prob+log(inner_sum)
+				  +log_alpha_i-log_alpha_mu));
+	  terms_vec.push_back(exp(log_vals_hist+log_prob
+				  +log_one_minus_prob+log_alpha_i
+				  -log_alpha_mu-2*log_alpha)*log_alpha_mu);
+	  terms_vec.push_back(-exp(log_vals_hist+log_one_minus_prob
+				   +log_prob+2*log_alpha_i+log_mu
+				   -log_alpha-3*log_alpha_mu));
+	}
+      }
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+double
+obs_fish_info_dmu_dalpha_diff_indx(const vector< vector<double> > &probs,
+				   const vector<size_t> &vals_hist,
+				   const vector<ZTNBD> &distros,
+				   const double expected_zeros,
+				   const size_t indx_mu,
+				   const size_t indx_alpha){
+
+  const double alpha1 = distros[indx_mu].get_alpha();
+  const double mu1 = distros[indx_mu].get_mu();
+  const double alpha2 = distros[indx_alpha].get_alpha();
+  const double mu2 = distros[indx_alpha].get_mu();
+  const double log_alpha_mu_1 = log(1+alpha1*mu1);
+  const double log_alpha_mu_2 = log(1+alpha2*mu2);
+
+  vector<double> terms_vec;
+  terms_vec.push_back(exp(log(expected_zeros)+log(probs[indx_mu][0])
+			  +log(probs[indx_alpha][0]) - log_alpha_mu_1)*
+		      (-log_alpha_mu_2/(alpha2*alpha2)+
+		       exp(log(mu2)-log(alpha2)-log_alpha_mu_2)));
+  for(size_t i = 1; i < vals_hist.size(); i++){
+    if(vals_hist[i] > 0){
+      const double log_vals_hist = log(vals_hist[i]);
+      const double log_probs = 
+	log(probs[indx_mu][i])+log(probs[indx_alpha][i]);
+      double inner_sum = 0.0;
+      for(size_t j = 0; j < i; j++)
+	inner_sum += j/(1+alpha2*j);
+      
+      if(finite(log_probs)){
+	terms_vec.push_back(exp(log_vals_hist+log_probs+log(i)-log(mu1)
+				+log(inner_sum)));
+	terms_vec.push_back(exp(log_vals_hist+log_probs+log(i)
+				-log(mu1)-2*log(alpha2))*log(1+alpha2*mu2));
+	terms_vec.push_back(-exp(log_vals_hist+log_probs+log(i)
+				 -log(mu1)+log(mu2)+log(1+alpha2*i)
+				 -log(1+alpha2*mu2)));
+	terms_vec.push_back(-exp(log_vals_hist+log_probs
+				 +log(1+alpha1*i)-log(1+alpha1*mu1)
+				 +log(inner_sum)));
+	terms_vec.push_back(-exp(log_vals_hist+log_probs
+				 +log(1+alpha1*i)-log(1+alpha1*mu1)
+				 -2*log(alpha2))*log(1+alpha2*mu2));
+	terms_vec.push_back(exp(log_vals_hist+log_probs
+				+log(1+alpha1*i)-log(1+alpha1*mu1)
+				+log(mu2)+log(1+alpha2*i)
+				-log(alpha2)-log(1+alpha2*mu2)));
+      }
+    }
+  }
+  return(accumulate(terms_vec.begin(), terms_vec.end(), 0.0));
+}
+
+
+
+
+
+
+void
+ZTNBD_mixture::compute_Fisher_info(const vector< vector<double> > &probs,
+				   const vector<size_t> &vals_hist,
+				   const vector<double> &mixing,
+				   const double expected_zeros){
+  const vector<ZTNBD> distros = get_distros();
+  const size_t num_mixs=mixing.size();
+  vector< vector<double> > holding_fish(3*num_mixs-1, 
+					vector<double>(3*num_mixs-1, 0.0));
+  cerr << "dim of Fish  = " << holding_fish.size() << "\t" 
+       <<holding_fish[0].size() << "\n";
+  cerr << "theta info = ";
+  for(size_t i = 0; i < num_mixs-1; i++){
+    for(size_t j = i; j < num_mixs-1; j++){
+      if(j == i){
+	holding_fish[i][j] = obs_fish_info_2nd_theta(probs, vals_hist,
+						     mixing, i, 
+						     expected_zeros);
+	cerr << holding_fish[i][j] << "\t";
+	
+      }
+      else{
+	holding_fish[i][j] = obs_fish_info_mixed_theta(probs, vals_hist,
+						       mixing, expected_zeros,
+						       i, j);
+	holding_fish[j][i] = holding_fish[i][j];
+	cerr << holding_fish[i][j] << "\t";
+      }
+    }
+  }
+  cerr << "\n mu derivs = ";
+  for(size_t i = 0; i < num_mixs; i++){
+    for(size_t j = i; j < num_mixs; j++){
+      if(j==i){
+	holding_fish[i+num_mixs-1][j+num_mixs-1] = 
+	  obs_fish_info_2nd_mu(probs, vals_hist, distros,
+			       expected_zeros, i);
+	cerr << holding_fish[i+num_mixs-1][j+num_mixs-1] << "\t";
+
+      }
+      else{
+	holding_fish[i+num_mixs-1][j+num_mixs-1] = 
+	  obs_fish_info_mixed_mu(probs, vals_hist, distros,
+				 expected_zeros, i, j);
+	holding_fish[j+num_mixs-1][i+num_mixs-1] = 
+	  holding_fish[i+num_mixs-1][j+num_mixs-1];
+	cerr << holding_fish[i+num_mixs-1][j+num_mixs-1] << "\t";
+      }
+    }
+  }
+  cerr << "\n alpha derivs = ";
+  for(size_t i = 0; i < num_mixs; i++){
+    for(size_t j = i; j < num_mixs; j++){
+      if(j==i){
+	holding_fish[i+2*num_mixs-1][j+2*num_mixs-1] = 
+	  obs_fish_info_2nd_alpha(probs, vals_hist, distros,
+				  expected_zeros, i);
+	cerr << holding_fish[i+2*num_mixs-1][j+2*num_mixs-1] << "\t";
+
+      }
+      else{
+	holding_fish[i+2*num_mixs-1][j+2*num_mixs-1] = 
+	  obs_fish_info_mixed_alpha(probs, vals_hist, distros,
+				    expected_zeros, i, j);
+	holding_fish[j+2*num_mixs-1][i+2*num_mixs-1] = 
+	  holding_fish[i+2*num_mixs-1][j+2*num_mixs-1];
+	cerr << holding_fish[i+2*num_mixs-1][j+2*num_mixs-1] << "\t";
+      }
+    }
+  }
+  cerr << "\n mu cros theta info = ";
+  for(size_t i = 0; i < num_mixs-1; i++){
+    for(size_t j = 0; j < num_mixs-1; j++){
+      if(j==i){
+	holding_fish[i][j+num_mixs-1] = 
+	  obs_fish_info_dtheta_dmu_same_indx(probs, vals_hist,
+					     distros, mixing, 
+					     expected_zeros, i);
+	holding_fish[j+num_mixs-1][i] = 
+	  holding_fish[i][j+num_mixs-1];
+	cerr << holding_fish[i][j+num_mixs-1] << "\t";
+      }
+      else{
+	holding_fish[i][j+num_mixs-1] = 
+	  obs_fish_info_dtheta_dmu_diff_indx(probs, vals_hist,
+					     distros, mixing, 
+					     expected_zeros, i, j);
+	holding_fish[j+num_mixs-1][i] = 
+	  holding_fish[i][j+num_mixs-1];
+	cerr << holding_fish[i][j+num_mixs-1] << "\t";
+      }
+    }
+  }
+  for(size_t i = 0; i < num_mixs-1; i++){
+    holding_fish[i][2*num_mixs-2] = 
+      obs_fish_info_dtheta_d_last_mu(probs, vals_hist, distros,
+				     mixing, expected_zeros, i);
+    holding_fish[2*num_mixs-2][i] = 
+      holding_fish[i][2*num_mixs-2];
+    cerr << holding_fish[i][2*num_mixs-2] << "\t";
+  }
+  cerr << "\n alpha cross theta terms = ";
+  for(size_t i = 0; i < num_mixs-1; i++){
+    for(size_t j = 0; j < num_mixs-1; j++){
+      if(j==i){
+	holding_fish[i][j+2*num_mixs-1] = 
+	  obs_fish_info_dtheta_dalpha_same_indx(probs, vals_hist,
+						distros, mixing,
+						expected_zeros, i);
+	holding_fish[j+2*num_mixs-1][i] = 
+	  holding_fish[i][j+2*num_mixs-1];
+	cerr << holding_fish[i][j+2*num_mixs-1] << "\t";
+      }
+      else{
+	holding_fish[i][j+2*num_mixs-1] = 
+	  obs_fish_info_dtheta_dalpha_diff_indx(probs, vals_hist,
+						distros, mixing, 
+						expected_zeros, i, j);
+	holding_fish[j+2*num_mixs-1][i] = 
+	  holding_fish[i][j+2*num_mixs-1];
+	cerr << holding_fish[i][j+2*num_mixs-1] << "\t";
+      }
+    }
+  }
+  for(size_t i = 0; i < num_mixs-1; i++){
+    holding_fish[i][3*num_mixs-2] = 
+      obs_fish_info_dtheta_d_last_alpha(probs, vals_hist,
+					distros, mixing, 
+					expected_zeros, i);
+    holding_fish[3*num_mixs-2][i] = holding_fish[i][3*num_mixs-2];
+    cerr << holding_fish[3*num_mixs-2][i] << "\t";
+  }
+  cerr << "\n alpha cross mu terms = ";
+
+  for(size_t i = 0; i < num_mixs; i++){
+    for(size_t j = i; j < num_mixs; j++){
+      if(j==i){
+	holding_fish[2*num_mixs-1+i][num_mixs-1+j] = 
+	  obs_fish_info_dmu_dalpha_same_indx(probs, vals_hist,
+					     distros, expected_zeros, i);
+	holding_fish[num_mixs-1+j][2*num_mixs-1+i] = 
+	  holding_fish[2*num_mixs-1+i][num_mixs-1+j];
+	cerr << holding_fish[2*num_mixs-1+i][num_mixs-1+j] << "\t";
+      }
+      else{
+	holding_fish[2*num_mixs-1+i][num_mixs-1+j] =
+	  obs_fish_info_dmu_dalpha_diff_indx(probs, vals_hist,
+					     distros, expected_zeros,
+					     i, j);
+	holding_fish[num_mixs-1+j][2*num_mixs-1+i] = 
+	  holding_fish[2*num_mixs-1+i][num_mixs-1+j];
+	cerr << holding_fish[2*num_mixs-1+i][num_mixs-1+j] << "\t";
+      }
+    }
+  }
+  cerr << "\n done with fisher info \n";
+  set_Fish_info(holding_fish);
+
+}
 
 
 double 
@@ -519,7 +1597,7 @@ ZTNBD_mixture::trunc_calculate_mixing(const vector<size_t> &vals_hist,
 void
 ZTNBD_mixture::trunc_expectation_step(const vector<size_t> &vals_hist,
 				      vector< vector<double> > &probs){
-  for(size_t i = 1; i < vals_hist.size(); i++){
+  for(size_t i = 0; i < vals_hist.size(); i++){
     vector<double> log_denom_vec;
     
     for(size_t j = 0; j < distros.size(); j++){
@@ -551,11 +1629,29 @@ ZTNBD_mixture::trunc_maximization_step(const vector<size_t> &vals_hist,
   }
 }
 
+void
+ZTNBD_mixture::compute_mixing_w_zeros(const size_t sample_size,
+				      vector<double> &mixing){
+  vector<double> log_genome_lengths;
+  vector<ZTNBD> distros= get_distros();
+  for(size_t i = 0; i < mixing.size(); i++){
+    log_genome_lengths.push_back(log(mixing[i])+log(sample_size)
+				 -log(1-exp(-log(1+distros[i].get_mu()*
+						 distros[i].get_alpha())
+					    /distros[i].get_alpha())));
+  }
+  double log_total_length = log_sum_log_vec(log_genome_lengths,
+					    log_genome_lengths.size());
+  for(size_t i = 0; i < mixing.size(); i++){
+    mixing[i] = exp(log_genome_lengths[i]-log_total_length);
+  }
+}
+
 double 
 ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
 					const size_t max_iter,
 					vector<size_t> &vals_hist){
-
+  const size_t vals_size = accumulate(vals_hist.begin(), vals_hist.end(), 0);
   const size_t number_states = distros.size();
   double probs_starting_val = 1/static_cast<double>(number_states);
   vector< vector<double> > probs(number_states, 
@@ -580,7 +1676,9 @@ ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
     vals_hist[0] = round(expected_zeros);
 
     trunc_maximization_step(vals_hist, probs);
+
     vals_hist[0] = 0;
+
     trunc_calculate_mixing(vals_hist, probs);
 
     score = trunc_log_L(vals_hist);
@@ -589,8 +1687,20 @@ ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
       break;
     }
     prev_score = score;
-
   }
+  //Compute Fisher_info, remember wrt to q, not theta
+    vector<double> mixing_w_zeros(mixing);
+   /*   compute_mixing_w_zeros(vals_size, mixing_w_zeros); */
+  double expected_zeros = 0.0;
+  for(size_t j = 0; j < distros.size(); j++){
+    double psuedo_size = 0.0;
+    for(size_t l = 1; l < vals_hist.size(); l++){
+      psuedo_size += vals_hist[l]*probs[j][l];
+    }
+    expected_zeros += distros[j].expected_zeros(psuedo_size);
+  }
+  cerr << "expected zeros = " << expected_zeros << "\n";
+  compute_Fisher_info(probs, vals_hist,mixing_w_zeros , expected_zeros);
 
   return(trunc_log_L(vals_hist));
 }
