@@ -521,31 +521,15 @@ main(int argc, const char **argv){
     }
     const string input_file_name = leftover_args.front();
     /**********************************************************************/
-
     vector<size_t> values;
-    std::ifstream in(input_file_name.c_str());
-    if (!in) 
-      throw BEDFileException("cannot open input file " + input_file_name);
-    static const size_t buffer_size = 10000; // Magic!
-    char buffer[buffer_size];
-    in.getline(buffer, buffer_size);
-    double real_score = atof(buffer);
-    while (!in.eof()){
-      int holding_val = 0;
-      char buffer[buffer_size];
-      in.getline(buffer, buffer_size);
-      holding_val = atoi(buffer);
-      if(!(holding_val >= 0)){
-        cerr << "Invalid Input.\n";
-      }
-      assert(holding_val >= 0);
-      values.push_back(holding_val);
-    }
-    in.close();
-    values.pop_back();
+    vector<SimpleGenomicRegion> read_locations;
+    ReadBEDFile(input_file_name, read_locations);
+    if (!check_sorted(read_locations))
+      throw RMAPException("read_locations not sorted");
 
+    get_counts(read_locations, values);
+    size_t values_size = values.size();
 
-    const size_t values_size = values.size();
     const size_t max_value = *std::max_element(values.begin(),values.end());
     vector<size_t> vals_hist(max_value + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i){
