@@ -395,20 +395,6 @@ resamplevals(const gsl_rng *rng,
     sample[i] = vals[indx_sample[i]];
 }
 
-static double
-calculate_expected_unique(const size_t sample_size,
-                          const vector<double> &current_lambdas,
-                          const vector<double> &mixing){
-
-  vector<double> M_vec;
-  for(size_t i = 0; i < current_lambdas.size(); i++){
-    const double mean = current_lambdas[i]/(1-exp(-current_lambdas[i]));
-    M_vec.push_back(mixing[i]*sample_size/mean);
-  }
-
-  return(accumulate(M_vec.begin(), M_vec.end(), 0.0));
-}
-
 static void
 compute_log_normalizing_constant(const double lambda,
                                  double &log_normalizing_constant){
@@ -889,7 +875,9 @@ main(int argc, const char **argv){
 							  0.0));
 	ZTP_mixture ZTP_mix(distros, mixing, Fish_info);
 
-	double score = ZTP_mix.EM_mix_resolve(vals_hist, tolerance, max_iter);
+	double score = 
+	  ZTP_mix.EM_mix_resolve(sample_hist, tolerance, max_iter);
+	score++; //do something with score, need it earlier
 	vector<double> expect_MN;
 	for(size_t i = step_btwn_extra; i <= extrapolation_size;
 	    i += step_btwn_extra){
@@ -921,11 +909,15 @@ main(int argc, const char **argv){
       }
       ostream* out = (outfile.empty()) ? 
 	&std::cout : new std::ofstream(outfile.c_str());
+      size_t time_step = step_btwn_extra;
       for(size_t i = 0; i < bootstrap_MN.size(); i++){
+	*out << time_step << "\t";
 	for(size_t j = 0; j < bootstrap_MN[i].size(); j++){
 	  *out << bootstrap_MN[i][j] << "\t";
 	}
 	*out << endl;
+	time_step += step_btwn_extra;
+
       }  
     }
 

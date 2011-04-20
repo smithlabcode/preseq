@@ -684,7 +684,8 @@ main(int argc, const char **argv){
 	ZTNBD_mixture ZTNBD_mix(distros, mixing, Fish_info);
 
 	double score = 
-	  ZTNBD_mix.EM_resolve_mix_add_zeros(tolerance, max_iter, vals_hist);
+	  ZTNBD_mix.EM_resolve_mix_add_zeros(tolerance, max_iter, sample_hist);
+	score++; //do something with score, doesn't matter
 	vector<double> expect_MN;
 	for(size_t i = step_btwn_extra; i <= extrapolation_size;
 	    i += step_btwn_extra){

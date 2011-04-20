@@ -592,14 +592,6 @@ NBD_mixture::EM_resolve_mix(const vector<size_t> &vals_hist,
   for (size_t i = 0; i < max_iter; ++i){
 
     expectation_step(vals_hist, probs);
- 
-    double expected_zeros = 0.0;
-    for(size_t j = 0; j < distros.size(); j++){
-      double psuedo_size = 0.0;
-      for(size_t l = 1; l < vals_hist.size(); l++){
-	psuedo_size += vals_hist[l]*probs[j][l];
-      }
-     }
 
     maximization_step(vals_hist, probs);
     calculate_mixing(vals_hist, probs);
@@ -627,23 +619,7 @@ obs_fish_info_2nd_theta(const vector< vector<double> > &probs,
 			const double expected_zeros){
   vector<double> log_pos_vec;
   vector<double> log_neg_vec;
-  /*
-  if(finite(log(probs[indx][0])) && expected_zeros > 0){
-    log_pos_vec.push_back(log(expected_zeros) + 2*log(probs[indx][0])
-			    -2*log(mixing[indx]));
-  }
-  if(finite(log(probs[probs.size()-1][0])) && expected_zeros > 0){
-    log_pos_vec.push_back(2*log(probs[probs.size()-1][0])
-			  +log(expected_zeros)
-			  -2*log(mixing.back()));
-  }
-  if(finite(log(probs[indx][0])) &&
-     finite(log(probs[probs.size()-1][0])) && expected_zeros > 0){
-    log_neg_vec.push_back(log(probs[indx][0])+log(probs[probs.size()-1][0])
-			  +log(expected_zeros)-log(mixing[indx])
-			  -log(mixing.back()));
-  }
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       if(finite(log(probs[indx][i]))){
@@ -675,28 +651,7 @@ obs_fish_info_mixed_theta(const vector< vector<double> > &probs,
 			  const size_t indx2){
   vector<double> pos_log_vec;
   vector<double> neg_log_vec;
-  /*
-  if(expected_zeros > 0){
-    if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))){
-      pos_log_vec.push_back(log(expected_zeros) + log(probs[indx1][0])
-			    +log(probs[indx2][0]) -log(mixing[indx1])
-			    -log(mixing[indx2]));
-    }
-    if(finite(log(probs[probs.size()-1][0]))){
-      pos_log_vec.push_back(log(expected_zeros)
-			    +2*log(probs[probs.size()-1][0])
-			    -2*log(mixing.back()));
-    }
-    if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))
-       && finite(log(probs[probs.size()-1][0]))){
-      neg_log_vec.push_back(log(expected_zeros)
-			    +log(probs[probs.size()-1][0])
-			    -log(mixing.back())
-			    +log(probs[indx1][0]/mixing[indx1]
-				 +probs[indx2][0]/mixing[indx2]));
-    }
-  }
-  */
+
   for(size_t i =1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_vals_hist = log(vals_hist[i]);
@@ -741,16 +696,7 @@ obs_fish_info_2nd_mu(const vector< vector<double> > &probs,
   const double mu = distros[indx].get_mu();
   const double alpha = distros[indx].get_alpha();
   const double plus_alpha_mu = 1+alpha*mu;
-  /*
-  if(expected_zeros > 0 && finite(log(probs[indx][0]))){
-    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
-			  +log(alpha)-2*log(plus_alpha_mu));
-    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
-			  -2*log(plus_alpha_mu));
-    pos_log_vec.push_back(log(expected_zeros)+2*log(probs[indx][0])
-			  -2*log(plus_alpha_mu));
-  }
-  */
+
   for(size_t i =1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_vals_hist = log(vals_hist[i]);
@@ -796,13 +742,7 @@ obs_fish_info_mixed_mu(const vector< vector<double> > &probs,
   const double mu2 = distros[indx2].get_mu();
   const double alpha1 = distros[indx1].get_alpha();
   const double alpha2 = distros[indx2].get_alpha();
-  /*
-  if(finite(log(probs[indx1][0])) && finite(log(probs[indx2][0]))){
-    pos_log_vec.push_back(log(expected_zeros)+log(probs[indx1][0])
-			  +log(probs[indx2][0])-log(1+alpha1*mu1)
-			  -log(1+alpha1*mu1));
-  }
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_probs1 = log(probs[indx1][i]);
@@ -842,47 +782,6 @@ obs_fish_info_2nd_alpha(const vector< vector<double> > &probs,
   for(size_t i = 1; i < vals_hist.size(); i++){
     const double log_prob = log(probs[indx][i]);
     const double log_1_minus_prob = log(1-probs[indx][i]);
-
-    /*
-    if(i ==0 && finite(log_prob)){
-      if(log(1+alpha*mu) > 0){
-	pos_log_vec.push_back(log(expected_zeros) + log_prob + 
-			      log(2) + log(log(1+alpha*mu)) - 3*log(alpha));
-	if(finite(log_1_minus_prob)){
-	  neg_log_vec.push_back(log(expected_zeros) + log_prob
-				+log_1_minus_prob
-				+2*log(log(1+alpha*mu))-4*log(alpha));
-	  pos_log_vec.push_back(log(expected_zeros)+log_prob
-				+log_1_minus_prob
-				+log(log(1+alpha*mu))+log(mu)
-				-3*log(alpha)-log(1+alpha*mu));
-	}
-      }
-      else if(log(1+alpha*mu) < 0){
-	neg_log_vec.push_back(log(expected_zeros)+log_prob+log(2)
-			      + log(log(1+alpha*mu)) - 3*log(alpha));
-	if(finite(log_1_minus_prob)){
-	  pos_log_vec.push_back(log(expected_zeros) + log_prob
-				+log_1_minus_prob
-				+2*log(log(1+alpha*mu))-4*log(alpha)
-				+2*log(log(1+alpha*mu))-4*log(alpha));
-	  neg_log_vec.push_back(log(expected_zeros)+log_prob
-				+log_1_minus_prob
-				+log(log(1+alpha*mu))+log(mu)
-				-3*log(alpha)-log(1+alpha*mu));
-	}
-      }
-      neg_log_vec.push_back(log(expected_zeros)+log_prob+log(2)
-			    +log(mu)-2*log(alpha)-log(1+alpha*mu)); 
-      if(finite(log_1_minus_prob)){
-	neg_log_vec.push_back(log(expected_zeros)+log_prob+log_1_minus_prob
-			      +2*log(mu)-2*log(alpha)-2*log(1+alpha*mu));
-      }
-    }
-    
-  //not zero case
-    else{
-    */
       if(vals_hist[i] > 0){
 
 	const double log_vals_hist = log(vals_hist[i]);
@@ -919,7 +818,6 @@ obs_fish_info_2nd_alpha(const vector< vector<double> > &probs,
 	  }
 	}
       }
-      // }
   }
   return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
 	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
@@ -937,14 +835,7 @@ obs_fish_info_mixed_alpha(const vector< vector<double> > &probs,
   const double alpha2 = distros[indx2].get_alpha();
   const double mu1 = distros[indx1].get_mu();
   const double mu2 = distros[indx2].get_mu();
-  /*
-  terms_vec.push_back(exp(log(expected_zeros)+log(probs[indx1][0])
-			 +log(probs[indx2][0]))*
-		     (log(1+alpha1*mu1)/(alpha1*alpha1)
-		      -mu1/(alpha1*(1+alpha1*mu1)))*
-		     (log(1+alpha2*mu2)/(alpha2*alpha2)
-		      -mu2/(alpha2*(1+alpha2*mu2))));
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       double first_deriv_sum1 = 0.0;
@@ -978,19 +869,7 @@ obs_fish_info_dtheta_dmu_same_indx(const vector< vector<double> > &probs,
   const double alpha = distros[indx].get_alpha();
   vector<double> pos_log_vec;
   vector<double> neg_log_vec;
-  /*
-  if(finite(log(probs[indx][0])) && expected_zeros > 0){
-    pos_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
-			  -log(1+alpha*mu));
-    neg_log_vec.push_back(log(expected_zeros)+2*log(probs[indx][0])
-			  -log(1+alpha*mu));
-    if(finite(log(probs[probs.size()-1][0]))){
-      pos_log_vec.push_back(log(expected_zeros)+log(probs[indx][0])
-			    +log(probs[probs.size()-1][0])
-			    -log(last_mix)-log(1+alpha*mu));
-    }
-  }
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_prob = log(probs[indx][i]);
@@ -1040,20 +919,7 @@ obs_fish_info_dtheta_dmu_diff_indx(const vector< vector<double> > &probs,
 
   vector<double> pos_log_vec;
   vector<double> neg_log_vec;
-  /*
-  if(finite(log(probs[indx_mix][0])) && finite(log(probs[indx_mu][0]))
-     && expected_zeros > 0){
-    neg_log_vec.push_back(log(expected_zeros)+log(probs[indx_mix][0])
-			  +log(probs[indx_mu][0])-log(mix)
-			  -log(1+alpha*mu));
-  }
-  if(finite(log(probs[probs.size()-1][0])) && finite(log(probs[indx_mu][0]))
-     && expected_zeros > 0){
-    pos_log_vec.push_back(log(expected_zeros) + log(probs[probs.size()-1][0])
-			  +log(probs[indx_mu][0])-log(last_mix)
-			  -log(1+alpha*mu));
-  }
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_prob_mix = log(probs[indx_mix][i]);
@@ -1094,22 +960,7 @@ obs_fish_info_dtheta_d_last_mu(const vector< vector<double> > &probs,
 
   vector<double> pos_log_vec;
   vector<double> neg_log_vec;
-  /*
-  if(finite(log(probs[probs.size()-1][0]))){
-    neg_log_vec.push_back(log(expected_zeros)
-			  +log(probs[probs.size()-1][0])
-			  -log(last_mix)-log(1+alpha*mu));
-    pos_log_vec.push_back(log(expected_zeros)
-			  +2*log(probs[probs.size()-1][0])
-			  -log(last_mix)-log(1+alpha*mu));
-    if(finite(log(probs[indx][0]))){
-      neg_log_vec.push_back(log(expected_zeros)
-			    +log(probs[indx][0])
-			    +log(probs[probs.size()-1][0])
-			    -log(mix)-log(1+alpha*mu));
-    }
-  }
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_last_prob = log(probs[probs.size()-1][i]);
@@ -1152,14 +1003,7 @@ obs_fish_info_dtheta_dalpha_same_indx(const vector< vector<double> > &probs,
   const double mix = mixing[indx];
   const double last_mix = mixing.back();
   vector<double> terms_vec;
-  /*
-  terms_vec.push_back(-expected_zeros*probs[indx][0]*(1-probs[indx][0])*
-		      (log(1+alpha*mu)/(alpha*alpha)-mu/(alpha*(1+alpha*mu)))
-		      /mix);
-  terms_vec.push_back(-expected_zeros*probs[indx][0]*probs[probs.size()-1][0]*
-		      log(1+alpha*mu)/(alpha*alpha)-
-		      mu/(alpha*(1+alpha*mu))/last_mix);
-  */
+ 
   for(size_t i  = 0; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       double inner_sum = 0;
@@ -1193,15 +1037,7 @@ obs_fish_info_dtheta_dalpha_diff_indx(const vector< vector<double> > &probs,
   const double last_mix = mixing.back();
 
   vector<double> terms_vec;
-  /*
-  terms_vec.push_back(expected_zeros*probs[indx_mix][0]*probs[indx_alpha][0]*
-		      (log(1+alpha*mu)/(alpha*alpha)
-		       -mu/(alpha*(1+alpha*mu)))/mix);
-  terms_vec.push_back(-expected_zeros*probs[indx_alpha][0]*
-		      probs[probs.size()-1][0]*
-		      (log(1+alpha*mu)/(alpha*alpha)
-		       -mu/(alpha*(1+alpha*mu)))/last_mix);
-  */
+
   for(size_t  i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double prob_alpha = probs[indx_alpha][i];
@@ -1234,19 +1070,11 @@ obs_fish_info_dtheta_d_last_alpha(const vector< vector<double> > &probs,
   const double mu = distros[distros.size()-1].get_mu();
   const double last_mix = mixing.back();
   const double mix = mixing[indx];
-  double last_prob = probs[probs.size()-1][0];
   vector<double> terms_vec;
-  /*
-  terms_vec.push_back(expected_zeros*last_prob*(1-last_prob)*
-		      (log(1+alpha*mu)/(alpha*alpha)
-		       -mu/(alpha*(1+alpha*mu)))/last_mix);
-  terms_vec.push_back(expected_zeros*last_prob*probs[indx][0]*
-		      (log(1+alpha*mu)/(alpha*alpha)
-		       -mu/(alpha*(1+alpha*mu)))/mix);
-  */
+
   for(size_t  i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
-      last_prob = probs[probs.size()-1][i];
+      const double last_prob = probs[probs.size()-1][i];
       const double prob = probs[indx][i];
       const double hist = static_cast<double>(vals_hist[i]);
       double inner_sum = 0.0;
@@ -1272,27 +1100,10 @@ obs_fish_info_dmu_dalpha_same_indx(const vector< vector<double> > &probs,
 				   const size_t indx){
   const double alpha = distros[indx].get_alpha();
   const double mu = distros[indx].get_mu();
-  const double log_mu=log(mu);
-  const double log_alpha = log(alpha);
   const double log_alpha_mu = log(1+alpha*mu);
 
   vector<double> terms_vec;
-
-  const double log_prob_zero = log(probs[indx][0]);
-  const double log_1_minus_prob_zero = log(1-probs[indx][0]);
-  const double log_e_zeros = log(expected_zeros);
-  /*
-  if(finite(log_prob_zero) && expected_zeros > 0){
-    terms_vec.push_back(-exp(log_e_zeros + log_prob_zero + log_mu
-			     -2*log_alpha_mu));
-    terms_vec.push_back(exp(log_e_zeros+log_prob_zero
-			    +log_1_minus_prob_zero-log_alpha_mu
-			    -2*log_alpha));
-    terms_vec.push_back(-exp(log_e_zeros+log_prob_zero
-			     +log_1_minus_prob_zero-log_alpha_mu
-			     +log_mu-log_alpha-log_alpha_mu));
-  }
-  */
+ 
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_prob = log(probs[indx][i]);
@@ -1333,16 +1144,9 @@ obs_fish_info_dmu_dalpha_diff_indx(const vector< vector<double> > &probs,
   const double mu1 = distros[indx_mu].get_mu();
   const double alpha2 = distros[indx_alpha].get_alpha();
   const double mu2 = distros[indx_alpha].get_mu();
-  const double log_alpha_mu_1 = log(1+alpha1*mu1);
-  const double log_alpha_mu_2 = log(1+alpha2*mu2);
 
   vector<double> terms_vec;
-  /*
-  terms_vec.push_back(exp(log(expected_zeros)+log(probs[indx_mu][0])
-			  +log(probs[indx_alpha][0]) - log_alpha_mu_1)*
-		      (-log_alpha_mu_2/(alpha2*alpha2)+
-		       exp(log(mu2)-log(alpha2)-log_alpha_mu_2)));
-  */
+
   for(size_t i = 1; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
       const double log_vals_hist = log(vals_hist[i]);
@@ -1601,7 +1405,6 @@ double
 ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
 					const size_t max_iter,
 					vector<size_t> &vals_hist){
-  const size_t vals_size = accumulate(vals_hist.begin(), vals_hist.end(), 0);
   const size_t number_states = distros.size();
   double probs_starting_val = 1/static_cast<double>(number_states);
   vector< vector<double> > probs(number_states, 
@@ -1638,9 +1441,7 @@ ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
     }
     prev_score = score;
   }
-  //Compute Fisher_info, remember wrt to q, not theta
-    vector<double> mixing_w_zeros(mixing);
-   /*   compute_mixing_w_zeros(vals_size, mixing_w_zeros); */
+
   double expected_zeros = 0.0;
   for(size_t j = 0; j < distros.size(); j++){
     double psuedo_size = 0.0;
@@ -1649,7 +1450,7 @@ ZTNBD_mixture::EM_resolve_mix_add_zeros(const double &tol,
     }
     expected_zeros += distros[j].expected_zeros(psuedo_size);
   }
-  compute_Fisher_info(probs, vals_hist,mixing_w_zeros , expected_zeros);
+  compute_Fisher_info(probs, vals_hist,mixing , expected_zeros);
 
   return(trunc_log_L(vals_hist));
 }
