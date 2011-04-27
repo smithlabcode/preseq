@@ -285,9 +285,14 @@ ZTP_mixture::Fisher_obs_info_2nd_theta(const vector< vector<double> > &probs,
       }
     }
   }
-   
-  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
-	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+  double return_val  = 0.0;
+  if(pos_log_vec.size() > 0){
+    return_val += exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()));
+  }
+  if(neg_log_vec.size() > 0){
+    return_val -= exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size()));
+  }
+  return(return_val);
 }
 
 double
@@ -334,8 +339,14 @@ ZTP_mixture::Fisher_obs_info_mixed_theta(
       }
     }
   }
-  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
-	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+  double return_val  = 0.0;
+  if(pos_log_vec.size() > 0){
+    return_val += exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()));
+  }
+  if(neg_log_vec.size() > 0){
+    return_val -= exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size()));
+  }
+  return(return_val);
 }
 
 double
@@ -435,8 +446,14 @@ ZTP_mixture::Fisher_obs_info_mixed_same_indx(
       }
     }
   }
-  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
-	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+  double return_val  = 0.0;
+  if(pos_log_vec.size() > 0){
+    return_val += exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()));
+  }
+  if(neg_log_vec.size() > 0){
+    return_val -= exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size()));
+  }
+  return(return_val);
 }
 
 
@@ -476,8 +493,14 @@ ZTP_mixture::Fisher_obs_info_mixed_mixed_indx(
       }
     }
   }
-  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
-	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+  double return_val  = 0.0;
+  if(pos_log_vec.size() > 0){
+    return_val += exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()));
+  }
+  if(neg_log_vec.size() > 0){
+    return_val -= exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size()));
+  }
+  return(return_val);
 }
 
 double 
@@ -517,8 +540,14 @@ ZTP_mixture::Fisher_obs_info_mixed_last_indx(
       }
     }
   }
-  return(exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()))
-	 -exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size())));
+  double return_val  = 0.0;
+  if(pos_log_vec.size() > 0){
+    return_val += exp(log_sum_log_vec(pos_log_vec, pos_log_vec.size()));
+  }
+  if(neg_log_vec.size() > 0){
+    return_val -= exp(log_sum_log_vec(neg_log_vec, neg_log_vec.size()));
+  }
+  return(return_val);
 }
 
 
@@ -527,14 +556,17 @@ ZTP_mixture::compute_observed_Fisher_info(const vector<size_t> &vals_hist,
 					    const vector< vector<double> >
 					    &probs){
   const size_t number_states = distros.size();
+  vector< vector<double> > Fish_info(2*number_states-1,
+				     vector<double>(2*number_states-1,0.0));
+
   for(size_t i = 0; i < number_states-1; i++){
     for(size_t j = 0; j < number_states-1; j++){
       if(i != j){
-	Fisher_info[i][j] = 
+	Fish_info[i][j] = 
 	  Fisher_obs_info_mixed_theta(probs, vals_hist, i,j);
       }
       else{
-	Fisher_info[i][j] = 
+	Fish_info[i][j] = 
 	  Fisher_obs_info_2nd_theta(probs, vals_hist, i);
       }
     }
@@ -542,13 +574,13 @@ ZTP_mixture::compute_observed_Fisher_info(const vector<size_t> &vals_hist,
   for(size_t i = number_states-1; i < 2*number_states-1; i++){
     for(size_t j = number_states-1; j < 2*number_states-1; j++){
       if(i != j){
-	Fisher_info[i][j] = 
+	Fish_info[i][j] = 
 	  Fisher_obs_info_mixed_lambda(probs,
 					    vals_hist, i-number_states+1,
 					    j-number_states+1);
       }
       else{
-	Fisher_info[i][j] = 
+	Fish_info[i][j] = 
 	  Fisher_obs_info_2nd_lambda(probs, vals_hist, i-number_states+1);
       }
     }
@@ -556,25 +588,26 @@ ZTP_mixture::compute_observed_Fisher_info(const vector<size_t> &vals_hist,
   for(size_t i = 0;  i < number_states-1; i++){
     for(size_t j = 0; j < number_states-1; j++){
       if(i != j){
-	Fisher_info[i][j+number_states-1] = 
+	Fish_info[i][j+number_states-1] = 
 	  Fisher_obs_info_mixed_mixed_indx(probs, vals_hist, j, i);
-	Fisher_info[j+number_states-1][i] = 
-	  Fisher_info[i][j+number_states-1];
+	Fish_info[j+number_states-1][i] = 
+	  Fish_info[i][j+number_states-1];
       }
       else{
-	Fisher_info[i][j+number_states-1] = 
+	Fish_info[i][j+number_states-1] = 
 	  Fisher_obs_info_mixed_same_indx(probs, vals_hist, i);
-	Fisher_info[j+number_states-1][i] =
-	  Fisher_info[i][j+number_states-1];
+	Fish_info[j+number_states-1][i] =
+	  Fish_info[i][j+number_states-1];
       }
     }
   }
   for(size_t i=0; i< number_states-1; i++){
-    Fisher_info[i][2*number_states-2] = 
+    Fish_info[i][2*number_states-2] = 
       Fisher_obs_info_mixed_last_indx(probs, vals_hist, i);
-    Fisher_info[2*number_states-2][i] = 
-      Fisher_info[i][2*number_states-2];
+    Fish_info[2*number_states-2][i] = 
+      Fish_info[i][2*number_states-2];
   }
+  set_Fish_info(Fish_info);
 
 }
 
@@ -602,11 +635,9 @@ ZTP_mixture::EM_mix_resolve(const vector<size_t> &vals_hist,
     }
     prev_score = score;
 
-
   }
   /* compute Fisher info */
   compute_observed_Fisher_info(vals_hist, probs);
-
 
   return(trunc_log_L(vals_hist));
 }
@@ -713,7 +744,6 @@ Poiss_mixture::EM_mix_resolve(const vector<size_t> &vals_hist,
       break;
     }
     prev_score = score;
-
 
   }
 

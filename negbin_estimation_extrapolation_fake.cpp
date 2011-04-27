@@ -102,7 +102,7 @@ select_number_mixtures(const vector<double> log_like){
     double holding_score = calculate_neg_AIC(i+1, log_like[i]);
     if(holding_score >= current_max_score){
       current_max_score = holding_score;
-      current_max = i+1;
+      current_max = i;
     }
   }
   return(current_max);
@@ -521,7 +521,6 @@ main(int argc, const char **argv){
     }
     const string input_file_name = leftover_args.front();
     /**********************************************************************/
-
     vector<size_t> values;
     std::ifstream in(input_file_name.c_str());
     if (!in) 
@@ -544,19 +543,15 @@ main(int argc, const char **argv){
     in.close();
     values.pop_back();
 
+    size_t values_size = values.size();
 
-    const size_t values_size = values.size();
     const size_t max_value = *std::max_element(values.begin(),values.end());
     vector<size_t> vals_hist(max_value + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i){
       ++vals_hist[static_cast<size_t>(values[i])];
     }
     vector<double> score_vec;
-    vector< vector<double> > mus_vec;
-    vector< vector<double> > alphas_vec;
-    vector< vector<double> > mixings_vec;
-    vector< vector< vector<double> > > Fisher_info_vec;
-    vector< vector<double> > expected_MN_vec;
+    vector<ZTNBD_mixture> mixture_vec;
 
     for(size_t k = min_number_mixtures; 
 	k <= max_number_mixtures; k += step_size){
@@ -591,37 +586,33 @@ main(int argc, const char **argv){
       double score = 
 	ZTNBD_mix.EM_resolve_mix_add_zeros(tolerance, max_iter, vals_hist);
 
-      distros = ZTNBD_mix.get_distros();
-      vector<double> mus;
-      vector<double> alphas;
-      for(size_t j = 0; j < distros.size(); j++){
-        mus.push_back(distros[j].get_mu());
-	alphas.push_back(distros[j].get_alpha());
-      }
-      mus_vec.push_back(mus);
-      alphas_vec.push_back(alphas);
-      mixings_vec.push_back(ZTNBD_mix.get_mixing());
       score_vec.push_back(score);
-      Fisher_info_vec.push_back(ZTNBD_mix.get_Fish_info());
 
-
-      vector<double> expect_MN;
-      for(size_t i = step_btwn_extra; i <= extrapolation_size;
-	  i += step_btwn_extra){
-	expect_MN.push_back(ZTNBD_mix.expected_inverse_sum(values_size, i));
-      }
-      expected_MN_vec.push_back(expect_MN);
+      mixture_vec.push_back(ZTNBD_mix);
 			   
     }
 
     size_t opt_num = select_number_mixtures(score_vec);
-    size_t opt_num_mixs = step_size*(opt_num-1) + min_number_mixtures;
+    size_t opt_num_mixs = step_size*(opt_num) + min_number_mixtures;
 
-    vector<double> mus = mus_vec[opt_num-1];
-    vector<double> alphas = alphas_vec[opt_num-1];
-    vector<double> mixing = mixings_vec[opt_num-1];
-    vector< vector<double> > Fisher_info=Fisher_info_vec[opt_num-1];
-    vector<double> expected_MN = expected_MN_vec[opt_num-1];
+    ZTNBD_mixture opt_mix = mixture_vec[opt_num];
+    vector<ZTNBD> opt_distros = opt_mix.get_distros();
+    vector<double> mus;
+    vector<double> alphas;
+    for(size_t i = 0; i < opt_distros.size(); i++){
+      mus.push_back(opt_distros[i].get_mu());
+      alphas.push_back(opt_distros[i].get_alpha());
+    }
+
+    vector<double> mixing = opt_mix.get_mixing();
+    vector< vector<double> > Fisher_info = opt_mix.get_Fish_info();
+
+    vector<double> expected_MN;
+    for(size_t i = step_btwn_extra; i <= extrapolation_size;
+	i += step_btwn_extra){
+      expected_MN.push_back(opt_mix.expected_inverse_sum(values_size, i));
+    }    
+
 
     if(bootstraps == 0){
       invert_Fisher_info(Fisher_info);
@@ -700,7 +691,7 @@ main(int argc, const char **argv){
 	ZTNBD_mixture ZTNBD_mix(distros, mixing, Fish_info);
 
 	double score = 
-	  ZTNBD_mix.EM_resolve_mix_add_zeros(tolerance, max_iter, vals_hist);
+	  ZTNBD_mix.EM_resolve_mix_add_zeros(tolerance, max_iter, sample_hist);
 	vector<double> expect_MN;
 	for(size_t i = step_btwn_extra; i <= extrapolation_size;
 	    i += step_btwn_extra){

@@ -151,6 +151,7 @@ public:
   vector< vector<double> > get_Fish_info() const {return Fisher_info;}
   void set_distros(const vector<ZTP> dist) { distros = dist;}
   void set_mixing(const vector<double> mix) {mixing = mix;}
+  void set_Fish_info(const vector< vector<double> > Fish) {Fisher_info = Fish;}
 
   double trunc_expectation_step(const vector<size_t> &vals_hist,
 				vector< vector<double> > &probs);
@@ -190,6 +191,7 @@ public:
 					  const size_t theta_indx);
   void compute_observed_Fisher_info(const vector<size_t> &vals_hist,
 				    const vector< vector<double> > &probs);
+  //
 private:
   vector<ZTP> distros;
   vector<double> mixing;

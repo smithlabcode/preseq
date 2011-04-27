@@ -1,4 +1,4 @@
-/*    Poiss_mixture:
+/*    poiss_estimation_extrapolation:
  *
  *    Copyright (C) 2011 University of Southern California and
  *                       Andrew D. Smith
@@ -62,6 +62,7 @@ using std::ceil;
 using std::greater;
 using std::numeric_limits;
 
+
 static void
 get_counts(const vector<SimpleGenomicRegion> &read_locations,
 	   vector<size_t> &values) {
@@ -102,7 +103,7 @@ select_number_mixtures(const vector<double> log_like){
     double holding_score = calculate_neg_AIC(i+1, log_like[i]);
     if(holding_score >= current_max_score){
       current_max_score = holding_score;
-      current_max = i+1;
+      current_max = i;
     }
   }
   return(current_max);
@@ -131,6 +132,17 @@ invert_Fisher_info(vector< vector<double> > &Fisher_info){
       Fisher_info[i][j] = gsl_matrix_get(inv_fish_mat, i, j);
     }
   }
+}
+
+void
+calculate_real_mixing(const vector<double> &lambdas,
+		      const vector<double> &mixing,
+		      vector<double> &real_mixing){
+  double mean  = 0;
+  for(size_t i = 0; i < lambdas.size(); i++)
+    mean += mixing[i]*lambdas[i]/(1-exp(-lambdas[i]));
+  for(size_t i = 0; i < real_mixing.size(); i++)
+    real_mixing[i] = mixing[i]*lambdas[i]/((1-exp(-lambdas[i]))*mean);
 }
 
 
@@ -323,16 +335,6 @@ compute_deriv_MN_vec(const vector<double> &lambdas,
   }
 }
 
-void
-calculate_real_mixing(const vector<double> &lambdas,
-		      const vector<double> &mixing,
-		      vector<double> &real_mixing){
-  double mean  = 0;
-  for(size_t i = 0; i < lambdas.size(); i++)
-    mean += mixing[i]*lambdas[i]/(1-exp(-lambdas[i]));
-  for(size_t i = 0; i < real_mixing.size(); i++)
-    real_mixing[i] = mixing[i]*lambdas[i]/((1-exp(-lambdas[i]))*mean);
-}
 
 void
 calculate_current_lambdas(const vector<double> &lambdas,
@@ -378,6 +380,7 @@ compute_log_var_from_fit(const vector< vector<double> > &var_matrix,
 
   return(log(var));
 }
+
 
 static void
 resamplevals(const gsl_rng *rng,
@@ -627,7 +630,6 @@ calculate_current_mixings(const vector<double> &real_mixing,
 int
 main(int argc, const char **argv){
 
-
   try {
     /* FILES */
     string outfile;
@@ -674,7 +676,6 @@ main(int argc, const char **argv){
 		      "Include sampling variance in CI",
 		      false, sampling_error);
 
-
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -718,26 +719,21 @@ main(int argc, const char **argv){
     in.close();
     values.pop_back();
 
+    size_t values_size = values.size();
 
-    const size_t values_size = values.size();
     const size_t max_value = *std::max_element(values.begin(),values.end());
     vector<size_t> vals_hist(max_value + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i){
       ++vals_hist[static_cast<size_t>(values[i])];
     }
     vector<double> score_vec;
-    vector< vector<double> > lambdas_vec;
-    vector< vector<double> > mixings_vec;
-    vector< vector< vector<double> > > Fisher_info_vec;
-    vector< vector<double> > expected_MN_vec;
-
+    vector<ZTP_mixture> mixture_vec;
     for(size_t k = min_number_mixtures; 
 	k <= max_number_mixtures; k += step_size){
       size_t number_mixtures = k;
       vector<ZTP> distros;
       vector<double> mixing(number_mixtures, 
                           1/static_cast<double>(number_mixtures));
-    
       sort(values.begin(), values.end());
       double step_size = floor(static_cast<double>(values.size())
                                  /static_cast<double>(number_mixtures));
@@ -762,54 +758,49 @@ main(int argc, const char **argv){
       ZTP_mixture ZTP_mix(distros, mixing, Fish_info);
 
       double score = ZTP_mix.EM_mix_resolve(vals_hist, tolerance, max_iter);
-      distros = ZTP_mix.get_distros();
-      vector<double> lambdas;
-      for(size_t j = 0; j < distros.size(); j++)
-        lambdas.push_back(distros[j].get_lambda());
-
-      lambdas_vec.push_back(lambdas);
-      mixings_vec.push_back(ZTP_mix.get_mixing());
       score_vec.push_back(score);
-      Fisher_info_vec.push_back(ZTP_mix.get_Fish_info());
-
-    vector<double> expect_MN;
-    for(size_t i = step_btwn_extra; i <= extrapolation_size;
-	i += step_btwn_extra){
-      expect_MN.push_back(ZTP_mix.expected_inverse_sum(values_size, i));
-    }
-    expected_MN_vec.push_back(expect_MN);
+      mixture_vec.push_back(ZTP_mix);
 			   
     }
 
     size_t opt_num = select_number_mixtures(score_vec);
-    size_t opt_num_mixs = step_size*(opt_num-1) + min_number_mixtures;
+    size_t opt_num_mixs = step_size*(opt_num) + min_number_mixtures;
 
-    vector<double> lambdas = lambdas_vec[opt_num-1];
-    vector<double> mixing = mixings_vec[opt_num-1];
-    vector< vector<double> > Fisher_info=Fisher_info_vec[opt_num-1];
-    vector<double> expected_MN = expected_MN_vec[opt_num-1];
+    ZTP_mixture opt_mix = mixture_vec[opt_num];
+    vector<ZTP> opt_distros = opt_mix.get_distros();
+    vector<double> opt_lambdas;
+    for(size_t i = 0; i < opt_distros.size(); i++)
+      opt_lambdas.push_back(opt_distros[i].get_lambda());
 
+    vector<double> opt_mixing = opt_mix.get_mixing();
+    vector< vector<double> > Fisher_info = opt_mix.get_Fish_info();
+
+    vector<double> expected_MN;
+    for(size_t i = step_btwn_extra; i <= extrapolation_size;
+	i += step_btwn_extra){
+      expected_MN.push_back(opt_mix.expected_inverse_sum(values_size, i));
+    }    
 
 
     if(bootstraps == 0){
       invert_Fisher_info(Fisher_info);
 
 
-      vector<double> current_lambdas(lambdas);
-      vector<double> real_mixing(mixing);
-      calculate_real_mixing(lambdas, mixing, real_mixing);
+      vector<double> current_lambdas(opt_lambdas);
+      vector<double> real_mixing(opt_mixing);
+      calculate_real_mixing(opt_lambdas, opt_mixing, real_mixing);
 
       if(sampling_error == false){
 	ostream* out = (outfile.empty()) ? 
 	  &std::cout : new std::ofstream(outfile.c_str());
 	size_t time_step = step_btwn_extra;
 	for(size_t i = 0; i < expected_MN.size(); i++){
-	  calculate_current_lambdas(lambdas, real_mixing, mixing, values_size,
-				    time_step, current_lambdas);
+	  calculate_current_lambdas(opt_lambdas, real_mixing, opt_mixing, 
+				    values_size, time_step, current_lambdas);
 
 
 	  double log_var_fit = 
-	    compute_log_var_from_fit(Fisher_info, lambdas,mixing,
+	    compute_log_var_from_fit(Fisher_info, opt_lambdas,opt_mixing,
 				     current_lambdas,real_mixing,
 				     time_step, values_size);
 	  *out << time_step << "\t" << expected_MN[i] << "\t"
@@ -823,12 +814,12 @@ main(int argc, const char **argv){
 	ostream* out = (outfile.empty()) ? 
 	  &std::cout : new std::ofstream(outfile.c_str());
 	size_t time_step = step_btwn_extra;
-	vector<double> current_mixing(mixing);
+	vector<double> current_mixing(opt_mixing);
 	double var_samp = 0.0;
 
 	for(size_t i = 0; i < expected_MN.size(); i++){
-	  calculate_current_lambdas(lambdas, real_mixing, mixing, values_size,
-				    time_step, current_lambdas);
+	  calculate_current_lambdas(opt_lambdas, real_mixing, opt_mixing, 
+				    values_size,time_step, current_lambdas);
 
 	  calculate_current_mixings(real_mixing, current_lambdas, 
 				    time_step, current_mixing);
@@ -840,8 +831,8 @@ main(int argc, const char **argv){
 					      tolerance));
 	  }
 	  double var_fit = 
-	    exp(compute_log_var_from_fit(Fisher_info, lambdas,mixing,
-				     current_lambdas,real_mixing,
+	    exp(compute_log_var_from_fit(Fisher_info, opt_lambdas,opt_mixing,
+					 current_lambdas,real_mixing,
 					 time_step, values_size));
 	  *out << time_step << "\t" << expected_MN[i] << "\t"
 	       << expected_MN[i]-1.959964*exp(0.5*(log(var_fit+var_samp))) 
@@ -903,7 +894,7 @@ main(int argc, const char **argv){
 							  0.0));
 	ZTP_mixture ZTP_mix(distros, mixing, Fish_info);
 
-	double score = ZTP_mix.EM_mix_resolve(vals_hist, tolerance, max_iter);
+	double score = ZTP_mix.EM_mix_resolve(sample_hist, tolerance, max_iter);
 	vector<double> expect_MN;
 	for(size_t i = step_btwn_extra; i <= extrapolation_size;
 	    i += step_btwn_extra){
@@ -935,15 +926,20 @@ main(int argc, const char **argv){
       }
       ostream* out = (outfile.empty()) ? 
 	&std::cout : new std::ofstream(outfile.c_str());
-      for(size_t i = 0; i < bootstrap_MN.size(); i++){
-	for(size_t j = 0; j < bootstrap_MN[i].size(); j++){
-	  *out << bootstrap_MN[i][j] << "\t";
+      size_t time_step = step_btwn_extra;
+      for(size_t i = 0; i < bootstrap_MN[0].size(); i++){
+	*out << time_step << "\t";
+	for(size_t j = 0; j < bootstrap_MN.size(); j++){
+	  *out << bootstrap_MN[j][i] << "\t";
 	}
 	*out << endl;
-      }  
+	time_step += step_btwn_extra;
+
+      }   
     }
 
   }  
+
   catch (RMAPException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
     return EXIT_FAILURE;
