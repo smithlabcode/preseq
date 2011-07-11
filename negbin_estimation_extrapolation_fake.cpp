@@ -475,8 +475,9 @@ main(int argc, const char **argv){
 
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("neg_bin_estimation_extrapolation", "",
-			   "*.txt");
+    OptionParser opt_parse("negbin_estimation_extrapolation", 
+                           "fit NB mixture and extrapolate complexity",
+                           "*.txt");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
     opt_parse.add_opt("verbose", 'v', "print more information", 

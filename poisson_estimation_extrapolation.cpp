@@ -633,8 +633,9 @@ main(int argc, const char **argv){
 
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("poisson_estimation_extrapolation", "",
-			   "*.txt");
+    OptionParser opt_parse("poisson_estimation_extrapolation", 
+                           "fit Poisson mixture and extrapolate complexity",
+                           "*.txt");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
     opt_parse.add_opt("verbose", 'v', "print more information", 

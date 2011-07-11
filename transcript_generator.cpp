@@ -1,3 +1,24 @@
+/*    transcript_generator:
+ *
+ *    Copyright (C) 2011 University of Southern California and
+ *                       Andrew D. Smith
+ *                       Timothy Daley
+ *
+ *    Authors: Andrew D. Smith and Timothy Daley
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "OptionParser.hpp"
 #include "rmap_utils.hpp"
 #include "GenomicRegion.hpp"
@@ -367,7 +388,8 @@ int main(int argc, const char **argv) {
     size_t bootstraps = 1000;
    
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("negbin_generator", "",
+    OptionParser opt_parse("transcript_generator", 
+                           "generate transcripts and sample reads",
                            "");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)",
                       false , outfile);

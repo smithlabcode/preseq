@@ -71,7 +71,7 @@ int main(int argc, const char **argv) {
 
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("complexity", "",
+    OptionParser opt_parse("complexity_plot", "",
 			   "<bed-format-file>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
