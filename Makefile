@@ -17,16 +17,22 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-PROGS = library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation extrapolate_library_complexity_byexpectation
+
+ifndef SMITHLAB_CPP
+$(error SMITHLAB_CPP variable undefined)
+endif
+
+PROGS = complexity_plot etcomplexity
 
 LIBS = -lgsl -lgslcblas
-LIBDIR = $(SMITHLAB_CPP)/
+LIBDIR = $(SMITHLAB_CPP)/lib
 INCLUDEDIR = $(SMITHLAB_CPP)/
 CXX = g++
 CFLAGS = -Wall -fPIC -fmessage-length=50
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
 COMMON_DIR = $(SMITHLAB_CPP)/
+TEST_DIR = $(SMITHLAB_CPP)/test
 
 ifeq "$(shell uname)" "Darwin"
 CFLAGS += -arch x86_64
@@ -40,25 +46,25 @@ ifdef OPT
 CFLAGS += $(OPTFLAGS)
 endif
 
+all:	$(PROGS)
+
+$(PROGS): \
+	$(addprefix $(COMMON_DIR), GenomicRegion.o rmap_os.o \
+	rmap_utils.o OptionParser.o MappedRead.o)
+
+%.o: %.cpp %.hpp
+	$(CXX) $(CFLAGS) -c -o $@ $< -I$(COMMON_DIR)
 
 
-library_complexity complexity_plot extrapolate_library_complexity poisson_generator poisson_mixture_estimation cutBEDfile poisson_mixture_estimation_clusterin2 poisson_estimation_hist poisson_estimation_hist_fake poisson_mix_estimation poisson_estimation_hist_AIC extrapolate_library_complexity_mixture_not_given BEDsample combine_mixture extrapolate_library_complexity_byexpectation negbin_generator fit_trunc_negbin: GenomicRegion.o rmap_utils.o OptionParser.o
-
-GenomicRegion.o: GenomicRegion.cpp GenomicRegion.hpp
-	$(CXX) $(CFLAGS) -c -o $@ $< 
-
-rmap_utils.o: rmap_utils.cpp rmap_utils.hpp
-	$(CXX) $(CFLAGS) -c -o $@ $< 
-
-OptionParser.o: OptionParser.cpp OptionParser.hpp
-	$(CXX) $(CFLAGS) -c -o $@ $< 
-
+install: all
+	@mkdir -p $(SMITHLAB_CPP)/bin
+	@install -m 755 $(PROGS) $(SMITHLAB_CPP)/bin
 
 %: %.cpp
-	$(CXX) $(CFLAGS) -o $@ $^ -I$(COMMON_DIR) -L$(LIBDIR) $(LIBS)
+	$(CXX) $(CFLAGS) -o $@ $^ -I$(COMMON_DIR) $(LIBS)
 
-test_%:	%
-	@$(TEST_DIR)/$@ $(TEST_DIR)
+# test_%:	%
+# 	@$(TEST_DIR)/$@ $(TEST_DIR)
 
 test:	$(addprefix test_, $(PROGS))
 
