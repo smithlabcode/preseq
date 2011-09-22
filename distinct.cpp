@@ -1,4 +1,4 @@
-/*    test_euler:
+/*    distinct:
  *
  *    Copyright (C) 2011 University of Southern California and
  *                       Andrew D. Smith
@@ -101,8 +101,8 @@ main(int argc, const char **argv){
 
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("neg_bin_estimation_extrapolation", "",
-			   "*.txt");
+    OptionParser opt_parse("distinct", "",
+                           "*.bed");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
     opt_parse.add_opt("verbose", 'v', "print more information", 

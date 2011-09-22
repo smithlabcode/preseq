@@ -1,4 +1,4 @@
-/*    test_euler:
+/*   coverage:
  *
  *    Copyright (C) 2011 University of Southern California and
  *                       Andrew D. Smith
@@ -96,13 +96,13 @@ main(int argc, const char **argv){
     size_t max_terms = 100;
     double max_time = 1.0;
     double time_step = 1.0;
-    double defect_error = 1e-4;
+    double defect_error = 1e-3;
  
 
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("neg_bin_estimation_extrapolation", "",
-			   "*.txt");
+    OptionParser opt_parse("coverage", "",
+                           "*.bed");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
     opt_parse.add_opt("verbose", 'v', "print more information", 
