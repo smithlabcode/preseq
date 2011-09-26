@@ -55,6 +55,7 @@ using std::make_pair;
 using std::sort;
 
 using std::max;
+using std::min;
 using std::setw;
 using std::fabs;
 using std::ceil;
@@ -93,10 +94,10 @@ main(int argc, const char **argv){
     bool VERBOSE = false;
 
     double tolerance = 1e-20;
-    size_t max_terms = 100;
+    size_t max_terms = 30;
     double max_time = 1.0;
     double time_step = 1.0;
-    double defect_error = 1e-3;
+    double defect_error = 5e-3;
  
 
     
@@ -160,9 +161,9 @@ main(int argc, const char **argv){
       ++vals_hist[static_cast<size_t>(values[i])];
     }
     
-    max_terms = std::min(max_terms, max_value);
+    max_terms = min(max_terms, max_value);
     
-    if(max_terms % 2 == 0)
+    if(max_terms % 2 == 1)
       max_terms--; //need max_terms = L+M+1 to be odd so that L+M is even and we get convergence from above since coverage = 1 - approx
     vector<double> summands;
     vector<double> coeffs(max_terms, 0.0);
@@ -221,63 +222,12 @@ main(int argc, const char **argv){
     &std::cout : new std::ofstream(outfile.c_str());
     for(size_t i = 0; i < numerator_approx.size(); i++){
       *out << t << "\t" << (t+1.0)*vals_sum << "\t" << numerator_approx[i] << "\t"
-      << denominator_approx[i] << "\t" << 1-numerator_approx[i]/denominator_approx[i]
+      << denominator_approx[i] << "\t" << min(1.0, 1-numerator_approx[i]/denominator_approx[i])
       << endl;
       t += time_step;
     }
       
-    
-    
-    /*
-    size_t numer_size = max_terms - denom_size;  //numer_size = L+1
-    
-    
-    vector<double> denom_vec;
-    vector<double> num_vec;
-    
-    cerr << "numer size = " << numer_size << ", denom size = " << denom_size << "\n";
-    
-    compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
-    
-    vector<double> numerator_approx;
-    vector<double> denominator_approx;
-    
-    double t = 0.0;
-    
-    double prev_denom_val = 1.0;
-    double current_denom_val = 1.0;
-    double zero_location = 0.0; 
-    
-    while(t <= max_time){
-      numerator_approx.push_back(compute_pade_approx_numerator(t, num_vec));
-      denominator_approx.push_back(compute_pade_approx_denominator(t, denom_vec));
-    
-    
-    
-    ostream* out = (outfile.empty()) ? 
-    &std::cout : new std::ofstream(outfile.c_str());
-
-
-
-    while(t <= max_time){
-      *out << t << "\t" << (t+1.0)*vals_sum << "\t" << compute_pade_approx_numerator(t, num_vec)
-      << "\t" << compute_pade_approx_denominator(t, denom_vec) << "\t"
-      << t*compute_pade_approx_numerator(t, num_vec)/compute_pade_approx_denominator(t, denom_vec) + values_size
-      << endl;
-      current_denom_val = compute_pade_approx_denominator(t, denom_vec);
-      if(current_denom_val*prev_denom_val < 0){
-        vector<double> denom_coeffs(denom_vec); 
-        denom_coeffs.insert(denom_coeffs.begin(), 1.0);
-        zero_location = locate_polynomial_zero(denom_coeffs, t-time_step, t, tolerance);
-        cerr << "zero located, lower limit = " << t-time_step << ", value = " << compute_pade_approx_denominator(t-time_step, denom_vec)
-        << ", upper limit = " << t << ", value = " << compute_pade_approx_denominator(t, denom_vec) 
-        << ", location = " << zero_location << "\n";
-      }
-      prev_denom_val = current_denom_val;
-      t += time_step;
-    }
-      */
-
+  
   }  
   catch (RMAPException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
