@@ -65,27 +65,6 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
     v[j] = -coeffs[j + numer_size];
   }
   
-  //   for(j = m + 1; j < m + n + 1; j++){  
-  //     gsl_vector_set(v, j - m - 1, - gsl_vector_get(c, j));  
-  //     for(k = 1; k <= (j > n ? n : j); k++){  
-  //       gsl_matrix_set(U, j - m - 1, k - 1, gsl_vector_get(c, j - k));  
-  //     }  
-  //   }  
-/*  vector< vector<double> > U(denom_size, vector<double>(denom_size, 0.0));
-  for (size_t j = 0; j < denom_size; j++){
-    for (size_t k = 0; k < denom_size; k++){
-      if(numer_size - denom_size +1 + j + k >= 0){
-        cerr << j << ", " << k << ", " << numer_size - denom_size +1 + j + k << ", " 
-        << coeffs[numer_size - denom_size +1 + j + k] << "\n";
-        U[j][k] = coeffs[numer_size - denom_size +1 + j + k]; // if the coeffs indx < 0, coeff = 0
-      }
-      else{
-        cerr << j << ", " << k << ", " << numer_size - denom_size +1 + j + k<< "\n";
-        U[j][k] = 0.0;
-      }
-    }
-  }
- */
   size_t n = denom_size;
   size_t m = numer_size-1;
   vector<vector<double> > U(n, vector<double>(n, 0.0));
@@ -94,20 +73,7 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
         U[j - m - 1][n-k] = coeffs[j - k];
     }
   }
-  
-/*  cerr << "U = \n";
-  for(size_t i = 0; i < U.size(); i++){
-    for(size_t j = 0; j < U[0].size(); j++){
-      cerr << U[i][j] << ", ";
-    }
-    cerr << "\n";
-  }
-  
-  cerr << "v = ";
-  for(size_t i = 0; i < v.size(); i++)
-    cerr << v[i] << ", ";
-  cerr << "\n";
-*/
+
   solve_linear_system(U, v, denom_coeffs);
 
 }
@@ -166,15 +132,10 @@ compute_pade_coeffs(const vector<double> &coeffs,
 double
 compute_pade_approx_numerator(const double t,
                               const vector<double> &numerator) {
-  //   unsigned int j;  
-  //   for(j = 0; j < a->size; j++)  
-  //     num += gsl_vector_get(a, j) * pow(x, j);  
-  double total = 0.0; //prev_total = 0.0;
+
+  double total = 0.0; 
   for (size_t j = 0; j < numerator.size(); ++j) {
     total += numerator[j]*pow(t, j);
-    // CHECK FOR CANCELLATION!!!!! no, some coefficients can be zero(this occurs when the pade table is singular but estimation is still valid)
-    // assert(total != prev_total);
-    // prev_total = total;
   }
   return total;
 }
@@ -238,10 +199,11 @@ compute_pade_curve(const std::vector<double> &coeffs,
                    const double allowable_defect_error,
                    const double tolerance,
                    const size_t denom_size,
+                   const bool VERBOSE,
                    vector<double> &numerator_approx,
                    vector<double> &denominator_approx,
                    bool &defect_flag){
-  size_t numer_size = coeffs.size() - denom_size;  //numer_size = L+1, denom_size = M
+  size_t numer_size = coeffs.size()-denom_size;  //numer_size = L+1, denom_size = M
   
   vector<double> denom_vec;
   vector<double> num_vec;
@@ -251,6 +213,7 @@ compute_pade_curve(const std::vector<double> &coeffs,
   vector<double> full_denom_vec(denom_vec);
   full_denom_vec.insert(full_denom_vec.begin(), 1.0);
   double t = 0.0;
+
   
   double prev_denom_val = 1.0;
   double current_denom_val = 1.0;
@@ -268,17 +231,83 @@ compute_pade_curve(const std::vector<double> &coeffs,
     if(current_denom_val*prev_denom_val < 0){
       double denom_zero = locate_polynomial_zero(full_denom_vec, t-time_step, t, tolerance);
       double numer_zero = locate_polynomial_zero(num_vec, t-time_step, t+time_step, tolerance);
-      cerr << "zero found, denom location = " << denom_zero << ", numerator location = "
-      << numer_zero << "\n";
+      if(VERBOSE){
+        cerr << "zero found, denom location = " << denom_zero << ", numerator location = "
+        << numer_zero << "\n";
+      }
       if(fabs(denom_zero - numer_zero) > allowable_defect_error)
         defect_flag = true;
     }
     prev_denom_val = current_denom_val;
     t += time_step;
   }
-  if(defect_flag == true)
+  if(defect_flag == true && VERBOSE)
     cerr << "defect found \n";
 }
+
+
+void 
+cont_frac_pd(const vector<double> &coeffs,
+             const size_t depth,
+             vector<double> &cf_coeffs){
+  vector< vector<double> > p_vec(2*depth-2, vector<double>(2*depth-2, 0.0));
+  p_vec[0][0] = 1;
+  for(size_t i = 0; i < p_vec.size(); i++)
+    p_vec[i][1] = coeffs[i];
+  for(size_t j = 2; j < p_vec[0].size(); j++){
+    for(size_t i = 0; i < p_vec.size()-1; i++){
+      p_vec[i][j] = p_vec[0][j-1]*p_vec[i+1][j-2] - p_vec[0][j-2]*p_vec[i+1][j-1];
+    }
+  }
+  cerr << "p calculated \n";
+  cf_coeffs.push_back(coeffs[0]);
+  for(size_t i = 1; i < depth; i++)
+    cf_coeffs.push_back(p_vec[0][i+1]/(p_vec[0][i-1]*p_vec[0][i]));
+}
+
+double 
+compute_cf_approx(const vector<double> &cf_coeffs,
+                  const double time){
+  if(time == 0.0){
+    return 0.0;
+  }
+  else{
+    double return_val = 0.0;
+    for(size_t i = cf_coeffs.size()-1; i > 0; i--){
+      return_val = cf_coeffs[i]*time/(1.0+return_val);
+    }
+    return_val = cf_coeffs[0]*time/(1.0+return_val);
+    return(return_val);
+  }
+}
+
+double
+compute_cf_approx_euler(const vector<double> &cf_coeffs,  //failure
+                        const double time){
+  if(time == 0.0){
+    return 0.0;
+  }
+  else{
+    double current_num = 0.0;
+    double prev_num1 = 0.0;
+    double prev_num2 = 1.0;
+    double current_denom = 0.0;
+    double prev_denom1 = 0.0;
+    double prev_denom2 = 1.0; 
+    for(size_t i = 0; i < cf_coeffs.size(); i++){
+      current_num = prev_num1 + cf_coeffs[i]*time*prev_num2;
+      current_denom = prev_denom1 + cf_coeffs[i]*time*prev_denom2;
+      prev_num2 = prev_num1;
+      prev_num1 = current_num;
+      prev_denom2= prev_denom1;
+      prev_denom1 = current_denom;
+      cerr << current_num << ", " << current_denom << "\n";
+    }
+    return(current_num/current_denom);
+  }
+}
+    
+      
   
       
 

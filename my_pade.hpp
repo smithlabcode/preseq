@@ -26,8 +26,17 @@ void compute_pade_curve(const std::vector<double> &coeffs,
                         const double allowable_defect_error,
                         const double tolerance,
                         const size_t denom_size,
+                        const bool VERBOSE,
                         std::vector<double> &numerator_approx,
                         std::vector<double> &denominator_approx,
                         bool &defect_flag);
+void cont_frac_pd(const std::vector<double> &coeffs,
+                  const size_t depth,
+                  std::vector<double> &cf_coeffs); //implements pd algorithm to compute cont frac coeffs
+double compute_cf_approx(const std::vector<double> &cf_coeffs,
+                         const double time);
+double compute_cf_approx_euler(const std::vector<double> &cf_coeffs,
+                               const double time); //euler's recursion for cf's
+
 
 #endif
