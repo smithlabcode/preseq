@@ -21,29 +21,16 @@
  */
 
 
-#include "my_pade.hpp"
+#include <OptionParser.hpp>
+#include <GenomicRegion.hpp>
+#include <smithlab_utils.hpp>
 
-#include "OptionParser.hpp"
-#include "rmap_utils.hpp"
-#include "GenomicRegion.hpp"
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_sf_gamma.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_permutation.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_sf_psi.h>
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_fft_complex.h>
+#include "pade_approximant.hpp"
+#include "continued_fraction.hpp"
 
-
-#include <fstream>
-#include <iomanip>
+#include <iostream>
 #include <numeric>
 #include <vector>
-
-#define REAL(z,i) ((z)[2*(i)])
-#define IMAG(z,i) ((z)[2*(i)+1])
 
 using std::string;
 using std::vector;
@@ -54,74 +41,52 @@ using std::pair;
 using std::make_pair;
 using std::sort;
 
-using std::max;
-using std::setw;
-using std::fabs;
-using std::ceil;
 using std::greater;
-using std::numeric_limits;
-
-
-static inline bool
-is_greater(const double val1, const double val2){
-  return((val1 > val2));
-}
 
 static void
-get_counts(const vector<SimpleGenomicRegion> &read_locations,
-           vector<size_t> &values) {
+get_counts(const vector<SimpleGenomicRegion> &reads, vector<size_t> &values) {
   size_t count = 1;
-  for (size_t i = 1; i < read_locations.size(); i++)
-    if (read_locations[i] == read_locations[i-1])
+  for (size_t i = 1; i < reads.size(); i++)
+    if (reads[i] == reads[i-1])
       ++count;
     else {
       values.push_back(count);
       count = 1;
     }
+  values.push_back(count);
 }
 
-
-
-
 int
-main(int argc, const char **argv){
-
+main(int argc, const char **argv) {
 
   try {
-    /* FILES */
-    string outfile;
-    bool VERBOSE = false;
 
+    bool VERBOSE = false;
+    string outfile;
+    
     double tolerance = 1e-20;
     size_t max_terms = 100;
     double max_time = 1.0;
     double time_step = 1.0;
-    double defect_error = 1e-4;
- 
+    double defect_tolerance = 1e-4;
 
-    
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("distinct", "",
-                           "*.bed");
-    opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
+    OptionParser opt_parse("distinct", "", "<bed-file>");
+    opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false , outfile);
-    opt_parse.add_opt("verbose", 'v', "print more information", 
-		      false , VERBOSE);
+    opt_parse.add_opt("time",'s',"maximum time",
+		      false, max_time);
     opt_parse.add_opt("time_step",'p',"time step",
                       false, time_step);
-    opt_parse.add_opt("tolerance", 't', "Numerical tolerance",
-                     false, tolerance);
-    opt_parse.add_opt("max_time",'s',"maximum time",
-                     false, max_time);
-    opt_parse.add_opt("max_terms",'x',"maximum number of terms",
+    opt_parse.add_opt("terms",'t',"maximum number of terms",
                       false, max_terms);
-    opt_parse.add_opt("defect_error",'e',"allowable error between zero and pole in approximation",
-                      false, defect_error);
+    opt_parse.add_opt("tol", '\0', "general numerical tolerance",
+		      false, tolerance);
+    opt_parse.add_opt("def",'\0',"defect tolerance = abs(zero - pole)", 
+		      false, defect_tolerance);
+    opt_parse.add_opt("verbose", 'v', "print more information", 
+		      false , VERBOSE);
     
-
-
-
-
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -142,44 +107,47 @@ main(int argc, const char **argv){
     }
     const string input_file_name = leftover_args.front();
     /**********************************************************************/
-    
-    vector<size_t> values;
+
+    // READ IN THE DATA
     vector<SimpleGenomicRegion> read_locations;
     ReadBEDFile(input_file_name, read_locations);
     if (!check_sorted(read_locations))
-      throw RMAPException("read_locations not sorted");
+      throw SMITHLABException("read_locations not sorted");
     
+    vector<size_t> values;
     get_counts(read_locations, values);
     
-    size_t values_size = values.size();
-    size_t vals_sum = accumulate(values.begin(), values.end(), 0);
-
-    const size_t max_value = *std::max_element(values.begin(),values.end());
+    const size_t vals_sum = accumulate(values.begin(), values.end(), 0);
+    
+    const size_t max_value = *std::max_element(values.begin(), values.end());
     vector<size_t> vals_hist(max_value + 1, 0.0);
-    for (size_t i = 0; i < values.size(); ++i){
+    for (size_t i = 0; i < values.size(); ++i)
       ++vals_hist[static_cast<size_t>(values[i])];
-    }
     
     max_terms = std::min(max_terms, max_value);
     
+    // need max_terms = L+M+1 to be even so that L+M is odd and we get
+    // convergence from above
     if(max_terms % 2 == 0)
-      max_terms--; //need max_terms = L+M+1 to be even so that L+M is odd and we get convergence from above
+      max_terms--; 
     vector<double> summands;
     vector<double> coeffs(max_terms, 0.0);
     for(size_t j = 0; j < max_terms; j++)
       coeffs[j] = vals_hist[j+1]*pow(-1, j+2);
     
-    size_t denom_size = max_terms/2; //denom_size = M
+    size_t denom_size = max_terms/2;
     
     vector<double> numerator_approx;
     vector<double> denominator_approx;
     
-    bool defect_flag = false;
+    bool DEFECT_FLAG = false;
     size_t max_number_approxs = static_cast<size_t>(round((max_terms-8)/2));
-    for(size_t i = 0; i < max_number_approxs; i++){ //detect defect, move up table to more conservative approx
-      compute_pade_curve(coeffs, max_time, time_step, defect_error, tolerance,
-                         denom_size, numerator_approx, denominator_approx, defect_flag);
-      if(defect_flag == false)
+    for(size_t i = 0; i < max_number_approxs; i++) { 
+      //detect defect, move up table to more conservative approx
+      compute_pade_curve(coeffs, max_time, time_step, defect_tolerance, tolerance,
+                         denom_size, VERBOSE, numerator_approx, denominator_approx, 
+			 DEFECT_FLAG);
+      if (DEFECT_FLAG == false)
         break;  //no allowable defect detected, accept approx
       coeffs.pop_back();
       coeffs.pop_back();
@@ -195,91 +163,46 @@ main(int argc, const char **argv){
       coeffs.push_back(vals_hist[j+1]);
     denom_size = coeffs.size()/2 - 1; 
     
-    //if moving up table doesn't work, move down table
-    if(defect_flag == true){
-      while(coeffs.size() < vals_hist.size()-1){
-        compute_pade_curve(coeffs, max_time, time_step, defect_error, tolerance,
-                           denom_size, numerator_approx, denominator_approx, defect_flag);
-        if(defect_flag == false)  //exit if no defect
+    // if moving up table doesn't work, move down table
+    if (DEFECT_FLAG == true) {
+      while (coeffs.size() < vals_hist.size()-1) {
+        compute_pade_curve(coeffs, max_time, time_step, defect_tolerance, tolerance,
+                           denom_size, VERBOSE, numerator_approx, denominator_approx, 
+			   DEFECT_FLAG);
+        if (DEFECT_FLAG == false)  //exit if no defect
           break;
         coeffs.push_back(vals_hist[coeffs.size()+1]);
         coeffs.push_back(vals_hist[coeffs.size()+1]);
         denom_size++;
         numerator_approx.clear();
         denominator_approx.clear();
-        defect_flag = false; //reset flag for next iter
+        DEFECT_FLAG = false; //reset flag for next iter
       }
     }
     
-    if(defect_error == true){
-      cerr << "no allowable approximation" << endl; //exit if no acceptable approximation found
+    // exit if no acceptable approximation found
+    if (DEFECT_FLAG) {
+      cerr << "no acceptable approximation" << endl; 
       return EXIT_SUCCESS;
     }
     
+
+    std::ofstream of;
+    if (!outfile.empty()) of.open(outfile.c_str());
+    ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+
     double t = 0.0;
-    ostream* out = (outfile.empty()) ? 
-    &std::cout : new std::ofstream(outfile.c_str());
     for(size_t i = 0; i < numerator_approx.size(); i++){
-      *out << t << "\t" << (t+1.0)*vals_sum << "\t" << numerator_approx[i] << "\t"
-      << denominator_approx[i] << "\t" << t*numerator_approx[i]/denominator_approx[i] + values_size
-      << endl;
+      out << t << "\t" 
+	  << (t+1.0)*vals_sum << "\t" 
+	  << numerator_approx[i] << "\t"
+	  << denominator_approx[i] << "\t" 
+	  << t*numerator_approx[i]/denominator_approx[i] + values.size()
+	  << endl;
       t += time_step;
     }
-      
-    
-    
-    /*
-    size_t numer_size = max_terms - denom_size;  //numer_size = L+1
-    
-    
-    vector<double> denom_vec;
-    vector<double> num_vec;
-    
-    cerr << "numer size = " << numer_size << ", denom size = " << denom_size << "\n";
-    
-    compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
-    
-    vector<double> numerator_approx;
-    vector<double> denominator_approx;
-    
-    double t = 0.0;
-    
-    double prev_denom_val = 1.0;
-    double current_denom_val = 1.0;
-    double zero_location = 0.0; 
-    
-    while(t <= max_time){
-      numerator_approx.push_back(compute_pade_approx_numerator(t, num_vec));
-      denominator_approx.push_back(compute_pade_approx_denominator(t, denom_vec));
-    
-    
-    
-    ostream* out = (outfile.empty()) ? 
-    &std::cout : new std::ofstream(outfile.c_str());
-
-
-
-    while(t <= max_time){
-      *out << t << "\t" << (t+1.0)*vals_sum << "\t" << compute_pade_approx_numerator(t, num_vec)
-      << "\t" << compute_pade_approx_denominator(t, denom_vec) << "\t"
-      << t*compute_pade_approx_numerator(t, num_vec)/compute_pade_approx_denominator(t, denom_vec) + values_size
-      << endl;
-      current_denom_val = compute_pade_approx_denominator(t, denom_vec);
-      if(current_denom_val*prev_denom_val < 0){
-        vector<double> denom_coeffs(denom_vec); 
-        denom_coeffs.insert(denom_coeffs.begin(), 1.0);
-        zero_location = locate_polynomial_zero(denom_coeffs, t-time_step, t, tolerance);
-        cerr << "zero located, lower limit = " << t-time_step << ", value = " << compute_pade_approx_denominator(t-time_step, denom_vec)
-        << ", upper limit = " << t << ", value = " << compute_pade_approx_denominator(t, denom_vec) 
-        << ", location = " << zero_location << "\n";
-      }
-      prev_denom_val = current_denom_val;
-      t += time_step;
-    }
-      */
-
   }  
-  catch (RMAPException &e) {
+  catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
     return EXIT_FAILURE;
   }
