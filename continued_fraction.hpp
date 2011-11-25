@@ -25,15 +25,14 @@
 #include <numeric>
 #include <vector>
 
- //implements pd algorithm to compute cont frac coeffs
+// PD algorithm to compute cf coeffs
 void
 cont_frac_pd(const std::vector<double> &coeffs,
-	     const size_t depth,
-	     std::vector<double> &cf_coeffs);
+	     const size_t depth, std::vector<double> &cf_coeffs);
 double
 compute_cf_approx(const std::vector<double> &cf_coeffs, const double time);
 
-//euler's recursion for cf's
+// Euler's recursion for cf's
 double
 compute_cf_approx_euler(const std::vector<double> &cf_coeffs, const double time); 
 

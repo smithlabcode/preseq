@@ -71,19 +71,19 @@ compute_cf_approx(const vector<double> &cf_coeffs, const double time) {
 
 double
 compute_cf_approx_euler(const vector<double> &cf_coeffs, const double time) {
-  double current_num = 0.0, current_denom = 0.0;
+  double curr_num = 0.0, curr_denom = 0.0;
   double prev_num1 = 0.0, prev_num2 = 1.0;
   double prev_denom1 = 0.0, prev_denom2 = 1.0; 
   
   for (size_t i = 0; i < cf_coeffs.size(); ++i) {
-    current_num = prev_num1 + cf_coeffs[i]*time*prev_num2;
-    current_denom = prev_denom1 + cf_coeffs[i]*time*prev_denom2;
+    curr_num = prev_num1 + cf_coeffs[i]*time*prev_num2;
+    curr_denom = prev_denom1 + cf_coeffs[i]*time*prev_denom2;
     prev_num2 = prev_num1;
-    prev_num1 = current_num;
+    prev_num1 = curr_num;
     prev_denom2= prev_denom1;
-    prev_denom1 = current_denom;
+    prev_denom1 = curr_denom;
     if (CF_APPROX_VERBOSE)
-      cerr << current_num << '\t' << current_denom << endl;
+      cerr << curr_num << '\t' << curr_denom << endl;
   }
-  return current_num/current_denom;
+  return curr_num/curr_denom;
 }

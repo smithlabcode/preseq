@@ -38,10 +38,9 @@ using std::endl;
 using std::cerr;
 using std::fabs;
 
-void
+static void
 solve_linear_system(const vector<vector<double> > &U, 
                     const vector<double> &v, vector<double> &b) {
-  
   // compute Ub = v
   
   gsl_vector *v_gsl = gsl_vector_alloc(v.size());
@@ -63,16 +62,16 @@ solve_linear_system(const vector<vector<double> > &U,
   gsl_vector_free(b_gsl);
 }
 
-void
+
+static void
 compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
                      const size_t denom_size,
                      vector<double> &denom_coeffs) {
   
   //use the formula from Baker, Pade Approximants page 2 and 3
   vector<double> v(denom_size, 0.0);
-  for (size_t j = 0; j < denom_size; j++) {
+  for (size_t j = 0; j < denom_size; j++)
     v[j] = -coeffs[j + numer_size];
-  }
   
   size_t n = denom_size;
   size_t m = numer_size-1;
@@ -82,12 +81,12 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
         U[j - m - 1][n-k] = coeffs[j - k];
     }
   }
-
+  
   solve_linear_system(U, v, denom_coeffs);
 
 }
 
-void
+static void
 test_coefficients(const vector<double> &coeffs, 
                   const vector<double> &num_coeffs, 
                   const vector<double> &denom_coeffs) {
@@ -140,23 +139,20 @@ compute_pade_coeffs(const vector<double> &coeffs,
 double
 compute_pade_approx_numerator(const double t,
                               const vector<double> &numerator) {
-
   double total = 0.0; 
-  for (size_t j = 0; j < numerator.size(); ++j) {
+  for (size_t j = 0; j < numerator.size(); ++j)
     total += numerator[j]*pow(t, j);
-  }
   return total;
 }
 
 double
 compute_pade_approx_denominator(const double t,
                                 const vector<double> &denominator) {
-  //   for (j = 0; j <= b->size; j++)  
-  //     den += (j == 0 ? 1.0 : gsl_vector_get(b, j - 1)) * pow(x, j);  
+  // for (j = 0; j <= b->size; j++)  
+  //   den += (j == 0 ? 1.0 : gsl_vector_get(b, j - 1)) * pow(x, j);  
   double total = 1.0;
   for (size_t j = 0; j < denominator.size(); ++j)
     total += denominator[j]*pow(t, j + 1);
-  
   return total;
 }
 
@@ -174,7 +170,7 @@ evaluate_polynomial(const vector<double> &coeffs,
   return(return_val);
 }
 
-double
+static double
 locate_polynomial_zero(const vector<double> &coeffs, //by bisection
                        const double lower_lim,
                        const double upper_lim,
@@ -201,16 +197,16 @@ locate_polynomial_zero(const vector<double> &coeffs, //by bisection
 }
 
 void
-compute_pade_curve(const std::vector<double> &coeffs,
-                   const double max_time,
-                   const double time_step,
+compute_pade_curve(const bool VERBOSE,
+                   const std::vector<double> &coeffs,
+                   const double max_time, const double time_step,
                    const double allowable_defect_error,
                    const double tolerance,
                    const size_t denom_size,
-                   const bool VERBOSE,
                    vector<double> &numerator_approx,
                    vector<double> &denominator_approx,
                    bool &defect_flag) {
+  
   size_t numer_size = coeffs.size()-denom_size;  //numer_size = L+1, denom_size = M
   
   vector<double> denom_vec;
@@ -220,35 +216,33 @@ compute_pade_curve(const std::vector<double> &coeffs,
   
   vector<double> full_denom_vec(denom_vec);
   full_denom_vec.insert(full_denom_vec.begin(), 1.0);
-  double t = 0.0;
-
   
   double prev_denom_val = 1.0;
   double current_denom_val = 1.0;
-  // double zero_location = 0.0; 
   
   numerator_approx.clear();
   denominator_approx.clear();
-
-  while (t <= max_time) {
+  
+  for (double t = 0.0; t <= max_time; t += time_step) {
     numerator_approx.push_back(compute_pade_approx_numerator(t, num_vec));
     denominator_approx.push_back(compute_pade_approx_denominator(t, denom_vec));
-  //  numerator_approx.push_back(evaluate_polynomial(num_vec, t));
-  //  denominator_approx.push_back(evaluate_polynomial(full_denom_vec, t));
+    //  numerator_approx.push_back(evaluate_polynomial(num_vec, t));
+    //  denominator_approx.push_back(evaluate_polynomial(full_denom_vec, t));
     current_denom_val = denominator_approx.back();
     if (current_denom_val*prev_denom_val < 0) {
-      double denom_zero = locate_polynomial_zero(full_denom_vec, t-time_step, t, tolerance);
-      double numer_zero = locate_polynomial_zero(num_vec, t-time_step, t+time_step, tolerance);
-      if (VERBOSE) {
-        cerr << "zero found, denom location = " << denom_zero << ", numerator location = "
-        << numer_zero << "\n";
-      }
+      
+      const double denom_zero = 
+	locate_polynomial_zero(full_denom_vec, t - time_step, t, tolerance);
+      const double numer_zero = 
+	locate_polynomial_zero(num_vec, t - time_step, t + time_step, tolerance);
+      
+      if (VERBOSE)
+        cerr << "DENOM ZERO AT " << denom_zero << "; NUM ZERO AT "
+	     << numer_zero << endl;
+      
       if (fabs(denom_zero - numer_zero) > allowable_defect_error)
         defect_flag = true;
     }
     prev_denom_val = current_denom_val;
-    t += time_step;
   }
-  if (defect_flag == true && VERBOSE)
-    cerr << "defect found \n";
 }
