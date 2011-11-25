@@ -114,22 +114,41 @@ main(int argc, const char **argv) {
     if (!check_sorted(read_locations))
       throw SMITHLABException("read_locations not sorted");
     
+    // OBTAIN THE COUNTS FOR DISTINCT READS
     vector<size_t> values;
     get_counts(read_locations, values);
+
+    const size_t distinct_reads = values.size();
     
-    const size_t vals_sum = accumulate(values.begin(), values.end(), 0);
+    // JUST A SANITY CHECK
+    const size_t n_reads = read_locations.size();
+    const size_t vals_sum = accumulate(values.begin(), values.end(), 0ul);
+    assert(vals_sum == n_reads);
     
-    const size_t max_value = *std::max_element(values.begin(), values.end());
-    vector<size_t> vals_hist(max_value + 1, 0.0);
-    for (size_t i = 0; i < values.size(); ++i)
-      ++vals_hist[static_cast<size_t>(values[i])];
-    
-    max_terms = std::min(max_terms, max_value);
-    
+    const size_t max_observed_count = 
+      *std::max_element(values.begin(), values.end());
+
+    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+    max_terms = std::min(max_terms, max_observed_count);
     // need max_terms = L+M+1 to be even so that L+M is odd and we get
     // convergence from above
-    if(max_terms % 2 == 0)
-      max_terms--; 
+    if (max_terms % 2 == 0)
+      --max_terms; 
+    
+    // BUILD THE HISTOGRAM
+    vector<size_t> vals_hist(max_observed_count + 1, 0.0);
+    for (size_t i = 0; i < values.size(); ++i)
+      ++vals_hist[values[i]];
+    
+    const size_t distinct_counts = std::count_if(vals_hist.begin(), vals_hist.end(),
+						 bind2nd(std::greater<size_t>(), 0));
+    
+    if (VERBOSE)
+      cerr << "TOTAL READS     = " << read_locations.size() << endl
+	   << "DISTINCT READS  = " << distinct_reads << endl
+	   << "DISTINCT COUNTS = " << distinct_counts << endl
+	   << "MAX COUNT       = " << max_observed_count << endl;
+    
     vector<double> summands;
     vector<double> coeffs(max_terms, 0.0);
     for(size_t j = 0; j < max_terms; j++)
@@ -142,7 +161,7 @@ main(int argc, const char **argv) {
     
     bool DEFECT_FLAG = false;
     size_t max_number_approxs = static_cast<size_t>(round((max_terms-8)/2));
-    for(size_t i = 0; i < max_number_approxs; i++) { 
+    for (size_t i = 0; i < max_number_approxs; i++) { 
       //detect defect, move up table to more conservative approx
       compute_pade_curve(coeffs, max_time, time_step, defect_tolerance, tolerance,
                          denom_size, VERBOSE, numerator_approx, denominator_approx, 
@@ -154,13 +173,13 @@ main(int argc, const char **argv) {
       denom_size--;
       numerator_approx.clear();
       denominator_approx.clear();
-      cerr << i+1 << "\n";
+      if (VERBOSE)
+	cerr << i + 1 << endl;
     }
-    cerr << "\n";
     
     coeffs.clear();
-    for(size_t j = 0; j < max_terms+2; j++)
-      coeffs.push_back(vals_hist[j+1]);
+    for (size_t j = 0; j < max_terms + 2; ++j)
+      coeffs.push_back(vals_hist[j + 1]);
     denom_size = coeffs.size()/2 - 1; 
     
     // if moving up table doesn't work, move down table
