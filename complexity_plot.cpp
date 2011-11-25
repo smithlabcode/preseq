@@ -1,8 +1,7 @@
 /*    complexity_plot: 
  *
  *    Copyright (C) 2010 University of Southern California and
- *                       Andrew D. Smith
- *                       Timothy Dailey
+ *                       Andrew D. Smith and Timothy Dailey
  *
  *    Authors: Andrew D. Smith and Timothy Dailey
  *
@@ -23,7 +22,7 @@
 #include <fstream>
 
 #include "OptionParser.hpp"
-#include "rmap_utils.hpp"
+#include "smithlab_utils.hpp"
 #include "GenomicRegion.hpp"
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
@@ -35,8 +34,6 @@ using std::vector;
 using std::ostream;
 using std::endl;
 using std::cerr;
-using std::pair;
-using std::make_pair;
 using std::sort;
 
 static size_t
@@ -115,7 +112,7 @@ int main(int argc, const char **argv) {
     vector<SimpleGenomicRegion> regions;
     ReadBEDFile(input_file_name, regions);
     if (!check_sorted(regions))
-      throw RMAPException("regions not sorted");
+      throw SMITHLABException("regions not sorted");
     
     vector<size_t> orig(regions.size());
     for (size_t i = 0; i < orig.size(); ++i)
@@ -124,16 +121,18 @@ int main(int argc, const char **argv) {
     if (upper_limit == 0)
       upper_limit = orig.size();
 
-    ostream* out = (outfile.empty()) ? 
-      &std::cout : new std::ofstream(outfile.c_str());
+    std::ofstream of;
+    if (!outfile.empty()) of.open(outfile.c_str());
+    ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+
     for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;
-      *out << i << "\t" << sample_and_unique(rng, i, orig, regions) << endl;
+      out << i << "\t" << sample_and_unique(rng, i, orig, regions) << endl;
     }
-    if (out != &std::cout) delete out;
+    
   }
-  catch (RMAPException &e) {
+  catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
     return EXIT_FAILURE;
   }
