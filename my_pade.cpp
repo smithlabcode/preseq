@@ -216,14 +216,6 @@ compute_pade_curve(const std::vector<double> &coeffs,
   vector<double> full_denom_vec(denom_vec);
   full_denom_vec.insert(full_denom_vec.begin(), 1.0);
   double t = 0.0;
-  cerr << "numerator coeffs = ";
-  for(size_t i = 0; i < num_vec.size(); i++)
-    cerr << num_vec[i] << ", ";
-  cerr << "\n";
-  cerr << "denominator coeffs = ";
-  for(size_t i = 0; i < full_denom_vec.size(); i++)
-    cerr << full_denom_vec[i] << ", ";
-  cerr << "\n";
   
   double prev_denom_val = 1.0;
   double current_denom_val = 1.0;
@@ -367,22 +359,13 @@ cont_frac_lower_offdiagonal(const vector<double> &coeffs,
   //need to work with reciprocal series g = f^{-1}
   vector<double> reciprocal_coeffs;
   reciprocal_coeffs.push_back(1/coeffs[0]);
-  cerr << "computing reciprocal:\n";
   for(size_t i = 1; i < depth; i++){
     double holding_val = 0.0;
-    cerr << "iter = " << i << " terms in holding_val  = ";
-    for(size_t j = 0; j < i; j++){
-      cerr << coeffs[i-j] << ", " << reciprocal_coeffs[j] << ", ";
+    for(size_t j = 0; j < i; j++)
       holding_val += coeffs[i-j]*reciprocal_coeffs[j];
-    }
-    cerr << "\n" << ", holding val = " << holding_val <<
-    ", reciprocal coeff = " << -holding_val/coeffs[0] << "\n";
+
     reciprocal_coeffs.push_back(-holding_val/coeffs[0]);
   }
-  cerr << "reciprocal series = ";
-  for(size_t i = 0; i < reciprocal_coeffs.size(); i++)
-    cerr << reciprocal_coeffs[i] << ", ";
-  cerr << "\n";
   vector<double> holding_coeffs;
   for(size_t i = offset; i < depth; i++)
     holding_coeffs.push_back(reciprocal_coeffs[i]);
