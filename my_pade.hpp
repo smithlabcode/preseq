@@ -31,10 +31,10 @@ public:
                                 const double dx, const double tolerance);
 
 private:
+  std::vector<double> cf_coeffs;
+  std::vector<double> offset_coeffs;
   size_t lower_offset;
   size_t upper_offset;
-  std::vector<double> offset_coeffs;
-  std::vector<double> cf_coeffs;
 };
   
 
