@@ -83,11 +83,12 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
 
 }
 
-void
+bool
 test_coefficients(const vector<double> &coeffs, 
                   const vector<double> &num_coeffs, 
                   const vector<double> &denom_coeffs) {
   
+  bool accept_approx = true;
   static const double COEFF_TEST_TOLERANCE = 1e-10;
   
   for (size_t i = 0; i < num_coeffs.size(); ++i) {
@@ -105,11 +106,12 @@ test_coefficients(const vector<double> &coeffs,
         sum += coeffs[offset-denom_coeffs.size()+j]*denom_coeffs[j];  // if the coeffs index < 0, coeff = 0
     }
 
-    assert(fabs(sum) < COEFF_TEST_TOLERANCE);
+    accept_approx = (accept_approx && (fabs(sum) < COEFF_TEST_TOLERANCE)); //set accept approx to zero if any test coeff fails
   }
+  return accept_approx;
 }
 
-void
+bool
 compute_pade_coeffs(const vector<double> &coeffs,
                     const size_t numer_size, const size_t denom_size, //numer_size = L+1
                     vector<double> &num_coeffs, 
@@ -126,12 +128,13 @@ compute_pade_coeffs(const vector<double> &coeffs,
   }
   
   
-  test_coefficients(coeffs, num_coeffs, denom_coeffs);
+  bool accept_approx = test_coefficients(coeffs, num_coeffs, denom_coeffs);
   //denom is backwards, rearrange it
   vector<double> denom_coeffs_copy(denom_coeffs);
   for(size_t j = 0; j < denom_coeffs.size(); j++)
     denom_coeffs[j] = denom_coeffs_copy[denom_coeffs_copy.size()-1-j];
   
+  return accept_approx;
 }
 
 double
@@ -196,7 +199,7 @@ locate_polynomial_zero(const vector<double> &coeffs, //by bisection
   return(z_mid);
 }
 
-void
+bool
 compute_pade_curve(const std::vector<double> &coeffs,
                    const double max_time,
                    const double time_step,
@@ -211,7 +214,17 @@ compute_pade_curve(const std::vector<double> &coeffs,
   vector<double> denom_vec;
   vector<double> num_vec;
     
-  compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
+  bool accept_approx = compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
+  
+  if(VERBOSE){
+    cerr << "numerator coeffs = ";
+    for(size_t i = 0; i < num_vec.size(); i++)
+      cerr << num_vec[i] << ", ";
+    cerr << "\ndenomimator coeffs = ";
+    for(size_t i = 0; i < denom_vec.size(); i++)
+      cerr << denom_vec[i] << ", ";
+    cerr << "\n";
+  }
   
   vector<double> full_denom_vec(denom_vec);
   full_denom_vec.insert(full_denom_vec.begin(), 1.0);
@@ -224,25 +237,28 @@ compute_pade_curve(const std::vector<double> &coeffs,
   numerator_approx.clear();
   denominator_approx.clear();
 
-  while(t <= max_time){
-    numerator_approx.push_back(compute_pade_approx_numerator(t, num_vec));
-    denominator_approx.push_back(compute_pade_approx_denominator(t, denom_vec));
-    current_denom_val = denominator_approx.back();
-    if(current_denom_val*prev_denom_val < 0){
-      double denom_zero = locate_polynomial_zero(full_denom_vec, t-time_step, t, tolerance);
-      double numer_zero = locate_polynomial_zero(num_vec, t-time_step, t+time_step, tolerance);
-      if(VERBOSE){
-        cerr << "zero found, denom location = " << denom_zero << ", numerator location = "
-        << numer_zero << "\n";
+  if(accept_approx){
+    while(t <= max_time){
+      numerator_approx.push_back(compute_pade_approx_numerator(t, num_vec));
+      denominator_approx.push_back(compute_pade_approx_denominator(t, denom_vec));
+      current_denom_val = denominator_approx.back();
+      if(current_denom_val*prev_denom_val < 0){
+        double denom_zero = locate_polynomial_zero(full_denom_vec, t-time_step, t, tolerance);
+        double numer_zero = locate_polynomial_zero(num_vec, t-time_step, t+time_step, tolerance);
+        if(VERBOSE){
+          cerr << "zero found, denom location = " << denom_zero << ", numerator location = "
+          << numer_zero << "\n";
+        }
+        if(fabs(denom_zero - numer_zero) > allowable_defect_error)
+          defect_flag = true;
       }
-      if(fabs(denom_zero - numer_zero) > allowable_defect_error)
-        defect_flag = true;
+      prev_denom_val = current_denom_val;
+      t += time_step;
     }
-    prev_denom_val = current_denom_val;
-    t += time_step;
+    if(defect_flag == true && VERBOSE)
+      cerr << "defect found \n";
   }
-  if(defect_flag == true && VERBOSE)
-    cerr << "defect found \n";
+  return(accept_approx);
 }
 
 
@@ -741,10 +757,11 @@ cont_frac::locate_zero_cf_deriv(const double val, const double prev_val,
   while(diff > tolerance && movement(val_low, val_high) > tolerance){
     val_mid = (val_low + val_high)/2.0;
     mid_deriv = cf_deriv_complex(val_mid, dx, tolerance);
-    if(mid_deriv*deriv_low  > 0)
-      val_low = val_mid;
-    else 
+    if((mid_deriv > 0 && deriv_low < 0) ||
+       (mid_deriv < 0 && deriv_low > 0))
       val_high = val_mid;
+    else 
+      val_low = val_mid;
     deriv_low = cf_deriv_complex(val_low, dx, tolerance);
     deriv_high = cf_deriv_complex(val_high, dx, tolerance);
     diff = fabs((prev_deriv - mid_deriv)/prev_deriv);

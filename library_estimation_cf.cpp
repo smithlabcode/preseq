@@ -146,26 +146,30 @@ test_stability_cf_distinct(cont_frac cf_estimate,
                            const bool VERBOSE){
   // stable if d/dt f(time) < 1 and f(time) <= prev_val+sample_per_time_step
   bool return_val = false;
+  const double current_val = cf_estimate.cf_approx(time, tolerance);
   double test_val = cf_estimate.cf_deriv_complex(time, dx, tolerance);
-  if(test_val <= vals_sum && test_val >= 0.0)
+  if(test_val <= vals_sum && test_val >= 0.0){
     return_val = true;
+  }
   if(return_val == true &&
-     cf_estimate.cf_approx(time, tolerance) <= prev_val + samples_per_time_step)
+     current_val <= prev_val + samples_per_time_step &&
+     current_val >= prev_val){
     return(true);
+  }
   else{
     if(VERBOSE){
     cerr << "error found at " << time << ", cf approx = " 
       << cf_estimate.cf_approx(time, tolerance) << ", deriv = "
       << cf_estimate.cf_deriv_complex(time, dx, tolerance) << 
       ", " << (cf_estimate.cf_approx(time+dx, tolerance)-cf_estimate.cf_approx(time, tolerance))/dx 
-      << ", vals_sum = " <<vals_sum;
+      << ", vals_sum = " << vals_sum << "\n";
     } 
     return(false);
   }
 }
   
   
-bool
+void
 compute_distinct(const vector<double> &vals_hist,
                  const double vals_sum,
                  const double max_time,
@@ -183,27 +187,32 @@ compute_distinct(const vector<double> &vals_hist,
     coeffs[j] = vals_hist[j+1]*pow(-1, j+2);
   
   const double values_size = accumulate(vals_hist.begin(), vals_hist.end(), 0.0);
-
   
-  vector<double> cf_coeffs;
-  vector<double> offset_coeffs;
-  cont_frac cf_estimate(cf_coeffs, offset_coeffs, 0, 0);
-  cf_estimate.compute_cf_coeffs(coeffs, max_terms);
-  
-  estimate_vec.push_back(values_size);
-  double time = time_step;
-  while(time <= max_time){
-    if(test_stability_cf_distinct(cf_estimate, time, estimate_vec.back(), dx,
-                                  tolerance, vals_sum, vals_sum*time_step, VERBOSE))
-      estimate_vec.push_back(values_size + cf_estimate.cf_approx(time, tolerance));
-    else{
-      if(VERBOSE)
-        cerr << ", number of terms = " << max_terms << "\n";
-      return(false);
+  while(max_terms > 10){
+    vector<double> cf_coeffs;
+    vector<double> offset_coeffs;
+    cont_frac cf_estimate(cf_coeffs, offset_coeffs, 0, 0);
+    cf_estimate.compute_cf_coeffs(coeffs, max_terms);
+    estimate_vec.push_back(values_size);
+    double time = time_step;
+    while(time <= max_time){
+      if(test_stability_cf_distinct(cf_estimate, time, estimate_vec.back()-values_size, dx,
+                                    tolerance, vals_sum, vals_sum*time_step, VERBOSE)){
+        estimate_vec.push_back(values_size + cf_estimate.cf_approx(time, tolerance));
+      }
+      else{
+        if(VERBOSE)
+          cerr << ", number of terms = " << max_terms << "\n";
+        estimate_vec.clear();
+        max_terms -= 2;
+        break;
+      }
+      time += time_step;
     }
-    time += time_step;
+    if(estimate_vec.size() > 1){ //break from max_terms loop
+      break;
+    }
   }
-  return(true);   //return success if all estimates are a success                               
 }
 
 static inline double
@@ -249,13 +258,26 @@ chao_lee_lowerbound_librarysize(const vector<double> &vals_hist){ //Chao & Lee (
   if(log_cv_terms.size() > 0)
     coeff_variation = max(exp(log_sum_log_vec(log_cv_terms, log_cv_terms.size()))-1, 0.0);
   
-  return(naive_lowerbound + sample_size*(1-coverage)*coeff_variation/coverage);
+  for(size_t i = 0; i < log_cv_terms.size(); i++)
+    log_cv_terms[i] -= log(naive_lowerbound);
+  double corrected_coeff_variation = coeff_variation*(1+sample_size*(1-coverage)
+                                                      *exp(log_sum_log_vec(log_cv_terms, 
+                                                                           log_cv_terms.size()))/coverage);
+  
+  return(naive_lowerbound + sample_size*(1-coverage)*corrected_coeff_variation/coverage);
+}
+
+double
+chao87_lowerbound_librarysize(const vector<double> &vals_hist){
+  return(accumulate(vals_hist.begin(), vals_hist.end(), 0.0)
+         + vals_hist[1]*vals_hist[1]/(2*vals_hist[2]));
 }
 
 
 double
 pade_upperbound_librarysize(const vector<double> &vals_hist,
-                            size_t &max_terms){
+                            const bool VERBOSE,
+                            size_t max_terms){
 
   vector<double> coeffs(max_terms, 0.0);
   for(size_t j = 0; j < max_terms; j++)
@@ -265,18 +287,29 @@ pade_upperbound_librarysize(const vector<double> &vals_hist,
     max_terms--; //need max_terms = L+M+1 to be even so that L+M is odd so that we can take lim_{t \to \infty} [L+1, M]
   vector<double> denom_vec;
   vector<double> num_vec;
-  for(size_t j = 0; j < max_terms/2 - 1; j++){
+  while(max_terms >= 12){
     size_t numer_size = max_terms/2;  //numer_size = L+1, denom_size = M
     size_t denom_size = max_terms - numer_size;
     if(numer_size != denom_size)
       cerr << "num size = " << numer_size << ", denom size = " << denom_size << "\n";
     assert(numer_size == denom_size);
-    compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
-    if(num_vec.back() > 0 && denom_vec.back() > 0)
+    bool accept_approx = compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
+    if(VERBOSE){
+      cerr << "numerator coeffs = ";
+      for(size_t i = 0; i < num_vec.size(); i++)
+        cerr << num_vec[i] << ", ";
+      cerr << "\ndenomimator coeffs = ";
+      for(size_t i = 0; i < denom_vec.size(); i++)
+        cerr << denom_vec[i] << ", ";
+      cerr << "\n";
+    }
+    if(accept_approx && num_vec.back()/denom_vec.back() > 0)
       break;
-    denom_vec.clear();
-    num_vec.clear();
-    max_terms -= 2;
+    else{
+      denom_vec.clear();
+      num_vec.clear();
+      max_terms -= 2;
+    }
   }
   return(num_vec.back()/denom_vec.back());
 }
@@ -363,7 +396,7 @@ pade_upperbound_librarysize(const vector<double> &vals_hist,
   return(current_global_max);
 }
 */
-
+                 
 
 double
 pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
@@ -372,52 +405,91 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
                                     const double max_time,
                                     const double dx,
                                     const double tolerance,
-                                    size_t &max_terms){ 
-  vector<double> coeffs(max_terms, 0.0);
-  for(size_t j = 0; j < max_terms; j++)
-    coeffs[j] = vals_hist[j+1]*pow(-1, j+2);
-    
-  if(max_terms % 2 == 0)
-    max_terms--; //need max_terms = L+M+1 to be even so that L+M is odd so that we have convergence from below
-  //easier to compute derivative using pade
+                                    const bool VERBOSE,
+                                    size_t max_terms){ 
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < vals_hist.size(); i++)
+    vals_sum += i*vals_hist[i];
+  
+  const double distinct_vals = accumulate(vals_hist.begin(), vals_hist.end(), 0.0); 
+  
   vector<double> cf_coeffs;
   vector<double> offset_coeffs;
   cont_frac cf_estimate(cf_coeffs, offset_coeffs, 2, 0);
-  cf_estimate.compute_cf_coeffs(coeffs, max_terms);
   
+  vector<double> coeffs(max_terms, 0.0);
+  for(size_t j = 0; j < max_terms; j++)
+    coeffs[j] = vals_hist[j+1]*pow(-1, j+2);
+  vector<double> possible_maxima_loc;
   vector<double> possible_maxima;
-  double t = time_step;
-  double prev_deriv = 0.0;
-  double current_deriv = cf_estimate.cf_deriv_complex(t, dx, tolerance);
-  while(t < max_time){
-    current_deriv = cf_estimate.cf_deriv_complex(t, dx, tolerance);
-    if(current_deriv*prev_deriv < 0.0)
-      possible_maxima.push_back(cf_estimate.locate_zero_cf_deriv(t, t-time_step,
-                                                                 dx, tolerance));
-    prev_deriv = current_deriv;
-    t += time_step;
-  }
-    
-  possible_maxima.push_back(max_time); //include boundary
-  
-  cerr << "possible maxima = ";
-  for(size_t i = 0; i < possible_maxima.size(); i++)
-    cerr << possible_maxima[i] << ", ";
-  cerr << "\nvalues = ";
-  for(size_t i = 0; i < possible_maxima.size(); i++)
-    cerr << cf_estimate.cf_approx(possible_maxima[i], tolerance) << ", ";
-  cerr << "\n";
-  cerr << "upper bound = " << upper_bound << "\n";
-  
-  double current_global_max = 0.0;
-  double current_global_max_loc = 0.0;
-  for(size_t j = 0; j < possible_maxima.size(); j++){
-    double test_val = cf_estimate.cf_approx(possible_maxima[j], tolerance);
-    if(test_val > current_global_max && test_val < upper_bound ){ //no genome is larger than 1e20
-      current_global_max = test_val;
-      current_global_max_loc = possible_maxima[j];
+  if(max_terms % 2 == 0)
+    max_terms--; //need max_terms = L+M+1 to be even so that L+M is odd so that we have convergence from below
+  while (max_terms > 10){
+    if(VERBOSE)
+    cf_estimate.compute_cf_coeffs(coeffs, max_terms);
+    double t = time_step;
+    double prev_deriv = 0.0;
+    double current_deriv = cf_estimate.cf_deriv_complex(t, dx, tolerance);
+    double current_val = distinct_vals;
+    double prev_val = distinct_vals;
+    while(t < max_time){
+      current_deriv = cf_estimate.cf_deriv_complex(t, dx, tolerance);
+      current_val = cf_estimate.cf_approx(t, tolerance)+distinct_vals;
+      if(fabs(current_deriv) > vals_sum || current_val > upper_bound){ //if derivative or estimate is not acceptable, choose different order approx
+        possible_maxima_loc.clear();  //so that we can know we need to go down in approx
+        possible_maxima.clear();
+        break; //out of t loop
+      }
+      else if(current_deriv*prev_deriv < 0.0 && current_val < upper_bound){
+        possible_maxima_loc.push_back(cf_estimate.locate_zero_cf_deriv(t, t-time_step,
+                                                                       dx, tolerance));
+        possible_maxima.push_back(cf_estimate.cf_approx(possible_maxima_loc.back(), tolerance)+distinct_vals);
+      }
+      else if(current_val < prev_val && prev_val < upper_bound){
+        possible_maxima_loc.push_back(t-time_step);
+        possible_maxima.push_back(prev_val);
+      }
+      prev_deriv = current_deriv;
+      prev_val = current_val;
+      t += time_step;
+    }
+    if(possible_maxima.size() > 0){
+      break; //out of max_terms loop
+    }
+    else{
+      possible_maxima.clear();
+      vector<double> no_cf_coeffs;
+      vector<double> no_offset_coeffs;
+      cf_estimate.set_cf_coeffs(no_cf_coeffs);
+      cf_estimate.set_offset_coeffs(no_offset_coeffs);
+      max_terms -= 2;
     }
   }
+    
+  possible_maxima_loc.push_back(max_time); //include boundary
+  possible_maxima.push_back(cf_estimate.cf_approx(max_time, tolerance)+distinct_vals);
+
+  if(VERBOSE){
+    cerr << "possible maxima = ";
+    for(size_t i = 0; i < possible_maxima_loc.size(); i++)
+      cerr << possible_maxima_loc[i] << ", ";
+    cerr << "\nvalues = ";
+    for(size_t i = 0; i < possible_maxima.size(); i++)
+      cerr << possible_maxima[i] << ", ";
+    cerr << "\n";
+    cerr << "upper bound = " << upper_bound << "\n";
+  }
+  double current_global_max = 0.0;
+  double current_global_max_loc = 0.0;
+  for(size_t j = 0; j < possible_maxima_loc.size(); j++){
+    double test_val = possible_maxima[j];
+    if(test_val > current_global_max && test_val < upper_bound ){ 
+      current_global_max = test_val;
+      current_global_max_loc = possible_maxima_loc[j];
+    }
+  }
+  if(VERBOSE)
+    cerr << "chosen global max = " << current_global_max << ", loc = " << current_global_max_loc << "\n";
   return(current_global_max);
 }
     
@@ -468,9 +540,6 @@ main(int argc, const char **argv){
                       false, library_size);
     
 
-
-
-
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -500,7 +569,7 @@ main(int argc, const char **argv){
     
     get_counts(read_locations, values);
     
- //   const size_t values_size = values.size();
+    const double distinct_vals = static_cast<double>(values.size());
     const size_t vals_sum = accumulate(values.begin(), values.end(), 0);
 
     const size_t max_value = *std::max_element(values.begin(),values.end());
@@ -525,8 +594,10 @@ main(int argc, const char **argv){
     // heuristics suggest the method is accurate even for large numbers,
     // set (max_time)^max_term < 10^250
     max_terms = std::min(max_approx, max_terms);
-    if(VERBOSE)
+    if(VERBOSE){
       cerr << "max term = " << max_terms << "\n";
+      cerr << "distinct_vals = " << distinct_vals << "\n";
+    }
     
     
     if(coverage){
@@ -535,38 +606,36 @@ main(int argc, const char **argv){
     }
     else if(library_size){
       estimate_vec.push_back(chao_lee_lowerbound_librarysize(vals_hist));
-      double upper_bound = pade_upperbound_librarysize(vals_hist, max_terms);
+      estimate_vec.push_back(chao87_lowerbound_librarysize(vals_hist));
+      double upper_bound = pade_upperbound_librarysize(vals_hist, VERBOSE, max_terms)+distinct_vals;
       estimate_vec.push_back(pade_lowerbound_librarysize_complex(vals_hist, upper_bound, time_step,
-                                                                 max_time, delta, tolerance,
+                                                                 max_time, delta, tolerance, VERBOSE,
                                                                  max_terms));
       estimate_vec.push_back(upper_bound);
 
       ostream* out = (outfile.empty()) ? 
       &std::cout : new std::ofstream(outfile.c_str());
-      for(size_t i = 0; i < estimate_vec.size(); i++)
-        *out << estimate_vec[i] << endl;
+      *out << "Chao-Lee(1992) lower bound\t" << estimate_vec[0] << endl;
+      *out << "Chao(1987) lower bound \t" << estimate_vec[1] << endl;
+      *out << "continued fraction lower bound\t" << estimate_vec[2] << endl;
+      *out << "continued fraction upper bound\t" << estimate_vec[3] << endl;
       
     }
     else{
-      bool testing = false;
-      for(size_t i = 0; i < max_terms/2-1; i++){
-        testing = compute_distinct(vals_hist, vals_sum, max_time, time_step,
-                                     delta, tolerance,  VERBOSE, estimate_vec,
-                                     max_terms);
-        if(testing){
-          break;
-        }
-        else{
-          max_terms -= 2;
-          estimate_vec.clear();
+      compute_distinct(vals_hist, vals_sum, max_time,
+                      time_step, delta, tolerance, VERBOSE,
+                       estimate_vec, max_terms);
+      double t = 0.0;
+      if(estimate_vec.size() > 0){
+        ostream* out = (outfile.empty()) ? 
+        &std::cout : new std::ofstream(outfile.c_str());
+        for(size_t i = 0; i < estimate_vec.size(); i++){
+          *out << (t+1.0)*vals_sum << "\t" << estimate_vec[i] << endl;
+          t += time_step;
         }
       }
-      double t = 0.0;
-      ostream* out = (outfile.empty()) ? 
-      &std::cout : new std::ofstream(outfile.c_str());
-      for(size_t i = 0; i < estimate_vec.size(); i++){
-        *out << (t+1.0)*vals_sum << "\t" << estimate_vec[i] << endl;
-        t += time_step;
+      else{
+        cerr << "no acceptable approx \n";
       }
     }
     

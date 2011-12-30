@@ -38,7 +38,7 @@ private:
 };
   
 
-void compute_pade_coeffs(const std::vector<double> &coeffs, 
+bool compute_pade_coeffs(const std::vector<double> &coeffs, 
                          const size_t numer_size, const size_t denom_size,
                          std::vector<double> &num_coeffs, 
                          std::vector<double> &denom_coeffs);
@@ -51,7 +51,7 @@ double locate_polynomial_zero(const std::vector<double> &coeffs,
                               const double tolerance);
 double evaluate_polynomial(const std::vector<double> &coeffs,
                            const double val);
-void compute_pade_curve(const std::vector<double> &coeffs,
+bool compute_pade_curve(const std::vector<double> &coeffs,
                         const double max_time,
                         const double time_step,
                         const double allowable_defect_error,
