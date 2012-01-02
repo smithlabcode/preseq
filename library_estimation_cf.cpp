@@ -250,7 +250,7 @@ chao_lee_lowerbound_librarysize(const vector<double> &vals_hist){ //Chao & Lee (
   vector<double> log_cv_terms;
   for(size_t i = 2; i < vals_hist.size(); i++){
     if(vals_hist[i] > 0){
-      log_cv_terms.push_back(log(naive_lowerbound) + log(i) + log(i-1)
+      log_cv_terms.push_back(log(naive_lowerbound) + log(i) + log(i-1) +log(vals_hist[i])
                              -log(sample_size) - log(sample_size-1));
     }
   }
@@ -406,7 +406,7 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
                                     const double dx,
                                     const double tolerance,
                                     const bool VERBOSE,
-                                    size_t max_terms){ 
+                                    size_t &max_terms){ 
   double vals_sum = 0.0;
   for(size_t i = 0; i < vals_hist.size(); i++)
     vals_sum += i*vals_hist[i];
@@ -424,8 +424,7 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
   vector<double> possible_maxima;
   if(max_terms % 2 == 0)
     max_terms--; //need max_terms = L+M+1 to be even so that L+M is odd so that we have convergence from below
-  while (max_terms > 10){
-    if(VERBOSE)
+  while (max_terms > 6){
     cf_estimate.compute_cf_coeffs(coeffs, max_terms);
     double t = time_step;
     double prev_deriv = 0.0;
@@ -440,7 +439,7 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
         possible_maxima.clear();
         break; //out of t loop
       }
-      else if(current_deriv*prev_deriv < 0.0 && current_val < upper_bound){
+      if(current_deriv*prev_deriv < 0.0 && current_val < upper_bound){
         possible_maxima_loc.push_back(cf_estimate.locate_zero_cf_deriv(t, t-time_step,
                                                                        dx, tolerance));
         possible_maxima.push_back(cf_estimate.cf_approx(possible_maxima_loc.back(), tolerance)+distinct_vals);
@@ -457,7 +456,6 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
       break; //out of max_terms loop
     }
     else{
-      possible_maxima.clear();
       vector<double> no_cf_coeffs;
       vector<double> no_offset_coeffs;
       cf_estimate.set_cf_coeffs(no_cf_coeffs);
@@ -465,10 +463,10 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
       max_terms -= 2;
     }
   }
-    
+  
   possible_maxima_loc.push_back(max_time); //include boundary
   possible_maxima.push_back(cf_estimate.cf_approx(max_time, tolerance)+distinct_vals);
-
+  
   if(VERBOSE){
     cerr << "possible maxima = ";
     for(size_t i = 0; i < possible_maxima_loc.size(); i++)
@@ -492,7 +490,6 @@ pade_lowerbound_librarysize_complex(const vector<double> &vals_hist,
     cerr << "chosen global max = " << current_global_max << ", loc = " << current_global_max_loc << "\n";
   return(current_global_max);
 }
-    
     
 
 int
@@ -605,9 +602,13 @@ main(int argc, const char **argv){
     //                   defect_error, VERBOSE, estimate_vec, max_terms);
     }
     else if(library_size){
+      cerr << "Chao Lee \n";
       estimate_vec.push_back(chao_lee_lowerbound_librarysize(vals_hist));
+      cerr << "Cha 87 \n";
       estimate_vec.push_back(chao87_lowerbound_librarysize(vals_hist));
+      cerr << "upper bound \n";
       double upper_bound = pade_upperbound_librarysize(vals_hist, VERBOSE, max_terms)+distinct_vals;
+      cerr << "lowe bound \n";
       estimate_vec.push_back(pade_lowerbound_librarysize_complex(vals_hist, upper_bound, time_step,
                                                                  max_time, delta, tolerance, VERBOSE,
                                                                  max_terms));
