@@ -76,6 +76,7 @@ compute_num_and_denom_coeffs(const bool VERBOSE, const size_t max_terms,
 			     const vector<double> &initial_coeffs,
 			     const double max_time, const double time_step,
 			     const double tolerance, const double defect_tolerance,
+			     vector<double> &contfrac_coeffs,
 			     vector<double> &num_approx, vector<double> &denom_approx) {
   
   vector<double> coeffs(initial_coeffs);
@@ -92,6 +93,12 @@ compute_num_and_denom_coeffs(const bool VERBOSE, const size_t max_terms,
     compute_pade_curve(VERBOSE, coeffs, max_time, time_step, 
 		       defect_tolerance, tolerance, denom_terms, 
 		       num_approx, denom_approx, DEFECT_FLAG);
+    
+    product_difference_alg_for_contfrac_coeffs(coeffs, 10, 
+ 					       contfrac_coeffs);
+    quotient_difference_alg_for_contfrac_coeffs(coeffs, 20, 
+						contfrac_coeffs);
+    
     FOUND_APPROX = !DEFECT_FLAG;
     coeffs.pop_back();
     coeffs.pop_back();
@@ -120,8 +127,10 @@ compute_coverage(const bool VERBOSE, const vector<double> &counts_histogram,
     coeffs[j] = counts_histogram[j + 1]*pow(-1, j + 2)*(j + 1)/vals_sum;
 
   vector<double> num_approx, denom_approx; 
+  vector<double> contfrac_coeffs;
   compute_num_and_denom_coeffs(VERBOSE, max_terms, coeffs, max_time, time_step,
-			       tolerance, defect_tolerance, num_approx, denom_approx);
+			       tolerance, defect_tolerance, contfrac_coeffs,
+			       num_approx, denom_approx);
   
   estimates.clear();
   for (size_t i = 0; i < num_approx.size(); ++i)
@@ -143,8 +152,14 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
     coeffs[j] = counts_histogram[j + 1]*pow(-1, j+2);
   
   vector<double> num_approx, denom_approx; 
+  vector<double> contfrac_coeffs;
   compute_num_and_denom_coeffs(VERBOSE, max_terms, coeffs, max_time, time_step,
-			       tolerance, defect_tolerance, num_approx, denom_approx);
+			       tolerance, defect_tolerance, contfrac_coeffs,
+			       num_approx, denom_approx);
+
+  for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
+    cerr << std::setw(12) << std::fixed << std::setprecision(2) << contfrac_coeffs[i] << "\t" 
+	 << std::setw(12) << std::fixed << std::setprecision(2) << coeffs[i] << endl;
   
   const double values_size = 
     accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
