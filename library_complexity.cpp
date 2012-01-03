@@ -180,31 +180,22 @@ chao87_lowerbound_librarysize(const vector<double> &counts_histogram){
 }
 
 static double 
-chao_lee_lowerbound_librarysize(const vector<double> &counts_histogram){ //Chao & Lee (JASA 1992) lower bound
+chao_lee_librarysize(const vector<double> &counts_histogram){ //Chao & Lee (JASA 1992) lower bound
   double sample_size = 0.0;
-  for(size_t i = 0; i < counts_histogram.size(); i++)
-    sample_size += i*counts_histogram[i]; 
-  const double distinct = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
-  const double coverage = 1 - counts_histogram[1]/sample_size;
-  const double naive_lowerbound = distinct/coverage;
-  vector<double> log_cv_terms;
+  for(size_t i = 0; i <  counts_histogram.size(); i++)
+    sample_size += counts_histogram[i]*i;
+  const double distinct_vals = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
+  const double estim_coverage = 1.0 - counts_histogram[1]/sample_size;
+  const double naive_lowerbound = distinct_vals/estim_coverage;
+  vector<double> log_coeff_var;
   for(size_t i = 2; i < counts_histogram.size(); i++){
-    if(counts_histogram[i] > 0){
-      log_cv_terms.push_back(log(naive_lowerbound) + log(i) + log(i-1) +log(counts_histogram[i])
-                             -log(sample_size) - log(sample_size-1));
-    }
+    if(counts_histogram[i] > 0)
+      log_coeff_var.push_back(log(i) + log(i-1) + log(counts_histogram[i]));
   }
-  double coeff_variation = 0.0;
-  if(log_cv_terms.size() > 0)
-    coeff_variation = max(exp(log_sum_log_vec(log_cv_terms, log_cv_terms.size()))-1, 0.0);
-  
-  for(size_t i = 0; i < log_cv_terms.size(); i++)
-    log_cv_terms[i] -= log(naive_lowerbound);
-  const double corrected_coeff_variation = coeff_variation*(1+sample_size*(1-coverage)
-                                                            *exp(log_sum_log_vec(log_cv_terms, 
-                                                                                 log_cv_terms.size()))/coverage);
-  
-  return(naive_lowerbound + sample_size*(1-coverage)*corrected_coeff_variation/coverage);
+  const double coeff_var = 
+  naive_lowerbound*exp(log_sum_log_vec(log_coeff_var, log_coeff_var.size())
+                       -log(sample_size) - log(sample_size-1))-1;
+  return(naive_lowerbound + counts_histogram[1]*coeff_var/estim_coverage);
 }
 
 
@@ -457,8 +448,8 @@ main(const int argc, const char **argv) {
       
       out << "Chao 1987 lower bound" << "\t" 
       << chao87_lowerbound_librarysize(counts_histogram) << endl;
-      out << "Chao-Lee lower bound" << "\t" 
-      << chao_lee_lowerbound_librarysize(counts_histogram) << endl;
+      out << "Chao-Lee estimate" << "\t" 
+      << chao_lee_librarysize(counts_histogram) << endl;
       const double upper_bound = upperbound_librarysize(VERBOSE, counts_histogram, max_terms)+distinct_reads;
       out << "Continued Fraction lower bound" << "\t"
       << lowerbound_librarysize(VERBOSE, counts_histogram, upper_bound, time_step, max_time, 
