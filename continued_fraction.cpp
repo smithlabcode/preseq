@@ -95,7 +95,7 @@ cont_frac_qd(const vector<double> &coeffs, //quotient-difference
   }
 }
 
-void
+static void
 cont_frac_upper_offdiagonal(const vector<double> &coeffs,
                             const size_t depth,
                             const size_t offset,
@@ -154,7 +154,7 @@ compute_upper_offdiag_cf_approx(const vector<double> &cf_coeffs,
   }
 } 
 
-void
+static void
 cont_frac_lower_offdiagonal(const vector<double> &coeffs,
                             const size_t depth,
                             const size_t offset,
@@ -181,8 +181,7 @@ cont_frac_lower_offdiagonal(const vector<double> &coeffs,
 static double 
 compute_lower_offdiag_cf_approx(const vector<double> &cf_coeffs,
                                 const vector<double> &offset_coeffs,
-                                const double time,
-                                const double tolerance){
+                                const double time, const double tolerance){
   if(time == 0)
     return 0.0;
   else{
@@ -224,8 +223,7 @@ compute_lower_offdiag_cf_approx(const vector<double> &cf_coeffs,
 
 static double
 compute_cf_approx_euler(const vector<double> &cf_coeffs, //uses euler's recursion
-                        const double time,
-                        const double tolerance){
+                        const double time, const double tolerance){
   if(time == 0.0){
     return 0.0;
   }
@@ -297,7 +295,7 @@ cont_frac::compute_cf_coeffs(const vector<double> ps_coeffs,
 double
 cont_frac::cf_approx(const double time, const double tolerance){
   if(upper_offset != 0 && lower_offset != 0){
-    cerr << "at least one offset must be zero, reset offset.\n";
+    cerr << "at least one offset must be zero, reset offsets.\n";
     return(0.0);
   }
   else if(upper_offset == 0 && lower_offset == 0)

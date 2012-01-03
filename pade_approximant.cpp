@@ -73,8 +73,8 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
   for (size_t j = 0; j < denom_size; j++)
     v[j] = -coeffs[j + numer_size];
   
-  size_t n = denom_size;
-  size_t m = numer_size-1;
+  const size_t n = denom_size;
+  const size_t m = numer_size-1;
   vector<vector<double> > U(n, vector<double>(n, 0.0));
   for (size_t j = m + 1; j < m + n + 1; j++) {
     for (size_t k = 1; k <= (j > n ? n : j); k++) {
@@ -91,7 +91,7 @@ test_coefficients(const vector<double> &coeffs,
                   const vector<double> &num_coeffs, 
                   const vector<double> &denom_coeffs) {
   
-  bool accept_approx = true;
+  bool ACCEPT_APPROX = true;
   static const double COEFF_TEST_TOLERANCE = 1e-10;
   
   for (size_t i = 0; i < num_coeffs.size(); ++i) {
@@ -109,9 +109,9 @@ test_coefficients(const vector<double> &coeffs,
         sum += coeffs[offset-denom_coeffs.size()+j]*denom_coeffs[j];  // if the coeffs index < 0, coeff = 0
     }
     
-    accept_approx = (accept_approx && (fabs(sum) < COEFF_TEST_TOLERANCE)); //set accept approx to zero if any test coeff fails
+    ACCEPT_APPROX = (ACCEPT_APPROX && (fabs(sum) < COEFF_TEST_TOLERANCE)); //set accept approx to zero if any test coeff fails
   }
-  return accept_approx;
+  return ACCEPT_APPROX;
 }
 
 bool
@@ -124,20 +124,20 @@ compute_pade_coeffs(const vector<double> &coeffs,
   
   for (size_t i = 0; i < numer_size; ++i) {
     num_coeffs.push_back(coeffs[i]);
-    size_t upper_lim = std::min(numer_size, denom_coeffs.size());
+    const size_t upper_lim = std::min(numer_size, denom_coeffs.size());
     for (size_t j = 0; j < std::min(i, upper_lim); ++j){
       num_coeffs[i] += denom_coeffs[denom_coeffs.size()-1-j]*coeffs[i - j-1];
     }
   }
   
   
-  bool accept_approx = test_coefficients(coeffs, num_coeffs, denom_coeffs);
+  bool ACCEPT_APPROX = test_coefficients(coeffs, num_coeffs, denom_coeffs);
   //denom is backwards, rearrange it
   vector<double> denom_coeffs_copy(denom_coeffs);
   for(size_t j = 0; j < denom_coeffs.size(); j++)
     denom_coeffs[j] = denom_coeffs_copy[denom_coeffs_copy.size()-1-j];
   
-  return accept_approx;
+  return ACCEPT_APPROX;
 }
 
 double
@@ -168,10 +168,10 @@ movement(const double a, const double b) {
 static inline double
 evaluate_polynomial(const vector<double> &coeffs,
                     const double val) {
-  double return_val = coeffs[0];
+  double polynomial_val = coeffs[0];
   for (size_t i = 1; i < coeffs.size(); i++)
-    return_val += coeffs[i]*pow(val, i);
-  return(return_val);
+    polynomial_val += coeffs[i]*pow(val, i);
+  return(polynomial_val);
 }
 
 static double
@@ -211,7 +211,7 @@ compute_pade_curve(const bool VERBOSE,
                    vector<double> &denominator_approx,
                    bool &defect_flag) {
   
-  size_t numer_size = coeffs.size()-denom_size;  //numer_size = L+1, denom_size = M
+  const size_t numer_size = coeffs.size()-denom_size;  //numer_size = L+1, denom_size = M
   
   vector<double> denom_vec;
   vector<double> num_vec;

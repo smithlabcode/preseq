@@ -96,13 +96,14 @@ cont_frac_distinct_stable(const bool VERBOSE, const double time,
                           const double tolerance, const double vals_sum,
                           const double samples_per_time_step,
                           cont_frac cf_estimate){
-  // stable if d/dt f(time) < 1 and f(time) <= prev_val+sample_per_time_step
+  // stable if d/dt f(time) < vals_sum and f(time) <= prev_val+sample_per_time_step
   bool IS_STABLE = false;
   const double current_val = cf_estimate.cf_approx(time, tolerance);
   double test_val = cf_estimate.cf_deriv_complex(time, dx, tolerance);
   if(test_val <= vals_sum && test_val >= 0.0){
     IS_STABLE = true;
   }
+  
   if(IS_STABLE && current_val >= prev_val &&
      current_val <= prev_val + samples_per_time_step){
     return(IS_STABLE);  //estimate is stable, exit_success
@@ -184,8 +185,8 @@ chao_lee_lowerbound_librarysize(const vector<double> &counts_histogram){ //Chao 
   for(size_t i = 0; i < counts_histogram.size(); i++)
     sample_size += i*counts_histogram[i]; 
   const double distinct = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
-  double coverage = 1 - counts_histogram[1]/sample_size;
-  double naive_lowerbound = distinct/coverage;
+  const double coverage = 1 - counts_histogram[1]/sample_size;
+  const double naive_lowerbound = distinct/coverage;
   vector<double> log_cv_terms;
   for(size_t i = 2; i < counts_histogram.size(); i++){
     if(counts_histogram[i] > 0){
@@ -199,9 +200,9 @@ chao_lee_lowerbound_librarysize(const vector<double> &counts_histogram){ //Chao 
   
   for(size_t i = 0; i < log_cv_terms.size(); i++)
     log_cv_terms[i] -= log(naive_lowerbound);
-  double corrected_coeff_variation = coeff_variation*(1+sample_size*(1-coverage)
-                                                      *exp(log_sum_log_vec(log_cv_terms, 
-                                                                           log_cv_terms.size()))/coverage);
+  const double corrected_coeff_variation = coeff_variation*(1+sample_size*(1-coverage)
+                                                            *exp(log_sum_log_vec(log_cv_terms, 
+                                                                                 log_cv_terms.size()))/coverage);
   
   return(naive_lowerbound + sample_size*(1-coverage)*corrected_coeff_variation/coverage);
 }
@@ -220,8 +221,8 @@ upperbound_librarysize(const vector<double> &counts_histogram,
   vector<double> denom_vec;
   vector<double> num_vec;
   while(max_terms >= 12){
-    size_t numer_size = max_terms/2;  //numer_size = L+1, denom_size = M
-    size_t denom_size = max_terms - numer_size;
+    const size_t numer_size = max_terms/2;  //numer_size = L+1, denom_size = M
+    const size_t denom_size = max_terms - numer_size;
     if(numer_size != denom_size)
       cerr << "num size = " << numer_size << ", denom size = " << denom_size << "\n";
     assert(numer_size == denom_size);
@@ -306,8 +307,8 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
       break; //out of max_terms loop
     }
     else{
-      vector<double> void_contfrac_coeffs;
-      vector<double> void_offset_coeffs;
+      const vector<double> void_contfrac_coeffs;
+      const vector<double> void_offset_coeffs;
       contfrac_estimate.set_cf_coeffs(void_contfrac_coeffs);
       contfrac_estimate.set_offset_coeffs(void_offset_coeffs);
       max_terms -= 2;
@@ -330,7 +331,7 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
   double current_global_max = 0.0;
   double current_global_max_loc = 0.0;
   for(size_t j = 0; j < possible_maxima_loc.size(); j++){
-    double test_val = possible_maxima[j];
+    const double test_val = possible_maxima[j];
     if(test_val > current_global_max && test_val < upper_bound ){ 
       current_global_max = test_val;
       current_global_max_loc = possible_maxima_loc[j];
