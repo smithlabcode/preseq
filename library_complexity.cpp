@@ -209,8 +209,8 @@ chao_lee_lowerbound_librarysize(const vector<double> &counts_histogram){ //Chao 
 
 
 static double
-upperbound_librarysize(const vector<double> &counts_histogram,
-                       const bool VERBOSE, const size_t initial_max_terms){
+upperbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogram,
+                       const size_t initial_max_terms){
 
   //need max_terms = L+M+1 to be even so that L+M is odd so that we can take lim_{t \to \infty} [L+1, M]
   size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1); 
@@ -459,7 +459,7 @@ main(const int argc, const char **argv) {
       << chao87_lowerbound_librarysize(counts_histogram) << endl;
       out << "Chao-Lee lower bound" << "\t" 
       << chao_lee_lowerbound_librarysize(counts_histogram) << endl;
-      const double upper_bound = upperbound_librarysize(counts_histogram, VERBOSE, max_terms);
+      const double upper_bound = upperbound_librarysize(VERBOSE, counts_histogram, max_terms)+distinct_reads;
       out << "Continued Fraction lower bound" << "\t"
       << lowerbound_librarysize(VERBOSE, counts_histogram, upper_bound, time_step, max_time, 
                                 deriv_delta, tolerance, max_terms) << endl;
