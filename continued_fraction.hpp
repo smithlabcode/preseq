@@ -24,16 +24,34 @@
 #include <iomanip>
 #include <numeric>
 #include <vector>
+#include <complex>
 
-// PD algorithm to compute cf coeffs
-void
-cont_frac_pd(const std::vector<double> &coeffs,
-	     const size_t depth, std::vector<double> &cf_coeffs);
-double
-compute_cf_approx(const std::vector<double> &cf_coeffs, const double time);
+class cont_frac {
+public:
+  cont_frac(const std::vector<double> in_cfs, const std::vector<double> in_offset,
+            const size_t in_lower, const size_t in_upper):
+  cf_coeffs(in_cfs), offset_coeffs(in_offset), lower_offset(in_lower), 
+  upper_offset(in_upper) {;}
+  void set_lower_offset(const size_t l_o) {lower_offset = l_o; upper_offset = 0;}
+  void set_upper_offset(const size_t u_o) {upper_offset = u_o; lower_offset = 0;}
+  void set_offset_coeffs(const std::vector<double> coeffs) {offset_coeffs = coeffs;}
+  void set_cf_coeffs(const std::vector<double> coeffs) {cf_coeffs = coeffs;}
+  void get_cf_coeffs(std::vector<double> &return_coeffs) {return_coeffs = cf_coeffs;}
+  void get_offset_coeffs(std::vector<double> &return_coeffs) {return_coeffs = offset_coeffs;}
+  
+  void compute_cf_coeffs(const std::vector<double> ps_coeffs, const size_t depth);
+  double cf_approx(const double time, const double tolerance);
+  double cf_deriv_complex(const double val, const double dx,
+                          const double tolerance);
+  double locate_zero_cf_deriv(const double val, const double prev_val,
+                              const double dx, const double tolerance);
+  
+private:
+  std::vector<double> cf_coeffs;
+  std::vector<double> offset_coeffs;
+  size_t lower_offset;
+  size_t upper_offset;
+};
 
-// Euler's recursion for cf's
-double
-compute_cf_approx_euler(const std::vector<double> &cf_coeffs, const double time); 
 
 #endif

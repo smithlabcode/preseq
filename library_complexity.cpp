@@ -35,6 +35,26 @@ using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
+using std::max;
+
+static inline double 
+log_sum_log_vec(const vector<double> &vals, size_t limit){
+  const size_t max_idx = 
+  max_element(vals.begin(), vals.begin() + limit) - 
+  vals.begin();
+  const double max_val = vals[max_idx];
+  double sum = 1.0;
+  for (size_t i = 0; i < limit; ++i) {
+    if (i != max_idx) {
+      sum += exp(vals[i] - max_val);
+#ifdef DEBUG
+      assert(finite(sum)); 
+      // abort if the sum is infinte //
+#endif
+    }
+  }
+  return(max_val + log(sum));
+}
 
 static inline double
 weight_exponential(const double dist, double decay_factor) {
@@ -70,110 +90,256 @@ get_counts(const vector<SimpleGenomicRegion> &reads,
     else counts.push_back(1);
 }
 
-
-static void 
-compute_num_and_denom_coeffs(const bool VERBOSE, const size_t max_terms, 
-			     const vector<double> &initial_coeffs,
-			     const double max_time, const double time_step,
-			     const double tolerance, const double defect_tolerance,
-			     vector<double> &contfrac_coeffs,
-			     vector<double> &num_approx, vector<double> &denom_approx) {
-  
-  vector<double> coeffs(initial_coeffs);
-  
-  size_t max_number_approxs = static_cast<size_t>(round((max_terms-8)/2)); 
-  
-  // DETECT DEFECT, MOVE UP TABLE TO MORE CONSERVATIVE APPROX
-  size_t denom_terms = max_terms/2;
-  bool FOUND_APPROX = false;
-  for (size_t i = 0; i < max_number_approxs && !FOUND_APPROX; i++) { 
-    num_approx.clear(); 
-    denom_approx.clear();
-    bool DEFECT_FLAG = false;
-    compute_pade_curve(VERBOSE, coeffs, max_time, time_step, 
-		       defect_tolerance, tolerance, denom_terms, 
-		       num_approx, denom_approx, DEFECT_FLAG);
-    
-    product_difference_alg_for_contfrac_coeffs(coeffs, 10, 
- 					       contfrac_coeffs);
-    quotient_difference_alg_for_contfrac_coeffs(coeffs, 20, 
-						contfrac_coeffs);
-    
-    FOUND_APPROX = !DEFECT_FLAG;
-    coeffs.pop_back();
-    coeffs.pop_back();
-    --denom_terms;
+bool
+cont_frac_distinct_stable(const bool VERBOSE, const double time,
+                          const double prev_val, const double dx,
+                          const double tolerance, const double vals_sum,
+                          const double samples_per_time_step,
+                          cont_frac cf_estimate){
+  // stable if d/dt f(time) < 1 and f(time) <= prev_val+sample_per_time_step
+  bool IS_STABLE = false;
+  const double current_val = cf_estimate.cf_approx(time, tolerance);
+  double test_val = cf_estimate.cf_deriv_complex(time, dx, tolerance);
+  if(test_val <= vals_sum && test_val >= 0.0){
+    IS_STABLE = true;
   }
-  if (!FOUND_APPROX)
-    throw SMITHLABException("no acceptable approximation found");
+  if(IS_STABLE && current_val >= prev_val &&
+     current_val <= prev_val + samples_per_time_step){
+    return(IS_STABLE);  //estimate is stable, exit_success
+  }
+  else{
+    IS_STABLE = false;
+    if(VERBOSE){
+      cerr << "error found at " << time << ", cf approx = " 
+      << cf_estimate.cf_approx(time, tolerance) << ", deriv = "
+      << cf_estimate.cf_deriv_complex(time, dx, tolerance) << 
+      ", " << (cf_estimate.cf_approx(time+dx, tolerance)-cf_estimate.cf_approx(time, tolerance))/dx 
+      << ", vals_sum = " << vals_sum << "\n";
+    } 
+    return(IS_STABLE); //estimate is unstable, exit_failure
+  }
 }
-
-
-static void
-compute_coverage(const bool VERBOSE, const vector<double> &counts_histogram,
-                 const double max_time, const double time_step,
-                 const double tolerance, const double defect_tolerance,
-		 const size_t initial_max_terms, vector<double> &estimates) {
-  
-  // need max_terms (L+M+1) odd for convergence from below
-  const size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1);
-  
-  size_t vals_sum = 0;
-  for (size_t i = 0; i < counts_histogram.size(); i++)
-    vals_sum += counts_histogram[i]*i;
-  
-  vector<double> coeffs(max_terms, 0.0);
-  for (size_t j = 0; j < max_terms; j++)
-    coeffs[j] = counts_histogram[j + 1]*pow(-1, j + 2)*(j + 1)/vals_sum;
-
-  vector<double> num_approx, denom_approx; 
-  vector<double> contfrac_coeffs;
-  compute_num_and_denom_coeffs(VERBOSE, max_terms, coeffs, max_time, time_step,
-			       tolerance, defect_tolerance, contfrac_coeffs,
-			       num_approx, denom_approx);
-  
-  estimates.clear();
-  for (size_t i = 0; i < num_approx.size(); ++i)
-    estimates.push_back(std::min(1.0, 1 - num_approx[i]/denom_approx[i]));
-}
-
 
 static void
 compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
                  const double max_time, const double time_step,
-                 const double tolerance, const double defect_tolerance,
-		 const size_t initial_max_terms, vector<double> &estimates) {
+                 const double tolerance, const double deriv_delta, 
+                 const size_t initial_max_terms, vector<double> &estimates) {
   
   //need max_terms = L+M+1 to be even so that L+M is odd and we get convergence from above
-  const size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0);
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0);
+  
+  const double values_size = 
+  accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
+  double vals_sum  = 0.0;
+  for(size_t i = 0; i < counts_histogram.size(); i++)
+    vals_sum += i*counts_histogram[i];
   
   vector<double> coeffs(max_terms, 0.0);
   for (size_t j = 0; j < max_terms; j++)
     coeffs[j] = counts_histogram[j + 1]*pow(-1, j+2);
   
-  vector<double> num_approx, denom_approx; 
-  vector<double> contfrac_coeffs;
-  compute_num_and_denom_coeffs(VERBOSE, max_terms, coeffs, max_time, time_step,
-			       tolerance, defect_tolerance, contfrac_coeffs,
-			       num_approx, denom_approx);
-
-  for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
-    cerr << std::setw(12) << std::fixed << std::setprecision(2) << contfrac_coeffs[i] << "\t" 
-	 << std::setw(12) << std::fixed << std::setprecision(2) << coeffs[i] << endl;
-  
-  const double values_size = 
-    accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
-  
-  estimates.clear();
-  double prev_estimate = 0.0;
-  double t = 0.0;
-  for (size_t i = 0; i < num_approx.size(); ++i, t += time_step) {
-    const double curr_estimate = t*num_approx[i]/denom_approx[i] + values_size;
-    estimates.push_back(std::max(prev_estimate, curr_estimate));
-    prev_estimate = estimates.back();
+  while(max_terms > 10){
+    vector<double> contfrac_coeffs;
+    vector<double> contfrac_offsetcoeffs;
+    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 0, 0);
+    contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
+    estimates.push_back(values_size);
+    double time = time_step;
+    while(time <= max_time){
+      if(cont_frac_distinct_stable(VERBOSE, time, estimates.back() - values_size,
+                                   deriv_delta, tolerance, vals_sum, vals_sum*time_step,
+                                   contfrac_estimate)) 
+        estimates.push_back(values_size + contfrac_estimate.cf_approx(time, tolerance));
+      else{
+        if(VERBOSE)
+          cerr << "defect found, number of terms = " << max_terms << "\n";
+        estimates.clear();
+        max_terms -= 2;
+        break; //out of time loop
+      }
+      time += time_step;
+    }
+    if(estimates.size()){ //if estimates.size() > 0
+      if(VERBOSE){
+        contfrac_estimate.get_cf_coeffs(contfrac_coeffs);
+        for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
+          cerr << std::setw(12) << std::fixed << std::setprecision(2) << contfrac_coeffs[i] << "\t" 
+          << std::setw(12) << std::fixed << std::setprecision(2) << coeffs[i] << endl;
+      }
+      break; //out of max_terms loop
+    }
   }
 }
 
+static double
+chao87_lowerbound_librarysize(const vector<double> &counts_histogram){
+  return(accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0)
+         + counts_histogram[1]*counts_histogram[1]/(2*counts_histogram[2]));
+}
+
+static double 
+chao_lee_lowerbound_librarysize(const vector<double> &counts_histogram){ //Chao & Lee (JASA 1992) lower bound
+  double sample_size = 0.0;
+  for(size_t i = 0; i < counts_histogram.size(); i++)
+    sample_size += i*counts_histogram[i]; 
+  const double distinct = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
+  double coverage = 1 - counts_histogram[1]/sample_size;
+  double naive_lowerbound = distinct/coverage;
+  vector<double> log_cv_terms;
+  for(size_t i = 2; i < counts_histogram.size(); i++){
+    if(counts_histogram[i] > 0){
+      log_cv_terms.push_back(log(naive_lowerbound) + log(i) + log(i-1) +log(counts_histogram[i])
+                             -log(sample_size) - log(sample_size-1));
+    }
+  }
+  double coeff_variation = 0.0;
+  if(log_cv_terms.size() > 0)
+    coeff_variation = max(exp(log_sum_log_vec(log_cv_terms, log_cv_terms.size()))-1, 0.0);
+  
+  for(size_t i = 0; i < log_cv_terms.size(); i++)
+    log_cv_terms[i] -= log(naive_lowerbound);
+  double corrected_coeff_variation = coeff_variation*(1+sample_size*(1-coverage)
+                                                      *exp(log_sum_log_vec(log_cv_terms, 
+                                                                           log_cv_terms.size()))/coverage);
+  
+  return(naive_lowerbound + sample_size*(1-coverage)*corrected_coeff_variation/coverage);
+}
+
+
+static double
+upperbound_librarysize(const vector<double> &counts_histogram,
+                       const bool VERBOSE, const size_t initial_max_terms){
+
+  //need max_terms = L+M+1 to be even so that L+M is odd so that we can take lim_{t \to \infty} [L+1, M]
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1); 
+  vector<double> coeffs(max_terms, 0.0);
+  for(size_t j = 0; j < max_terms; j++)
+    coeffs[j] = counts_histogram[j+1]*pow(-1, j+2);
+  
+  vector<double> denom_vec;
+  vector<double> num_vec;
+  while(max_terms >= 12){
+    size_t numer_size = max_terms/2;  //numer_size = L+1, denom_size = M
+    size_t denom_size = max_terms - numer_size;
+    if(numer_size != denom_size)
+      cerr << "num size = " << numer_size << ", denom size = " << denom_size << "\n";
+    assert(numer_size == denom_size);
+    bool ACCEPT_APPROX = compute_pade_coeffs(coeffs, numer_size, denom_size, num_vec, denom_vec); 
+    if(ACCEPT_APPROX && num_vec.back()/denom_vec.back() > 0){
+      if(VERBOSE){
+        cerr << "numerator coeffs = ";
+        for(size_t i = 0; i < num_vec.size(); i++)
+          cerr << num_vec[i] << ", ";
+        cerr << "\ndenomimator coeffs = ";
+        for(size_t i = 0; i < denom_vec.size(); i++)
+          cerr << denom_vec[i] << ", ";
+        cerr << "\n";
+      }
+      break;
+    }
+    else{
+      if(VERBOSE)
+        cerr << "unacceptable approx, number of terms = " << max_terms << "\n";
+      denom_vec.clear();
+      num_vec.clear();
+      max_terms -= 2;
+    }
+  }
+  return(num_vec.back()/denom_vec.back());
+}
+
+static double
+lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogram,
+                        const double upper_bound, //use pade_lowerbound_librarysize(.) to compute
+                       const double time_step, const double max_time,
+                       const double deriv_delta, const double tolerance,
+                       const size_t initial_max_terms){ 
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < counts_histogram.size(); i++)
+    vals_sum += i*counts_histogram[i];
+  
+  const double distinct_vals = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0); 
+  
+  //need max_terms = L+M+1 to be even so that L+M is odd so that we have convergence from below
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0); 
+  
+  vector<double> contfrac_coeffs;
+  vector<double> contfrac_offsetcoeffs;
+  cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 2, 0);
+  
+  vector<double> coeffs(max_terms, 0.0);
+  for(size_t j = 0; j < max_terms; j++)
+    coeffs[j] = counts_histogram[j+1]*pow(-1, j+2);
+  
+  vector<double> possible_maxima_loc;
+  vector<double> possible_maxima;
+  while (max_terms > 6){
+    contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
+    double time = time_step;
+    double prev_deriv = 0.0;
+    double current_deriv = contfrac_estimate.cf_deriv_complex(time, deriv_delta, tolerance);
+    double current_val = distinct_vals;
+    double prev_val = distinct_vals;
+    while(time < max_time){
+      current_deriv = contfrac_estimate.cf_deriv_complex(time, deriv_delta, tolerance);
+      current_val = contfrac_estimate.cf_approx(time, tolerance)+distinct_vals;
+      if(fabs(current_deriv) > vals_sum || current_val > upper_bound){ //if derivative or estimate is not acceptable, choose different order approx
+        possible_maxima_loc.clear();  //so that we can know we need to go down in approx
+        possible_maxima.clear();
+        break; //out of t loop
+      }
+      if(current_deriv*prev_deriv < 0.0 && current_val < upper_bound){
+        possible_maxima_loc.push_back(contfrac_estimate.locate_zero_cf_deriv(time, time-time_step,
+                                                                             deriv_delta, tolerance));
+        possible_maxima.push_back(contfrac_estimate.cf_approx(possible_maxima_loc.back(), tolerance)+distinct_vals);
+      }
+      else if(current_val < prev_val && prev_val < upper_bound){
+        possible_maxima_loc.push_back(time-time_step);
+        possible_maxima.push_back(prev_val);
+      }
+      prev_deriv = current_deriv;
+      prev_val = current_val;
+      time += time_step;
+    }
+    if(possible_maxima.size() > 0){
+      break; //out of max_terms loop
+    }
+    else{
+      vector<double> void_contfrac_coeffs;
+      vector<double> void_offset_coeffs;
+      contfrac_estimate.set_cf_coeffs(void_contfrac_coeffs);
+      contfrac_estimate.set_offset_coeffs(void_offset_coeffs);
+      max_terms -= 2;
+    }
+  }
+  
+  possible_maxima_loc.push_back(max_time); //include boundary
+  possible_maxima.push_back(contfrac_estimate.cf_approx(max_time, tolerance)+distinct_vals);
+  
+  if(VERBOSE){
+    cerr << "possible maxima = ";
+    for(size_t i = 0; i < possible_maxima_loc.size(); i++)
+      cerr << possible_maxima_loc[i] << ", ";
+    cerr << "\nvalues = ";
+    for(size_t i = 0; i < possible_maxima.size(); i++)
+      cerr << possible_maxima[i] << ", ";
+    cerr << "\n";
+    cerr << "upper bound = " << upper_bound << "\n";
+  }
+  double current_global_max = 0.0;
+  double current_global_max_loc = 0.0;
+  for(size_t j = 0; j < possible_maxima_loc.size(); j++){
+    double test_val = possible_maxima[j];
+    if(test_val > current_global_max && test_val < upper_bound ){ 
+      current_global_max = test_val;
+      current_global_max_loc = possible_maxima_loc[j];
+    }
+  }
+  if(VERBOSE)
+    cerr << "chosen global max = " << current_global_max << ", loc = " << current_global_max_loc << "\n";
+  return(current_global_max);
+}
 
 int
 main(const int argc, const char **argv) {
@@ -186,12 +352,14 @@ main(const int argc, const char **argv) {
     double tolerance = 1e-20;
     double max_time = 10;
     double time_step = 0.1;
-    double defect_tolerance = 0.1;
+    double deriv_delta = 1e-8;
+    size_t smoothing_bandwidth = 4;
+    double smoothing_decay_factor = 15.0;
     
     /* FLAGS */
     bool VERBOSE = false;
-    bool coverage = false;
     bool SMOOTH_HISTOGRAM = false; 
+    bool LIBRARY_SIZE = false;
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
@@ -202,12 +370,16 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, max_terms);
     opt_parse.add_opt("tol", '\0', "general numerical tolerance",
 		      false, tolerance);
-    opt_parse.add_opt("def",'\0',"defect tolerance [for: abs(zero - pole)]",
-		      false, defect_tolerance);
+    opt_parse.add_opt("delta", '\0', "derivative step size",
+                      false, deriv_delta);
     opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
                       false, SMOOTH_HISTOGRAM);
-    opt_parse.add_opt("coverage", '\0', "estimate genome coverage "
-		      "(default: estimate distinct)", false, coverage);
+    opt_parse.add_opt("bandwidth", '\0', "smoothing bandwidth",
+                      false, smoothing_bandwidth);
+    opt_parse.add_opt("decay", '\0', "smoothing decay factor",
+                      false, smoothing_decay_factor);
+    opt_parse.add_opt("library_size", '\0', "estimate library size "
+		      "(default: estimate distinct)", false, LIBRARY_SIZE);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
     vector<string> leftover_args;
@@ -251,10 +423,7 @@ main(const int argc, const char **argv) {
     const size_t max_observed_count = 
       *std::max_element(values.begin(), values.end());
     
-    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE: max_terms selection
-    // needs to be dependent on max time heuristics suggest the method
-    // is accurate even for large numbers, set
-    // (max_time)^max_term<10^250.
+    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE:
     max_terms = std::min(max_terms, max_observed_count);
     if (max_terms % 2 == 0)
       --max_terms; 
@@ -268,37 +437,46 @@ main(const int argc, const char **argv) {
       std::count_if(counts_histogram.begin(), counts_histogram.end(),
 		    bind2nd(std::greater<size_t>(), 0));
     
-    if (SMOOTH_HISTOGRAM) {
-      const size_t smoothing_bandwidth = 4;
-      const double smoothing_decay_factor = 15.0;
+    if (SMOOTH_HISTOGRAM) 
       smooth_histogram(smoothing_bandwidth, smoothing_decay_factor, counts_histogram);
-    }
+    
     
     if (VERBOSE)
       cerr << "TOTAL READS     = " << read_locations.size() << endl
 	   << "DISTINCT READS  = " << distinct_reads << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
-	   << "COUNTS OF 1     = " << counts_histogram[1] << endl
-	   << "LIB SIZE GUESS  = " 
-	   << std::fixed << std::setprecision(1) 
-	   << distinct_reads/(1.0 - counts_histogram[1]/vals_sum) << endl;
+	   << "COUNTS OF 1     = " << counts_histogram[1] << endl;
     
     vector<double> estimates;
-    if (coverage)
-      compute_coverage(VERBOSE, counts_histogram, max_time, time_step, 
-		       tolerance, defect_tolerance, max_terms, estimates);
-    else compute_distinct(VERBOSE, counts_histogram, max_time, time_step, 
-			  tolerance, defect_tolerance, max_terms, estimates);
+    if (LIBRARY_SIZE){
+      std::ofstream of;
+      if (!outfile.empty()) of.open(outfile.c_str());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+      
+      out << "Chao 1987 lower bound" << "\t" 
+      << chao87_lowerbound_librarysize(counts_histogram) << endl;
+      out << "Chao-Lee lower bound" << "\t" 
+      << chao_lee_lowerbound_librarysize(counts_histogram) << endl;
+      const double upper_bound = upperbound_librarysize(counts_histogram, VERBOSE, max_terms);
+      out << "Continued Fraction lower bound" << "\t"
+      << lowerbound_librarysize(VERBOSE, counts_histogram, upper_bound, time_step, max_time, 
+                                deriv_delta, tolerance, max_terms) << endl;
+      out << "Continued Fraction upper bound" << "\t" << upper_bound << endl;
+    }
+    else{ 
+      compute_distinct(VERBOSE, counts_histogram, max_time, time_step,
+                       tolerance, deriv_delta, max_terms, estimates);
     
-    std::ofstream of;
-    if (!outfile.empty()) of.open(outfile.c_str());
-    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+      std::ofstream of;
+      if (!outfile.empty()) of.open(outfile.c_str());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     
-    double time = 0.0;
-    for (size_t i = 0; i < estimates.size(); ++i, time += time_step)
-      out << std::fixed << std::setprecision(1) 
-	  << (time + 1.0)*vals_sum << '\t' << estimates[i] << endl;
+      double time = 0.0;
+      for (size_t i = 0; i < estimates.size(); ++i, time += time_step)
+        out << std::fixed << std::setprecision(1) 
+        << (time + 1.0)*vals_sum << '\t' << estimates[i] << endl;
+    }
     
   }
   catch (SMITHLABException &e) {

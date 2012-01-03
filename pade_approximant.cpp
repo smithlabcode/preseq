@@ -86,11 +86,12 @@ compute_denom_ceoffs(const vector<double> &coeffs, const size_t numer_size,
 
 }
 
-static void
+static bool
 test_coefficients(const vector<double> &coeffs, 
                   const vector<double> &num_coeffs, 
                   const vector<double> &denom_coeffs) {
   
+  bool accept_approx = true;
   static const double COEFF_TEST_TOLERANCE = 1e-10;
   
   for (size_t i = 0; i < num_coeffs.size(); ++i) {
@@ -103,37 +104,40 @@ test_coefficients(const vector<double> &coeffs,
   for (size_t i = 0; i < denom_coeffs.size(); ++i) {
     const size_t offset = num_coeffs.size() + i;
     double sum = coeffs[offset];
-    for (size_t j = 0; j < denom_coeffs.size(); j++) {
-      if (offset-denom_coeffs.size()+j >= 0)
+    for (size_t j = 0; j < denom_coeffs.size(); j++){
+      if(offset-denom_coeffs.size()+j >= 0)
         sum += coeffs[offset-denom_coeffs.size()+j]*denom_coeffs[j];  // if the coeffs index < 0, coeff = 0
     }
     
-    assert(fabs(sum) < COEFF_TEST_TOLERANCE);
+    accept_approx = (accept_approx && (fabs(sum) < COEFF_TEST_TOLERANCE)); //set accept approx to zero if any test coeff fails
   }
+  return accept_approx;
 }
 
-void
+bool
 compute_pade_coeffs(const vector<double> &coeffs,
                     const size_t numer_size, const size_t denom_size, //numer_size = L+1
                     vector<double> &num_coeffs, 
                     vector<double> &denom_coeffs) {
-
+  
   compute_denom_ceoffs(coeffs, numer_size, denom_size, denom_coeffs);  
-
+  
   for (size_t i = 0; i < numer_size; ++i) {
     num_coeffs.push_back(coeffs[i]);
     size_t upper_lim = std::min(numer_size, denom_coeffs.size());
-    for (size_t j = 0; j < std::min(i, upper_lim); ++j) {
+    for (size_t j = 0; j < std::min(i, upper_lim); ++j){
       num_coeffs[i] += denom_coeffs[denom_coeffs.size()-1-j]*coeffs[i - j-1];
     }
   }
   
-  test_coefficients(coeffs, num_coeffs, denom_coeffs);
+  
+  bool accept_approx = test_coefficients(coeffs, num_coeffs, denom_coeffs);
   //denom is backwards, rearrange it
   vector<double> denom_coeffs_copy(denom_coeffs);
-  for (size_t j = 0; j < denom_coeffs.size(); j++)
+  for(size_t j = 0; j < denom_coeffs.size(); j++)
     denom_coeffs[j] = denom_coeffs_copy[denom_coeffs_copy.size()-1-j];
   
+  return accept_approx;
 }
 
 double
