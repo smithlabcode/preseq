@@ -113,8 +113,7 @@ cont_frac_distinct_stable(const bool VERBOSE, const double time,
     if(VERBOSE){
       cerr << "error found at " << time << ", cf approx = " 
       << cf_estimate.cf_approx(time, tolerance) << ", deriv = "
-      << cf_estimate.cf_deriv_complex(time, dx, tolerance) << 
-      ", " << (cf_estimate.cf_approx(time+dx, tolerance)-cf_estimate.cf_approx(time, tolerance))/dx 
+      << cf_estimate.cf_deriv_complex(time, dx, tolerance)  
       << ", vals_sum = " << vals_sum << "\n";
     } 
     return(IS_STABLE); //estimate is unstable, exit_failure
@@ -128,7 +127,7 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
                  const size_t initial_max_terms, vector<double> &estimates) {
   
   //need max_terms = L+M+1 to be even so that L+M is odd and we get convergence from above
-  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0);
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1);
   
   const double values_size = 
   accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
@@ -140,10 +139,10 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
   for (size_t j = 0; j < max_terms; j++)
     coeffs[j] = counts_histogram[j + 1]*pow(-1, j+2);
   
-  while(max_terms > 10){
+  while(max_terms > 6){
     vector<double> contfrac_coeffs;
     vector<double> contfrac_offsetcoeffs;
-    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 0, 0);
+    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 1, 0);
     contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
     estimates.push_back(values_size);
     double time = time_step;
@@ -204,7 +203,7 @@ upperbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
                        const size_t initial_max_terms){
 
   //need max_terms = L+M+1 to be even so that L+M is odd so that we can take lim_{t \to \infty} [L+1, M]
-  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1); 
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0); 
   vector<double> coeffs(max_terms, 0.0);
   for(size_t j = 0; j < max_terms; j++)
     coeffs[j] = counts_histogram[j+1]*pow(-1, j+2);
@@ -253,7 +252,7 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
   
   const double distinct_vals = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0); 
   
-  //need max_terms = L+M+1 to be even so that L+M is odd so that we have convergence from below
+  //need max_terms = L+M+1 to be odd so that L+M is even so that we have convergence from below
   size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0); 
   
   vector<double> contfrac_coeffs;
@@ -414,12 +413,8 @@ main(const int argc, const char **argv) {
     
     const size_t max_observed_count = 
       *std::max_element(values.begin(), values.end());
-    
-    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE:
-    max_terms = std::min(max_terms, max_observed_count);
-    if (max_terms % 2 == 0)
-      --max_terms; 
-    
+
+        
     // BUILD THE HISTOGRAM
     vector<double> counts_histogram(max_observed_count + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i)
@@ -428,6 +423,15 @@ main(const int argc, const char **argv) {
     const size_t distinct_counts = 
       std::count_if(counts_histogram.begin(), counts_histogram.end(),
 		    bind2nd(std::greater<size_t>(), 0));
+          
+    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+    size_t max_count_b4_zero = 0;
+    size_t indx = 1;
+    while(counts_histogram[indx] > 0){
+      max_count_b4_zero++;
+      indx++;
+    }
+    max_terms = std::min(max_terms, max_count_b4_zero);     
     
     if (SMOOTH_HISTOGRAM) 
       smooth_histogram(smoothing_bandwidth, smoothing_decay_factor, counts_histogram);
