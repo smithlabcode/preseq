@@ -126,7 +126,6 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
                  const double tolerance, const double deriv_delta, 
                  const size_t initial_max_terms, vector<double> &estimates) {
   
-  //need max_terms = L+M+1 to be even so that L+M is odd and we get convergence from above
   size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1);
   
   const double values_size = 
@@ -142,7 +141,7 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
   while(max_terms > 6){
     vector<double> contfrac_coeffs;
     vector<double> contfrac_offsetcoeffs;
-    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 1, 0);
+    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 2, 0);
     contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
     estimates.push_back(values_size);
     double time = time_step;
@@ -203,7 +202,7 @@ upperbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
                        const size_t initial_max_terms){
 
   //need max_terms = L+M+1 to be even so that L+M is odd so that we can take lim_{t \to \infty} [L+1, M]
-  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0); 
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1); 
   vector<double> coeffs(max_terms, 0.0);
   for(size_t j = 0; j < max_terms; j++)
     coeffs[j] = counts_histogram[j+1]*pow(-1, j+2);
@@ -252,12 +251,11 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
   
   const double distinct_vals = accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0); 
   
-  //need max_terms = L+M+1 to be odd so that L+M is even so that we have convergence from below
-  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0); 
+  size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 0);
   
   vector<double> contfrac_coeffs;
   vector<double> contfrac_offsetcoeffs;
-  cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 2, 0);
+  cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 1, 0);
   
   vector<double> coeffs(max_terms, 0.0);
   for(size_t j = 0; j < max_terms; j++)
