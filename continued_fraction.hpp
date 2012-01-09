@@ -26,23 +26,34 @@
 #include <vector>
 #include <complex>
 
-class cont_frac {
+class ContinuedFraction {
 public:
-  cont_frac(const std::vector<double> in_cfs, const std::vector<double> in_offset,
-            const size_t in_lower, const size_t in_upper):
-  cf_coeffs(in_cfs), offset_coeffs(in_offset), lower_offset(in_lower), 
-  upper_offset(in_upper) {;}
+  // Constructor
+  ContinuedFraction(const std::vector<double> in_cfs, 
+		    const std::vector<double> in_offset,
+		    const size_t in_lower, const size_t in_upper) :
+    cf_coeffs(in_cfs), offset_coeffs(in_offset), lower_offset(in_lower), 
+    upper_offset(in_upper) {}
+
+  // Mutators
   void set_lower_offset(const size_t l_o) {lower_offset = l_o; upper_offset = 0;}
   void set_upper_offset(const size_t u_o) {upper_offset = u_o; lower_offset = 0;}
   void set_offset_coeffs(const std::vector<double> coeffs) {offset_coeffs = coeffs;}
   void set_cf_coeffs(const std::vector<double> coeffs) {cf_coeffs = coeffs;}
-  void get_cf_coeffs(std::vector<double> &return_coeffs) {return_coeffs = cf_coeffs;}
-  void get_offset_coeffs(std::vector<double> &return_coeffs) {return_coeffs = offset_coeffs;}
   
-  void compute_cf_coeffs(const std::vector<double> ps_coeffs, const size_t depth);
+  // Accessors
+  void get_cf_coeffs(std::vector<double> &return_coeffs) const
+  {return_coeffs = cf_coeffs;}
+  void get_offset_coeffs(std::vector<double> &return_coeffs) const 
+  {return_coeffs = offset_coeffs;}
+  
+  // Push this inside
+  void compute_cf_coeffs(const std::vector<double> ps_coeffs, const size_t depth) const;
   double cf_approx(const double time, const double tolerance);
   double cf_deriv_complex(const double val, const double dx,
                           const double tolerance);
+  
+  // Should not be public -- functionality should be pushed inside
   double locate_zero_cf_deriv(const double val, const double prev_val,
                               const double dx, const double tolerance);
   
@@ -53,5 +64,7 @@ private:
   size_t upper_offset;
 };
 
+// double
+// evaluate_continued_fraction(const std::vector<double> &cf_coeffs, const double t);
 
 #endif

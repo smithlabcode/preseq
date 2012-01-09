@@ -18,57 +18,84 @@
  */
 
 #include "continued_fraction.hpp"
-
 #include <smithlab_utils.hpp>
 
-#include <gsl/gsl_vector_double.h>  
-#include <gsl/gsl_matrix_double.h>  
-#include <gsl/gsl_linalg.h>  
-
-#include <iostream>
-#include <cassert>
-#include <numeric>
 #include <vector>
-#include <cstdlib>
 #include <cmath>
+#include <cassert>
 #include <complex>
 
-using std::string;
 using std::vector;
-using std::endl;
-using std::cerr;
-using std::fabs;
 using std::complex;
 using std::real;
 using std::imag;
 
-bool CF_APPROX_VERBOSE = false;
-
-void 
-cont_frac_pd(const vector<double> &coeffs, const size_t depth, 
-	     vector<double> &cf_coeffs) {
-
-  vector< vector<double> > p_vec(2*depth-2, vector<double>(2*depth-2, 0.0));
-  p_vec[0][0] = 1;
-
-  for (size_t i = 0; i < p_vec.size(); i++)
-    p_vec[i][1] = coeffs[i];
+/*
+// This is the quotient difference algorithm...
+void
+quotient_difference_alg_for_contfrac_coeffs(const vector<double> &coeffs,
+const size_t depth,
+vector<double> &cf_coeffs){
+vector< vector<double> > q_table(depth, vector<double>(depth, 0.0));
+vector< vector<double> > e_table(depth, vector<double>(depth, 0.0));
+for(size_t i = 0; i < q_table[1].size(); i++)
+q_table[1][i] = coeffs[i+1]/coeffs[i];
   
-  for (size_t j = 2; j < p_vec[0].size(); j++)
-    for (size_t i = 0; i < p_vec.size()-1; i++)
-      p_vec[i][j] = p_vec[0][j-1]*p_vec[i+1][j-2] - p_vec[0][j-2]*p_vec[i+1][j-1];
-
-  if (CF_APPROX_VERBOSE)
-    cerr << "p calculated" << endl;
-  cf_coeffs.push_back(coeffs[0]);
-  for (size_t i = 1; i < depth; i++)
-    cf_coeffs.push_back(p_vec[0][i + 1]/(p_vec[0][i - 1]*p_vec[0][i]));
+for(size_t j = 0; j < depth-1; j++)
+e_table[1][j] = q_table[1][j+1] - q_table[1][j] + e_table[0][j+1];
+  
+for(size_t i = 2; i < depth; i++){
+for(size_t j = 0; j < depth - i; j++)
+q_table[i][j] = q_table[i-1][j+1]*e_table[i-1][j+1]/e_table[i-1][j];
+    
+for(size_t j = 0; j < depth - i; j++)
+e_table[i][j] = q_table[i][j+1] - q_table[i][j] + e_table[i-1][j+1];
+}
+  
+//   for (size_t j = 0; j < q_table.front().size(); ++j) {
+//     for (size_t i = 0; i < q_table.size(); ++i)
+//       std::cerr << std::setprecision(5) << std::setw(10) << q_table[j][i] << ' ';
+//     std::cerr << std::endl;
+//   }
+//   std::cerr << std::endl;
+//   for (size_t j = 0; j < e_table.front().size(); ++j) {
+//     for (size_t i = 0; i < e_table.size(); ++i)
+//       std::cerr << std::setprecision(5) << std::setw(10) << e_table[j][i] << ' ';
+//     std::cerr << std::endl;
+//   }
+//   std::cerr << std::endl;
+  
+cf_coeffs.push_back(coeffs[0]);
+for (size_t i = 1; i < depth; ++i) {
+if (i % 2 == 0) cf_coeffs.push_back(-e_table[i/2][0]);
+else cf_coeffs.push_back(-q_table[(i + 1)/2][0]);
+}
 }
 
-void
-cont_frac_qd(const vector<double> &coeffs, //quotient-difference
-             const size_t depth,  // odd depth gives M,M pade even depth gives M-1,M pade
-             vector<double> &cf_coeffs){
+
+void 
+product_difference_alg_for_contfrac_coeffs(const vector<double> &coeffs, 
+const size_t depth,
+vector<double> &cf_coeffs) {
+vector< vector<double> > p_table(2*depth-2, vector<double>(2*depth-2, 0.0));
+p_table[0][0] = 1;
+for(size_t i = 0; i < p_table.size(); i++)
+p_table[i][1] = coeffs[i];
+for(size_t j = 2; j < p_table[0].size(); j++){
+for(size_t i = 0; i < p_table.size()-1; i++){
+p_table[i][j] = p_table[0][j-1]*p_table[i+1][j-2] - p_table[0][j-2]*p_table[i+1][j-1];
+}
+}
+cf_coeffs.push_back(coeffs[0]);
+for(size_t i = 1; i < depth; i++)
+cf_coeffs.push_back(p_table[0][i+1]/(p_table[0][i-1]*p_table[0][i]));
+}
+*/
+
+static void
+ContinuedFraction_qd(const vector<double> &coeffs, //quotient-difference
+		     const size_t depth,  // odd depth gives M,M pade even depth gives M-1,M pade
+		     vector<double> &cf_coeffs){
   vector< vector<double> > q_table(depth, vector<double>(depth, 0.0));
   vector< vector<double> > e_table(depth, vector<double>(depth, 0.0));
   for(size_t i = 0; i < q_table[1].size(); i++)
@@ -96,15 +123,15 @@ cont_frac_qd(const vector<double> &coeffs, //quotient-difference
 }
 
 static void
-cont_frac_upper_offdiagonal(const vector<double> &coeffs,
-                            const size_t depth,
-                            const size_t offset,
-                            vector<double> &offset_cf_coeffs,
-                            vector<double> &cf_coeffs){ //first offset coefficients set to coeffs
+ContinuedFraction_upper_offdiagonal(const vector<double> &coeffs,
+				    const size_t depth,
+				    const size_t offset,
+				    vector<double> &offset_cf_coeffs,
+				    vector<double> &cf_coeffs){ //first offset coefficients set to coeffs
   vector<double> holding_coeffs;
   for(size_t i = offset; i < depth; i++)
     holding_coeffs.push_back(coeffs[i]);
-  cont_frac_qd(holding_coeffs, depth-offset, cf_coeffs);
+  ContinuedFraction_qd(holding_coeffs, depth-offset, cf_coeffs);
   for(size_t i =0; i < offset; i++)
     offset_cf_coeffs.push_back(coeffs[i]);
 }
@@ -155,11 +182,11 @@ compute_upper_offdiag_cf_approx(const vector<double> &cf_coeffs,
 } 
 
 static void
-cont_frac_lower_offdiagonal(const vector<double> &coeffs,
-                            const size_t depth,
-                            const size_t offset,
-                            vector<double> &offset_cf_coeffs,
-                            vector<double> &cf_coeffs){  //remember to invert the formulas.
+ContinuedFraction_lower_offdiagonal(const vector<double> &coeffs,
+				    const size_t depth,
+				    const size_t offset,
+				    vector<double> &offset_cf_coeffs,
+				    vector<double> &cf_coeffs){  //remember to invert the formulas.
   //need to work with reciprocal series g = f^{-1}
   vector<double> reciprocal_coeffs;
   reciprocal_coeffs.push_back(1/coeffs[0]);
@@ -173,7 +200,7 @@ cont_frac_lower_offdiagonal(const vector<double> &coeffs,
   vector<double> holding_coeffs;
   for(size_t i = offset; i < depth; i++)
     holding_coeffs.push_back(reciprocal_coeffs[i]);
-  cont_frac_qd(holding_coeffs, depth-offset, cf_coeffs);
+  ContinuedFraction_qd(holding_coeffs, depth-offset, cf_coeffs);
   for(size_t i = 0; i < offset; i++)
     offset_cf_coeffs.push_back(reciprocal_coeffs[i]);
 }
@@ -263,68 +290,72 @@ compute_cf_approx_euler(const vector<double> &cf_coeffs, //uses euler's recursio
 
 
 void
-cont_frac::compute_cf_coeffs(const vector<double> ps_coeffs,
-                             const size_t depth){
+ContinuedFraction::compute_cf_coeffs(const vector<double> ps_coeffs,
+				     const size_t depth) {
   cf_coeffs.clear();
   offset_coeffs.clear();
   if(upper_offset != 0 && lower_offset != 0)
     cerr << "at least one offset must be zero, reset offset.\n";
   else if(upper_offset == 0 && lower_offset == 0){    
     vector<double> temp_cf_coeffs;
-    cont_frac_qd(ps_coeffs, depth, temp_cf_coeffs);
+    ContinuedFraction_qd(ps_coeffs, depth, temp_cf_coeffs);
     set_cf_coeffs(temp_cf_coeffs);
   }
   else if(upper_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    cont_frac_upper_offdiagonal(ps_coeffs, depth, upper_offset, 
-                                temp_cf_coeffs, temp_offset_coeffs);
+    ContinuedFraction_upper_offdiagonal(ps_coeffs, depth, upper_offset, 
+					temp_cf_coeffs, temp_offset_coeffs);
     set_offset_coeffs(temp_offset_coeffs);
     set_cf_coeffs(temp_cf_coeffs);
   }
   else if(lower_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    cont_frac_lower_offdiagonal(ps_coeffs, depth, lower_offset,
-                                temp_offset_coeffs, temp_cf_coeffs);
+    ContinuedFraction_lower_offdiagonal(ps_coeffs, depth, lower_offset,
+					temp_offset_coeffs, temp_cf_coeffs);
     set_offset_coeffs(temp_offset_coeffs);
     set_cf_coeffs(temp_cf_coeffs);
   }
 }
 
+// TODO: comment this function well
 double
-cont_frac::cf_approx(const double time, const double tolerance){
-  if(upper_offset != 0 && lower_offset != 0){
+ContinuedFraction::cf_approx(const double time, const double tolerance){
+  if (upper_offset != 0 && lower_offset != 0) {
+    // TODO: THROW AN EXCEPTION!
     cerr << "at least one offset must be zero, reset offsets.\n";
-    return(0.0);
-  }
-  else if(upper_offset == 0 && lower_offset == 0)
-    return(compute_cf_approx_euler(cf_coeffs, time, tolerance));
-  else if(upper_offset > 0)
-    return(compute_upper_offdiag_cf_approx(cf_coeffs, offset_coeffs,
-                                           time, tolerance));
-  else if(lower_offset > 0)
-    return(compute_lower_offdiag_cf_approx(cf_coeffs, offset_coeffs,
-                                           time, tolerance));
-  else
     return 0.0;
+  }
+  else if (upper_offset == 0 && lower_offset == 0)
+    return compute_cf_approx_euler(cf_coeffs, time, tolerance);
+  else if (upper_offset > 0)
+    return compute_upper_offdiag_cf_approx(cf_coeffs, offset_coeffs,
+					   time, tolerance);
+  else if (lower_offset > 0)
+    return(compute_lower_offdiag_cf_approx(cf_coeffs, offset_coeffs,
+					   time, tolerance));
+  else return 0.0;
 }
+
 
 static void
 cf_approx_euler_complex(const vector<double> &cf_coeffs,
-                        const complex<double> perturbed_val,
-                        const double tolerance,
-                        complex<double> &approx){
+			const complex<double> perturbed_val,
+			const double tolerance,
+			complex<double> &approx){
   const complex<double> i(0.0,1.0);
   if(norm(perturbed_val) == 0.0)
     approx = 0.0*i;
   else{
+    
+    // Previous elements of the table to recursively fill it
     complex<double> current_num(0.0, 0.0);
-    complex<double> prev_num1(cf_coeffs[0], 0.0);
-    complex<double> prev_num2(0.0, 0.0);
+    complex<double> prev_num1(cf_coeffs[0], 0.0), prev_num2(0.0, 0.0);
+    
     complex<double> current_denom(0.0, 0.0);
-    complex<double> prev_denom1(1.0, 0.0);
-    complex<double> prev_denom2(1.0, 0.0);
+    complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
+    
     for(size_t j = 1; j < cf_coeffs.size(); j++){
       complex<double> coeff(cf_coeffs[j], 0.0);
       current_num = prev_num1 + coeff*perturbed_val*prev_num2;
@@ -333,20 +364,21 @@ cf_approx_euler_complex(const vector<double> &cf_coeffs,
       prev_num1 = current_num;
       prev_denom2 = prev_denom1;
       prev_denom1 = current_denom;
+      //// !!!!!!!!!!!!TODO: NO MAGIC!!!!!!!!!!!!!!!!!!!!!!
       if(j % 10 == 0){ //rescale every 10th iter
-        double rescale_val = norm(current_num) + norm(current_denom);
-        if(rescale_val > 1/tolerance)
-          rescale_val = 1/rescale_val;
-        else if(rescale_val < tolerance)
-          rescale_val = 1/rescale_val;
-        else
-          rescale_val = 1.0;
-        current_num = current_num*rescale_val;
-        current_denom = current_denom*rescale_val;
-        prev_num1 = prev_num1*rescale_val;
-        prev_num2 = prev_num2*rescale_val;
-        prev_denom1 = prev_denom1*rescale_val;
-        prev_denom2 = prev_denom2*rescale_val;
+	double rescale_val = norm(current_num) + norm(current_denom);
+	if(rescale_val > 1/tolerance)
+	  rescale_val = 1/rescale_val;
+	else if(rescale_val < tolerance)
+	  rescale_val = 1/rescale_val;
+	else
+	  rescale_val = 1.0;
+	current_num = current_num*rescale_val;
+	current_denom = current_denom*rescale_val;
+	prev_num1 = prev_num1*rescale_val;
+	prev_num2 = prev_num2*rescale_val;
+	prev_denom1 = prev_denom1*rescale_val;
+	prev_denom2 = prev_denom2*rescale_val;
       }
     }
     approx = perturbed_val*current_num/current_denom;
@@ -355,10 +387,10 @@ cf_approx_euler_complex(const vector<double> &cf_coeffs,
 
 static void
 compute_upper_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
-                                        const vector<double> &offset_coeffs,
-                                        const complex<double> perturbed_val,
-                                        const double tolerance,
-                                        complex<double> &approx){
+					const vector<double> &offset_coeffs,
+					const complex<double> perturbed_val,
+					const double tolerance,
+					complex<double> &approx){
   const complex<double> i(0.0,1.0);
   if(norm(perturbed_val) == 0.0)
     approx = 0.0*i;
@@ -377,20 +409,22 @@ compute_upper_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
       prev_num1 = current_num;
       prev_denom2 = prev_denom1;
       prev_denom1 = current_denom;
+
+      //// !!!!!!!!!!!!TODO: NO MAGIC!!!!!!!!!!!!!!!!!!!!!!
       if(j % 10 == 0){ //rescale every 10th iter
-        double rescale_val = norm(current_num) + norm(current_denom);
-        if(rescale_val > 1/tolerance)
-          rescale_val = 1/rescale_val;
-        else if(rescale_val < tolerance)
-          rescale_val = 1/rescale_val;
-        else
-          rescale_val = 1.0;
-        current_num = current_num*rescale_val;
-        current_denom = current_denom*rescale_val;
-        prev_num1 = prev_num1*rescale_val;
-        prev_num2 = prev_num2*rescale_val;
-        prev_denom1 = prev_denom1*rescale_val;
-        prev_denom2 = prev_denom2*rescale_val;
+	double rescale_val = norm(current_num) + norm(current_denom);
+	if(rescale_val > 1/tolerance)
+	  rescale_val = 1/rescale_val;
+	else if(rescale_val < tolerance)
+	  rescale_val = 1/rescale_val;
+	else
+	  rescale_val = 1.0;
+	current_num = current_num*rescale_val;
+	current_denom = current_denom*rescale_val;
+	prev_num1 = prev_num1*rescale_val;
+	prev_num2 = prev_num2*rescale_val;
+	prev_denom1 = prev_denom1*rescale_val;
+	prev_denom2 = prev_denom2*rescale_val;
       }
     }
     complex<double> offset_terms(0.0, 0.0);
@@ -400,14 +434,15 @@ compute_upper_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
   }
 } 
 
+
 static void
 compute_lower_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
-                                        const vector<double> &offset_coeffs,
-                                        const complex<double> perturbed_val,
-                                        const double tolerance,
-                                        complex<double> &approx){
+					const vector<double> &offset_coeffs,
+					const complex<double> perturbed_val,
+					const double tolerance,
+					complex<double> &approx) {
   const complex<double> i(0.0,1.0);
-  if(norm(perturbed_val) == 0.0)
+  if (norm(perturbed_val) == 0.0)
     approx = 0.0*i;
   else{
     complex<double> current_num(0.0, 0.0);
@@ -425,19 +460,19 @@ compute_lower_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
       prev_denom2 = prev_denom1;
       prev_denom1 = current_denom;
       if(j % 10 == 0){ //rescale every 10th iter
-        double rescale_val = norm(current_num) + norm(current_denom);
-        if(rescale_val > 1/tolerance)
-          rescale_val = 1/rescale_val;
-        else if(rescale_val < tolerance)
-          rescale_val = 1/rescale_val;
-        else
-          rescale_val = 1.0;
-        current_num = current_num*rescale_val;
-        current_denom = current_denom*rescale_val;
-        prev_num1 = prev_num1*rescale_val;
-        prev_num2 = prev_num2*rescale_val;
-        prev_denom1 = prev_denom1*rescale_val;
-        prev_denom2 = prev_denom2*rescale_val;
+	double rescale_val = norm(current_num) + norm(current_denom);
+	if(rescale_val > 1/tolerance)
+	  rescale_val = 1/rescale_val;
+	else if(rescale_val < tolerance)
+	  rescale_val = 1/rescale_val;
+	else
+	  rescale_val = 1.0;
+	current_num = current_num*rescale_val;
+	current_denom = current_denom*rescale_val;
+	prev_num1 = prev_num1*rescale_val;
+	prev_num2 = prev_num2*rescale_val;
+	prev_denom1 = prev_denom1*rescale_val;
+	prev_denom2 = prev_denom2*rescale_val;
       }
     }
     complex<double> offset_terms(0.0, 0.0);
@@ -448,9 +483,9 @@ compute_lower_offdiag_cf_approx_complex(const vector<double> &cf_coeffs,
 } 
 
 double
-cont_frac::cf_deriv_complex(const double val,
-                            const double dx,
-                            const double tolerance){
+ContinuedFraction::cf_deriv_complex(const double val,
+				    const double dx,
+				    const double tolerance){
   const complex<double> i(0.0,1.0);
   complex<double> df(0.0, 0.0);
   complex<double> value(val, 0.0);
@@ -460,10 +495,10 @@ cont_frac::cf_deriv_complex(const double val,
     cf_approx_euler_complex(cf_coeffs, value + dx*i, tolerance, df);
   else if(upper_offset > 0)
     compute_upper_offdiag_cf_approx_complex(cf_coeffs, offset_coeffs,
-                                            value + dx*i, tolerance, df);
+					    value + dx*i, tolerance, df);
   else if(lower_offset > 0)
     compute_lower_offdiag_cf_approx_complex(cf_coeffs, offset_coeffs,
-                                            value + dx*i, tolerance, df);
+					    value + dx*i, tolerance, df);
   return(imag(df)/dx);
 }
 
@@ -473,8 +508,8 @@ movement(const double a, const double b) {
 }
 
 double
-cont_frac::locate_zero_cf_deriv(const double val, const double prev_val,
-                                const double dx, const double tolerance){
+ContinuedFraction::locate_zero_cf_deriv(const double val, const double prev_val,
+					const double dx, const double tolerance){
   double val_low = prev_val;
   double deriv_low = cf_deriv_complex(val_low, dx, tolerance);
   double val_high = val;
