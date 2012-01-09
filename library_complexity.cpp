@@ -339,8 +339,8 @@ main(const int argc, const char **argv) {
     
     size_t max_terms = 1000;
     double tolerance = 1e-20;
-    double max_time = 10;
-    double time_step = 0.1;
+    double max_extrapolation = 1e10;
+    double step_size = 1e6;
     double deriv_delta = 1e-8;
     size_t smoothing_bandwidth = 4;
     double smoothing_decay_factor = 15.0;
@@ -354,8 +354,10 @@ main(const int argc, const char **argv) {
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false , outfile);
-    opt_parse.add_opt("time",'m',"maximum time", false, max_time);
-    opt_parse.add_opt("step",'s',"time step", false, time_step);
+    opt_parse.add_opt("extrapolation_length",'e',"maximum extrapolation length", 
+                      false, max_extrapolation);
+    opt_parse.add_opt("step",'s',"step size between extrapolations", 
+                      false, step_size);
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, max_terms);
     opt_parse.add_opt("tol", '\0', "general numerical tolerance",
 		      false, tolerance);
@@ -408,6 +410,9 @@ main(const int argc, const char **argv) {
     const size_t n_reads = read_locations.size();
     const size_t vals_sum = accumulate(values.begin(), values.end(), 0ul);
     assert(vals_sum == n_reads);
+    
+    const double max_time = max_extrapolation/static_cast<double>(vals_sum);
+    const double time_step = step_size/static_cast<double>(vals_sum);
     
     const size_t max_observed_count = 
       *std::max_element(values.begin(), values.end());
