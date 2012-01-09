@@ -141,7 +141,7 @@ compute_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
   while(max_terms > 6){
     vector<double> contfrac_coeffs;
     vector<double> contfrac_offsetcoeffs;
-    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 2, 0);
+    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 0, 0);
     contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
     estimates.push_back(values_size);
     double time = time_step;
@@ -255,7 +255,7 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
   
   vector<double> contfrac_coeffs;
   vector<double> contfrac_offsetcoeffs;
-  cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 1, 0);
+  cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 2, 0);
   
   vector<double> coeffs(max_terms, 0.0);
   for(size_t j = 0; j < max_terms; j++)
