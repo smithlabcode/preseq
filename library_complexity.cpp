@@ -83,16 +83,16 @@ get_counts(const vector<SimpleGenomicRegion> &reads,
 // particular approximation (degrees of num and denom) at a specific
 // point
 bool
-cont_frac_distinct_stable(const bool VERBOSE, const double time,
+cont_frac_distinct_stable(const bool VERBOSE, const double t,
                           const double prev_val, const double dx,
                           const double tolerance, const double vals_sum,
                           const double samples_per_time_step,
                           cont_frac cf_estimate){
-  // stable if d/dt f(time) < vals_sum and f(time) <= prev_val+sample_per_time_step
+  // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
   // TODO: RENAME VARIABLES
   bool IS_STABLE = false;
-  const double current_val = cf_estimate.cf_approx(time, tolerance);
-  const double test_val = cf_estimate.cf_deriv_complex(time, dx, tolerance);
+  const double current_val = cf_estimate.cf_approx(t, tolerance);
+  const double test_val = cf_estimate.cf_deriv_complex(t, dx, tolerance);
   if(test_val <= vals_sum && test_val >= 0.0){
     IS_STABLE = true;
   }
@@ -105,9 +105,9 @@ cont_frac_distinct_stable(const bool VERBOSE, const double time,
     IS_STABLE = false;
     if (VERBOSE) {
       // TODO: make it more sensible:
-      cerr << "error found at " << time << ", cf approx = " 
-	   << cf_estimate.cf_approx(time, tolerance) << ", deriv = "
-	   << cf_estimate.cf_deriv_complex(time, dx, tolerance)  
+      cerr << "error found at " << t << ", cf approx = " 
+	   << cf_estimate.cf_approx(t, tolerance) << ", deriv = "
+	   << cf_estimate.cf_deriv_complex(t, dx, tolerance)  
 	   << ", vals_sum = " << vals_sum << "\n";
     } 
     return IS_STABLE; //estimate is unstable, exit_failure
@@ -141,12 +141,12 @@ extrapolate_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
     cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 0, 0);
     contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
     estimates.push_back(values_size);
-    double time = time_step;
-    while (time <= max_time) {
-      if (cont_frac_distinct_stable(VERBOSE, time, estimates.back() - values_size,
+    double t = time_step;
+    while (t <= max_time) {
+      if (cont_frac_distinct_stable(VERBOSE, t, estimates.back() - values_size,
 				    deriv_delta, tolerance, vals_sum, vals_sum*time_step,
 				    contfrac_estimate)) 
-        estimates.push_back(values_size + contfrac_estimate.cf_approx(time, tolerance));
+        estimates.push_back(values_size + contfrac_estimate.cf_approx(t, tolerance));
       else{
         if(VERBOSE)
 	  /// TODO: check this reporting for consiseness
@@ -154,9 +154,9 @@ extrapolate_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
         estimates.clear();
 	// TODO: COMMENT
         max_terms -= 2;
-        break; //out of time loop
+        break; //out of t loop
       }
-      time += time_step;
+      t += time_step;
     }
     if (estimates.size()) { //if estimates.size() > 0
       if (VERBOSE) {
@@ -272,14 +272,14 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
   while (max_terms > 6){
     contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
     // TODO: "TIME"
-    double time = time_step;
+    double t = time_step;
     double prev_deriv = 0.0;
-    double current_deriv = contfrac_estimate.cf_deriv_complex(time, deriv_delta, tolerance);
+    double current_deriv = contfrac_estimate.cf_deriv_complex(t, deriv_delta, tolerance);
     double current_val = distinct_vals;
     double prev_val = distinct_vals;
-    while(time < max_time){
-      current_deriv = contfrac_estimate.cf_deriv_complex(time, deriv_delta, tolerance);
-      current_val = contfrac_estimate.cf_approx(time, tolerance)+distinct_vals;
+    while(t < max_time){
+      current_deriv = contfrac_estimate.cf_deriv_complex(t, deriv_delta, tolerance);
+      current_val = contfrac_estimate.cf_approx(t, tolerance)+distinct_vals;
       //if derivative or estimate is not acceptable, choose different order approx
       if(fabs(current_deriv) > vals_sum || current_val > upper_bound){
 	//so that we can know we need to go down in approx
@@ -289,17 +289,17 @@ lowerbound_librarysize(const bool VERBOSE, const vector<double> &counts_histogra
         break; //out of t loop
       }
       if(current_deriv*prev_deriv < 0.0 && current_val < upper_bound){
-        possible_maxima_loc.push_back(contfrac_estimate.locate_zero_cf_deriv(time, time-time_step,
+        possible_maxima_loc.push_back(contfrac_estimate.locate_zero_cf_deriv(t, t-time_step,
                                                                              deriv_delta, tolerance));
         possible_maxima.push_back(contfrac_estimate.cf_approx(possible_maxima_loc.back(), tolerance)+distinct_vals);
       }
       else if (current_val < prev_val && prev_val < upper_bound) {
-        possible_maxima_loc.push_back(time-time_step);
+        possible_maxima_loc.push_back(t-time_step);
         possible_maxima.push_back(prev_val);
       }
       prev_deriv = current_deriv;
       prev_val = current_val;
-      time += time_step;
+      t += time_step;
     }
     if (possible_maxima.size() > 0) {
       break; //out of max_terms loop
