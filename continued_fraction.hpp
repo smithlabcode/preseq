@@ -41,6 +41,10 @@ public:
     lower_offset = 0; compute_cf_coeffs();}
   void set_ps_coeffs(const std::vector<double> &coeffs)
   {ps_coeffs = coeffs; compute_cf_coeffs();}
+  void set_cf_coeffs(const std::vector<double> &coeffs)
+  {cf_coeffs = coeffs;}
+  void set_offset_coeffs(const std::vector<double> &coeffs)
+  {offset_coeffs = coeffs;}
   
   // Accessors
   void get_cf_coeffs(std::vector<double> &return_coeffs) const
@@ -56,7 +60,7 @@ public:
                           const double tolerance);
   double locate_local_max(const double max_time, const double dx,
 			  const double upper_bound, const double tolerance);
-
+private:
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;

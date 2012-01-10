@@ -132,7 +132,7 @@ ContinuedFraction_upper_offset(const vector<double> &coeffs,
 			       const size_t offset,
 			       vector<double> &offset_cf_coeffs,
 			       vector<double> &cf_coeffs){ 
-//first offset coefficients set to coeffs
+//first offset coefficients set to first offset coeffs
   vector<double> holding_coeffs;
   for(size_t i = offset; i < depth; i++)
     holding_coeffs.push_back(coeffs[i]);
@@ -142,6 +142,7 @@ ContinuedFraction_upper_offset(const vector<double> &coeffs,
 }
 
 // evaluate CF when upper_offset > 0
+// using euler's recursion
 static double
 cf_approx_upper_offset(const vector<double> &cf_coeffs,
 		       const vector<double> &offset_coeffs,
@@ -192,7 +193,8 @@ ContinuedFraction_lower_offset(const vector<double> &coeffs,
 			       const size_t offset,
 			       vector<double> &offset_cf_coeffs,
 			       vector<double> &cf_coeffs){ 
-  //need to work with reciprocal series g = 1/f
+  //need to work with reciprocal series g = 1/f, then invert
+  //set offset_coeffs to 1st offset coeffs of 1/f
   vector<double> reciprocal_coeffs;
   reciprocal_coeffs.push_back(1/coeffs[0]);
   for(size_t i = 1; i < depth; i++){
@@ -302,23 +304,23 @@ compute_cf_coeffs(ContinuedFraction &cont_frac) {
   if(upper_offset == 0 && lower_offset == 0){    
     vector<double> temp_cf_coeffs;
     ContinuedFraction_qd(ps_coeffs, temp_cf_coeffs);
-    cont_frac.cf_coeffs = temp_cf_coeffs;
+    cont_frac.set_cf_coeffs(temp_cf_coeffs);
   }
   else if(upper_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
     ContinuedFraction_upper_offset(ps_coeffs, depth, upper_offset, 
 				   temp_cf_coeffs, temp_offset_coeffs);
-    cont_frac.offset_coeffs = temp_offset_coeffs;
-    cont_frac.cf_coeffs = temp_cf_coeffs;
+    cont_frac.set_offset_coeffs(temp_offset_coeffs);
+    cont_frac.set_cf_coeffs(temp_cf_coeffs);
   }
   else if(lower_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
     ContinuedFraction_lower_offset(ps_coeffs, depth, lower_offset,
 				   temp_offset_coeffs, temp_cf_coeffs);
-    cont_frac.offset_coeffs = temp_offset_coeffs;
-    cont_frac.cf_coeffs = temp_cf_coeffs;
+    cont_frac.set_offset_coeffs(temp_offset_coeffs);
+    cont_frac.set_cf_coeffs(temp_cf_coeffs);
   }
 }
 
@@ -496,7 +498,7 @@ movement(const double a, const double b) {
   return fabs((a - b)/std::max(a, b)); //delta
 }
 
-// locate zero deriv to find local max
+// locate zero deriv by bisection to find local max
 static double
 locate_zero_cf_deriv(const double val, const double prev_val,
 		     const double dx, const double tolerance){
