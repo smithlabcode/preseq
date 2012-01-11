@@ -26,21 +26,20 @@
 #include <vector>
 #include <complex>
 
-struct ContinuedFraction {
-public:
+struct cont_frac {
   // Constructor
-  ContinuedFraction(const std::vector<double> &coeffs,
+  cont_frac(const std::vector<double> &coeffs,
 		    const size_t in_lower, const size_t in_upper) :
     lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs),
     {compute_cf_coeffs();}
 
   // Mutators
   void set_lower_offset(const size_t l_o) {lower_offset = l_o; 
-    upper_offset = 0; compute_cf_coeffs();}
+    upper_offset = 0;}
   void set_upper_offset(const size_t u_o) {upper_offset = u_o; 
-    lower_offset = 0; compute_cf_coeffs();}
+    lower_offset = 0;}
   void set_ps_coeffs(const std::vector<double> &coeffs)
-  {ps_coeffs = coeffs; compute_cf_coeffs();}
+  {ps_coeffs = coeffs;}
   void set_cf_coeffs(const std::vector<double> &coeffs)
   {cf_coeffs = coeffs;}
   void set_offset_coeffs(const std::vector<double> &coeffs)
@@ -55,17 +54,39 @@ public:
   {return_coeffs = ps_coeffs;}
   
   // Evaluators
-  double cf_approx(const double time, const double tolerance);
-  double cf_deriv_complex(const double val, const double dx,
-                          const double tolerance);
-  double locate_local_max(const double max_time, const double dx,
-			  const double upper_bound, const double tolerance);
-private:
+  double evaluate(const double val);
+  double cf_deriv_complex(const double val);
+
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;
   size_t lower_offset;
   size_t upper_offset;
+
+  static double TOLERANCE;
+  static double DERIV_DELTA;
 };
+
+class ContFracApprox {
+public:
+  // Constructor
+  ContFracApprox(const cont_frac &cf_instance) :
+    cf(cf_instance), {compute_cf_coeffs();}
+
+  // Mutators
+  void compute_cf_coeffs();
+  void find_local_max(const double lower_limit,
+		      const double upper_limit,
+		      const double upper_bound);
+
+
+private:
+  cont_frac cf;
+  static const size_t MINIMUM_ALLOWED_DEGREE = 6;
+}
+
+
+
+
 
 #endif
