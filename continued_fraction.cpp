@@ -326,28 +326,31 @@ ContFrac_eval_no_offset(const vector<double> &cf_coeffs,
 // calculate cf_coeffs depending on offset
 void
 ContFracApprox::compute_cf_coeffs() {
-  cf.cf_coeffs.clear();
-  cf.offset_coeffs.clear();
-  if(cf.upper_offset == 0 && cf.lower_offset == 0){    
+  cont_frac_estimate.cf_coeffs.clear();
+  cont_frac_estimate.offset_coeffs.clear();
+  if(cont_frac_estimate.upper_offset == 0 && 
+     cont_frac_estimate.lower_offset == 0){    
     vector<double> temp_cf_coeffs;
-    ContinuedFraction_qd(cf.ps_coeffs, temp_cf_coeffs);
-    cf.set_cf_coeffs(temp_cf_coeffs);
+    ContinuedFraction_qd(cont_frac_estimate.ps_coeffs, temp_cf_coeffs);
+    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
   }
-  else if(cf.upper_offset > 0){
+  else if(cont_frac_estimate.upper_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    ContinuedFraction_upper_offset(cf.ps_coeffs, cf.upper_offset, 
+    ContinuedFraction_upper_offset(cont_frac_estimate.ps_coeffs, 
+				   cont_frac_estimate.upper_offset, 
 				   temp_cf_coeffs, temp_offset_coeffs);
-    cf.set_offset_coeffs(temp_offset_coeffs);
-    cf.set_cf_coeffs(temp_cf_coeffs);
+    cont_frac_estimate.set_offset_coeffs(temp_offset_coeffs);
+    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
   }
-  else if(cf.lower_offset > 0){
+  else if(cont_frac_estimate.lower_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    ContinuedFraction_lower_offset(cf.ps_coeffs, cf.lower_offset,
+    ContinuedFraction_lower_offset(cont_frac_estimate.ps_coeffs, 
+				   cont_frac_estimate.lower_offset,
 				   temp_offset_coeffs, temp_cf_coeffs);
-    cf.set_offset_coeffs(temp_offset_coeffs);
-    cf.set_cf_coeffs(temp_cf_coeffs);
+    cont_frac_estimate.set_offset_coeffs(temp_offset_coeffs);
+    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
   }
 }
 
@@ -542,12 +545,12 @@ movement(const double a, const double b) {
 // locate zero deriv by bisection to find local max
 // within (prev_val, val)
 static double
-locate_zero_cf_deriv(cont_frac cf,
+locate_zero_cf_deriv(cont_frac cont_frac_estimate,
 		     const double val, const double prev_val){
   double val_low = prev_val;
-  double deriv_low = cf.complex_deriv(val_low);
+  double deriv_low = cont_frac_estimate.complex_deriv(val_low);
   double val_high = val;
-  double deriv_high = cf.complex_deriv(val_high);
+  double deriv_high = cont_frac_estimate.complex_deriv(val_high);
   double val_mid = (val-prev_val)/2;
   double deriv_mid = std::numeric_limits<double>::max();
 
@@ -556,7 +559,7 @@ locate_zero_cf_deriv(cont_frac cf,
 
   while(diff > TOLERANCE && movement(val_low, val_high) > TOLERANCE){
     val_mid = (val_low + val_high)/2.0;
-    deriv_mid = cf.complex_deriv(val_mid);
+    deriv_mid = cont_frac_estimate.complex_deriv(val_mid);
 
     if((deriv_mid > 0 && deriv_low < 0) ||
        (deriv_mid < 0 && deriv_low > 0))
@@ -564,8 +567,8 @@ locate_zero_cf_deriv(cont_frac cf,
     else 
       val_low = val_mid;
 
-    deriv_low = cf.complex_deriv(val_low);
-    deriv_high = cf.complex_deriv(val_high);
+    deriv_low = cont_frac_estimate.complex_deriv(val_low);
+    deriv_high = cont_frac_estimate.complex_deriv(val_high);
     diff = fabs((prev_deriv - deriv_mid)/prev_deriv);
     prev_deriv = deriv_mid;
   }
@@ -592,8 +595,8 @@ ContFracApprox::locate_local_max(const double min_val,
 				 const double upper_bound,
 				 const double deriv_upper_bound){
   double val = min_val;
-  double prev_approx = cf.evaluate(val);
-  double prev_deriv = cf.complex_deriv(val);
+  double prev_approx = cont_frac_estimate.evaluate(val);
+  double prev_deriv = cont_frac_estimate.complex_deriv(val);
   double current_approx, current_deriv;
 
   double current_max = prev_approx;
@@ -601,8 +604,8 @@ ContFracApprox::locate_local_max(const double min_val,
 
   while(val <= max_val){
     val += step_size;
-    current_approx = cf.evaluate(val);
-    current_deriv = cf.complex_deriv(val);
+    current_approx = cont_frac_estimate.evaluate(val);
+    current_deriv = cont_frac_estimate.complex_deriv(val);
 
     // test stability to locate possible defects
     // do not use approx if estimate is not stable
@@ -611,9 +614,9 @@ ContFracApprox::locate_local_max(const double min_val,
       // update max if it is greater
       if((current_deriv < 0.0) && (prev_deriv > 0.0)){ 
 	double possible_max_loc = 
-	  locate_zero_cf_deriv(cf, val, val-step_size);
-	if(cf.evaluate(possible_max_loc) > current_max){
-	  current_max = cf.evaluate(possible_max_loc);
+	  locate_zero_cf_deriv(cont_frac_estimate, val, val-step_size);
+	if(cont_frac_estimate.evaluate(possible_max_loc) > current_max){
+	  current_max = cont_frac_estimate.evaluate(possible_max_loc);
 	  current_max_loc = possible_max_loc;
 	}
       }
@@ -621,7 +624,7 @@ ContFracApprox::locate_local_max(const double min_val,
     //exit while loop if Approx is unstable
     else{
       val = max_val; 
-      current_max = cf.evaluate(min_val);
+      current_max = cont_frac_estimate.evaluate(min_val);
       current_max_loc = min_val;
     }
   }

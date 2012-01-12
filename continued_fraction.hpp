@@ -68,7 +68,7 @@ class ContFracApprox {
 public:
   // Constructor
   ContFracApprox(const cont_frac &cf_instance) :
-    cf(cf_instance) {compute_cf_coeffs();}
+    cont_frac_estimate(cf_instance) {compute_cf_coeffs();}
 
   // Mutators
   void compute_cf_coeffs();
@@ -80,7 +80,7 @@ public:
 
 
 private:
-  cont_frac cf;
+  cont_frac cont_frac_estimate;
   static const size_t MINIMUM_ALLOWED_DEGREE = 6;
 };
 
