@@ -22,6 +22,7 @@
 
 #include "pade_approximant.hpp"
 #include "continued_fraction.hpp"
+#include "library_size_estimates.hpp"
 
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
