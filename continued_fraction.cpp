@@ -29,10 +29,12 @@ using std::vector;
 using std::complex;
 using std::real;
 using std::imag;
+using std::cerr;
+using std::endl;
 
-double cont_frac::TOLERANCE = 1e-20;
-double cont_frac::DERIV_DELTA = 1e-8;
-double CF_APPROX_VERBOSE = false;
+const double TOLERANCE = 1e-20;
+const double DERIV_DELTA = 1e-8;
+const double CF_APPROX_VERBOSE = false;
 
 /*
 // This is the quotient difference algorithm...
@@ -133,16 +135,15 @@ ContinuedFraction_qd(const vector<double> &coeffs,
 // compute CF coeffs when upper_offset > 0
 static void
 ContinuedFraction_upper_offset(const vector<double> &coeffs,
-			       const size_t depth,
 			       const size_t offset,
 			       vector<double> &offset_cf_coeffs,
 			       vector<double> &cf_coeffs){ 
 //first offset coefficients set to first offset coeffs
   vector<double> holding_coeffs;
-  for(size_t i = offset; i < depth; i++)
+  for(size_t i = offset; i < coeffs.size(); i++)
     holding_coeffs.push_back(coeffs[i]);
   // qd to determine cf_coeffs
-  ContinuedFraction_qd(holding_coeffs, depth-offset, cf_coeffs);
+  ContinuedFraction_qd(holding_coeffs, cf_coeffs);
   for(size_t i = 0; i < offset; i++)
     offset_cf_coeffs.push_back(coeffs[i]);
 }
@@ -208,7 +209,7 @@ ContinuedFraction_lower_offset(const vector<double> &coeffs,
   //need to work with reciprocal series g = 1/f, then invert
   vector<double> reciprocal_coeffs;
   reciprocal_coeffs.push_back(1/coeffs[0]);
-  for(size_t i = 1; i < depth; i++){
+  for(size_t i = 1; i < coeffs.size(); i++){
     double holding_val = 0.0;
     for(size_t j = 0; j < i; j++)
       holding_val += coeffs[i - j]*reciprocal_coeffs[j];
@@ -325,43 +326,43 @@ ContFrac_eval_no_offset(const vector<double> &cf_coeffs,
 // calculate cf_coeffs depending on offset
 void
 ContFracApprox::compute_cf_coeffs() {
-  cf_coeffs.clear();
-  offset_coeffs.clear();
-  if(upper_offset == 0 && lower_offset == 0){    
+  cf.cf_coeffs.clear();
+  cf.offset_coeffs.clear();
+  if(cf.upper_offset == 0 && cf.lower_offset == 0){    
     vector<double> temp_cf_coeffs;
-    ContinuedFraction_qd(ps_coeffs, temp_cf_coeffs);
+    ContinuedFraction_qd(cf.ps_coeffs, temp_cf_coeffs);
     cf.set_cf_coeffs(temp_cf_coeffs);
   }
-  else if(upper_offset > 0){
+  else if(cf.upper_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    ContinuedFraction_upper_offset(ps_coeffs, depth, upper_offset, 
+    ContinuedFraction_upper_offset(cf.ps_coeffs, cf.upper_offset, 
 				   temp_cf_coeffs, temp_offset_coeffs);
     cf.set_offset_coeffs(temp_offset_coeffs);
     cf.set_cf_coeffs(temp_cf_coeffs);
   }
-  else if(lower_offset > 0){
+  else if(cf.lower_offset > 0){
     vector<double> temp_cf_coeffs;
     vector<double> temp_offset_coeffs;
-    ContinuedFraction_lower_offset(ps_coeffs, depth, lower_offset,
+    ContinuedFraction_lower_offset(cf.ps_coeffs, cf.lower_offset,
 				   temp_offset_coeffs, temp_cf_coeffs);
-    cont_frac.set_offset_coeffs(temp_offset_coeffs);
-    cont_frac.set_cf_coeffs(temp_cf_coeffs);
+    cf.set_offset_coeffs(temp_offset_coeffs);
+    cf.set_cf_coeffs(temp_cf_coeffs);
   }
 }
 
 // calculate cont_frac approx depending on offset
 double
-ContFrac::evaluate(const double val){
+cont_frac::evaluate(const double val){
   //no offset
   if (upper_offset == 0 && lower_offset == 0)
-    return cf.ContFrac_eval_no_offset(cf_coeffs, val);
+    return ContFrac_eval_no_offset(cf_coeffs, val);
   //upper offset
   else if (upper_offset > 0)
-    return cf.ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, val);
+    return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, val);
   //lower offset
   else if (lower_offset > 0)
-    return cf.ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, val);
+    return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, val);
 }
 
 // compute ContFrac_eval for complex values to compute deriv when no offset
@@ -509,11 +510,11 @@ ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
 //compute cf approx for complex depending on offset
 // df/dx = lim_{delta -> 0} Imag(f(val+i*delta))/delta
 double
-ContinuedFraction::cf_deriv_complex(const double val){
+cont_frac::complex_deriv(const double val){
   vector<double> ContFracCoeffs;
-  cf.get_cf_coeffs(ContFracCoeffs);
+  get_cf_coeffs(ContFracCoeffs);
   vector<double> ContFracOffCoeffs;
-  cf.get_offset_coeffs(ContFracOffCoeffs);
+  get_offset_coeffs(ContFracOffCoeffs);
 
   const complex<double> i(0.0,1.0);
   complex<double> df(0.0, 0.0);
@@ -539,37 +540,91 @@ movement(const double a, const double b) {
 }
 
 // locate zero deriv by bisection to find local max
+// within (prev_val, val)
 static double
-locate_zero_cf_deriv(const double val, const double prev_val){
+locate_zero_cf_deriv(cont_frac cf,
+		     const double val, const double prev_val){
   double val_low = prev_val;
-  double deriv_low = cf_deriv_complex(val_low);
+  double deriv_low = cf.complex_deriv(val_low);
   double val_high = val;
-  double deriv_high = cf_deriv_complex(val_high);
-  double val_mid = val;
-  double mid_deriv = 0.0;
+  double deriv_high = cf.complex_deriv(val_high);
+  double val_mid = (val-prev_val)/2;
+  double deriv_mid = std::numeric_limits<double>::max();
+
   double diff = std::numeric_limits<double>::max();
   double prev_deriv = std::numeric_limits<double>::max();
+
   while(diff > TOLERANCE && movement(val_low, val_high) > TOLERANCE){
     val_mid = (val_low + val_high)/2.0;
-    mid_deriv = cf_deriv_complex(val_mid, dx);
-    if((mid_deriv > 0 && deriv_low < 0) ||
-       (mid_deriv < 0 && deriv_low > 0))
+    deriv_mid = cf.complex_deriv(val_mid);
+
+    if((deriv_mid > 0 && deriv_low < 0) ||
+       (deriv_mid < 0 && deriv_low > 0))
       val_high = val_mid;
     else 
       val_low = val_mid;
-    deriv_low = cf_deriv_complex(val_low);
-    deriv_high = cf_deriv_complex(val_high);
-    diff = fabs((prev_deriv - mid_deriv)/prev_deriv);
-    prev_deriv = mid_deriv;
+
+    deriv_low = cf.complex_deriv(val_low);
+    deriv_high = cf.complex_deriv(val_high);
+    diff = fabs((prev_deriv - deriv_mid)/prev_deriv);
+    prev_deriv = deriv_mid;
   }
+
   return(val_mid);
 }
 
-void
-ContFracApprox::
+// 
+static bool
+test_stability_local_max(const double approx,
+			  const double deriv_val,
+			  const double approx_upper_bound,
+			  const double deriv_upper_bound){
+  return (deriv_val < deriv_upper_bound) &&
+    (approx < approx_upper_bound);
+}
 
+// search (min_val, max_val) for local max
+// return location of local max
 double
-ContinuedFraction::locate_local_max(const double max_time,
-				    const double upper_bound){
+ContFracApprox::locate_local_max(const double min_val,
+				 const double max_val,
+				 const double step_size,
+				 const double upper_bound,
+				 const double deriv_upper_bound){
+  double val = min_val;
+  double prev_approx = cf.evaluate(val);
+  double prev_deriv = cf.complex_deriv(val);
+  double current_approx, current_deriv;
 
+  double current_max = prev_approx;
+  double current_max_loc = val;
+
+  while(val <= max_val){
+    val += step_size;
+    current_approx = cf.evaluate(val);
+    current_deriv = cf.complex_deriv(val);
+
+    // test stability to locate possible defects
+    // do not use approx if estimate is not stable
+    if(test_stability_local_max(current_approx, current_deriv,
+				upper_bound, deriv_upper_bound)){
+      // update max if it is greater
+      if((current_deriv < 0.0) && (prev_deriv > 0.0)){ 
+	double possible_max_loc = 
+	  locate_zero_cf_deriv(cf, val, val-step_size);
+	if(cf.evaluate(possible_max_loc) > current_max){
+	  current_max = cf.evaluate(possible_max_loc);
+	  current_max_loc = possible_max_loc;
+	}
+      }
+    }
+    //exit while loop if Approx is unstable
+    else{
+      val = max_val; 
+      current_max = cf.evaluate(min_val);
+      current_max_loc = min_val;
+    }
+  }
+
+  return current_max_loc;
 }
