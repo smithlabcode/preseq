@@ -20,20 +20,22 @@
 #ifndef LIBRARY_SIZE_ESTIMATES_HPP
 #define LIBRARY_SIZE_ESTIMATES_HPP
 
+#include "continued_fraction.hpp"
+
 #include <vector>
 
 double
-compute_chao87_library_size_lower_bound(const std::vector<double> &counts_histogram);
+chao87_lowerbound_librarysize(const std::vector<double> &counts_histogram);
 
 double 
-compute_cl92_library_size_lower_bound(const std::vector<double> &counts_histogram);
+cl92_lowerbound_librarysize(const std::vector<double> &counts_histogram);
 
 double
-upperbound_librarysize(continued_fraction::ContFracApprox &ContFrac, 
+upperbound_librarysize(ContFracApprox &ContFrac, 
 		       size_t max_terms);
 
 double
-lowerbound_librarysize(const vector<double> &counts_hist,
+lowerbound_librarysize(const std::vector<double> &counts_hist,
 		       const double upper_bound, //from upperbound_librarysize
                        const double step_size, const double max_val,
                        size_t max_terms)

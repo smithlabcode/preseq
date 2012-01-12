@@ -84,90 +84,103 @@ get_counts(const vector<SimpleGenomicRegion> &reads,
 // particular approximation (degrees of num and denom) at a specific
 // point
 bool
-cont_frac_distinct_stable(const bool VERBOSE, const double t,
-                          const double prev_val, const double dx,
-                          const double tolerance, const double vals_sum,
-                          const double samples_per_time_step,
-                          cont_frac cf_estimate){
+cont_frac_distinct_stable(const bool VERBOSE, const double val,
+                          const double prev_estim, 
+			  const double step_size,
+			  const double init_distinct,
+                          ContFracApprox &CFestimate){
   // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
-  // TODO: RENAME VARIABLES
+  const double distinct_per_step = init_disinct*step_size;
   bool IS_STABLE = false;
-  const double current_val = cf_estimate.cf_approx(t, tolerance);
-  const double test_val = cf_estimate.cf_deriv_complex(t, dx, tolerance);
-  if(test_val <= vals_sum && test_val >= 0.0){
+  const double estimate = CFestimate.cont_frac_estimate.evaluate(val);
+  const double deriv =  
+    = CFestimate.cont_frac_estimate.complex_deriv(val);
+  // we are using an CF approx that acts like x in limit
+  // derivative must be positive and be less than the initial derivative
+  if(deriv <= init_distinct && deriv >= 0.0){
     IS_STABLE = true;
   }
-
-  if (IS_STABLE && current_val >= prev_val &&
-      current_val <= prev_val + samples_per_time_step) {
+  //make sure that the estimate is increasing in the time_step
+  // and is below the initial distinct per step_size
+  if (IS_STABLE && estimate >= prev_estim &&
+      current_val <= prev_estim + distinct_per_step) {
     return IS_STABLE;  //estimate is stable, exit_success
   }
   else {
     IS_STABLE = false;
     if (VERBOSE) {
-      // TODO: make it more sensible:
-      cerr << "error found at " << t << ", cf approx = " 
-	   << cf_estimate.cf_approx(t, tolerance) << ", deriv = "
-	   << cf_estimate.cf_deriv_complex(t, dx, tolerance)  
-	   << ", vals_sum = " << vals_sum << "\n";
+      cerr << "error_loc" << "\t" << "estimate" << "\t" 
+	   << "deriv" << endl;
+      cerr << val << "\t" <<  CFestimate.cont_frac_estimate.evaluate(val)
+	   << "\t" << CFestimate.cont_frac_estimate.complex_deriv(val)
+	   << endl;
     } 
-    return IS_STABLE; //estimate is unstable, exit_failure
+// if estimate is unstable, exit_failure, else exit_success
+    return IS_STABLE; 
   }
 }
 
-// Extrapolates the curve, for a given time (step & max) and numbers
+// Extrapolates the curve, for given values (step & max) and numbers
 // of terms
 static void
-extrapolate_distinct(const bool VERBOSE, const vector<double> &counts_histogram,
-		     const double max_time, const double time_step,
+extrapolate_distinct(const bool VERBOSE, 
+		     const vector<double> &counts_histogram,
+		     const double max_value, const double step_size,
 		     const double tolerance, const double deriv_delta, 
-		     const size_t initial_max_terms, vector<double> &estimates) {
-  
+		     const size_t initial_max_terms, 
+		     vector<double> &estimates) {
+  // ensure that we will use an underestimate
   size_t max_terms = initial_max_terms - (initial_max_terms % 2 == 1);
   
-  const double values_size = 
+  // hist_sum = number of distinct in initial sample
+  const double hist_sum = 
   accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
-  double vals_sum  = 0.0;
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_histogram.size(); i++)
     vals_sum += i*counts_histogram[i];
   
   vector<double> coeffs(max_terms, 0.0);
   for (size_t j = 0; j < max_terms; j++)
     coeffs[j] = counts_histogram[j + 1]*pow(-1, j+2);
+
+  cont_frac cont_frac_estim(coeffs, 0, 0);
+  ContFracApprox CFestimate(cont_frac_estim);
   
-  // TODO: NO MAGIC!!!!!!!!
-  while (max_terms > 6) {
-    vector<double> contfrac_coeffs;
-    vector<double> contfrac_offsetcoeffs;
-    cont_frac contfrac_estimate(contfrac_coeffs, contfrac_offsetcoeffs, 0, 0);
-    contfrac_estimate.compute_cf_coeffs(coeffs, max_terms);
-    estimates.push_back(values_size);
-    double t = time_step;
-    while (t <= max_time) {
-      if (cont_frac_distinct_stable(VERBOSE, t, estimates.back() - values_size,
-				    deriv_delta, tolerance, vals_sum, vals_sum*time_step,
-				    contfrac_estimate)) 
-        estimates.push_back(values_size + contfrac_estimate.cf_approx(t, tolerance));
+  estimates.clear();
+  while (max_terms > CFestimate.MINIMUM_ALLOWED_DEGREE &&
+	 estimates.size() == 0) {
+    estimates.push_back(hist_sum);
+    double value = step_size;
+    bool STABLE_ESTIMATE = true;
+    while (value <= max_value && STABLE_ESTIMATE) {
+
+      STABLE_ESTIMATE = STABLE_ESTIMATE &&
+	cont_frac_distinct_stable(VERBOSE, val, prev_estim, 
+				  step_size, hist_sum, CFestimate);
+      if(STABLE_ESTIMATE)
+        estimates.push_back(values_size 
+			    + CFestimate.cont_frac_estimate.cf_approx(val));
       else{
-        if(VERBOSE)
-	  /// TODO: check this reporting for consiseness
-	  cerr << "defect found, number of terms = " << max_terms << "\n";
         estimates.clear();
-	// TODO: COMMENT
         max_terms -= 2;
-        break; //out of t loop
       }
-      t += time_step;
+      val += step_size;
     }
     if (estimates.size()) { //if estimates.size() > 0
       if (VERBOSE) {
+	vector<double> contfrac_coeffs;
         contfrac_estimate.get_cf_coeffs(contfrac_coeffs);
         for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
-          cerr << setw(12) << fixed << setprecision(2) << contfrac_coeffs[i] << "\t" 
+          cerr << setw(12) << fixed << setprecision(2) 
+	       << contfrac_coeffs[i] << "\t" 
 	       << setw(12) << fixed << setprecision(2) << coeffs[i] << endl;
       }
-      // TODO: ANDREW HATES BREAK STATEMENTS
-      break; //out of max_terms loop
+    }
+    else{
+      coeffs.push_back();
+      coeffs.push_back();
+      ContFracApprox.set_ps_coeffs(coeffs);
     }
   }
 }

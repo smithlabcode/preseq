@@ -74,6 +74,8 @@ public:
 
   // Mutators
   void compute_cf_coeffs();
+  void set_ps_coeffs(std::vector<double> &coeffs) :
+    cont_frac_estimate.ps_coeffs(coeffs) {compute_cf_coeffs();}
   double locate_local_max(const double lower_limit, 
 			  const double upper_limit,
 			  const double step_size, 

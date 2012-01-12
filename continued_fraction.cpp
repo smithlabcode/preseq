@@ -153,8 +153,8 @@ ContinuedFraction_upper_offset(const vector<double> &coeffs,
 static double
 ContFrac_eval_upper_offset(const vector<double> &cf_coeffs,
 		       const vector<double> &offset_coeffs,
-		       const double t){
-  if(t == 0)
+			   const double val, const size_t depth){
+  if(val == 0)
     return 0.0;
   else{
     double current_num = 0.0;
@@ -165,10 +165,10 @@ ContFrac_eval_upper_offset(const vector<double> &cf_coeffs,
     double prev_denom1 = 1.0;
     double prev_denom2 = 1.0; 
 
-    for(size_t i = 1; i < cf_coeffs.size(); i++){
+    for(size_t i = 1; i < depth; i++){
       // initialize
-      current_num = prev_num1 + cf_coeffs[i]*t*prev_num2;
-      current_denom = prev_denom1 + cf_coeffs[i]*t*prev_denom2;
+      current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
+      current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
 
       prev_num2 = prev_num1;
       prev_num1 = current_num;
@@ -192,11 +192,12 @@ ContFrac_eval_upper_offset(const vector<double> &cf_coeffs,
       prev_denom2 = prev_denom2*rescale_val;
     }
     double offset_part = 0.0;
-    for(size_t i = 0; i < offset_coeffs.size(); i++)
-      offset_part += offset_coeffs[i]*pow(t, i);
+    for(size_t i = 0; i < std::min(offset_coeffs.size(),
+				   depth); i++)
+      offset_part += offset_coeffs[i]*pow(val, i);
 
-    return t*(offset_part + 
-	      pow(t, offset_coeffs.size())*current_num/current_denom);
+    return val*(offset_part + 
+	      pow(val, offset_coeffs.size())*current_num/current_denom);
   }
 } 
 
@@ -231,8 +232,8 @@ ContinuedFraction_lower_offset(const vector<double> &coeffs,
 static double 
 ContFrac_eval_lower_offset(const vector<double> &cf_coeffs,
 		       const vector<double> &offset_coeffs,
-		       const double t){
-  if(t == 0)
+			   const double val, const size_t depth) {
+  if(val == 0)
     return 0.0;
   else{
     //initialize
@@ -244,10 +245,10 @@ ContFrac_eval_lower_offset(const vector<double> &cf_coeffs,
     double prev_denom1 = 1.0;
     double prev_denom2 = 1.0; 
 
-    for(size_t i = 1; i < cf_coeffs.size(); i++){
+    for(size_t i = 1; i < depth; i++){
       // recursion
-      current_num = prev_num1 + cf_coeffs[i]*t*prev_num2;
-      current_denom = prev_denom1 + cf_coeffs[i]*t*prev_denom2;
+      current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
+      current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
 
       prev_num2 = prev_num1;
       prev_num1 = current_num;
@@ -269,11 +270,12 @@ ContFrac_eval_lower_offset(const vector<double> &cf_coeffs,
       prev_denom2 = prev_denom2*rescale_val;
     }
     double offset_terms = 0.0;
-    for(size_t i = 0; i < offset_coeffs.size(); i++)
-      offset_terms += offset_coeffs[i]*pow(t, i);
+    for(size_t i = 0; i < std::min(offset_coeffs.size(),
+				   depth); i++)
+      offset_terms += offset_coeffs[i]*pow(val, i);
     // recall that if lower_offset > 0, we are working with 1/f, invert approx
-    return t/(offset_terms + 
-	      pow(t, offset_coeffs.size())*current_num/current_denom);
+    return val/(offset_terms + 
+		pow(val, offset_coeffs.size())*current_num/current_denom);
   }
 }
 
@@ -281,8 +283,8 @@ ContFrac_eval_lower_offset(const vector<double> &cf_coeffs,
 // uses euler's recursion
 static double
 ContFrac_eval_no_offset(const vector<double> &cf_coeffs, 
-		    const double t){
-  if(t == 0.0){
+			const double val, const size_t depth){
+  if(val == 0.0){
     return 0.0;
   }
   else{
@@ -295,10 +297,10 @@ ContFrac_eval_no_offset(const vector<double> &cf_coeffs,
     double prev_denom1 = 1.0;
     double prev_denom2 = 1.0; 
 
-    for(size_t i = 1; i < cf_coeffs.size(); i++){
+    for(size_t i = 1; i < depth; i++){
       // recursion
-      current_num = prev_num1 + cf_coeffs[i]*t*prev_num2;
-      current_denom = prev_denom1 + cf_coeffs[i]*t*prev_denom2;
+      current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
+      current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
 
       prev_num2 = prev_num1;
       prev_num1 = current_num;
@@ -319,7 +321,7 @@ ContFrac_eval_no_offset(const vector<double> &cf_coeffs,
       prev_denom1 = prev_denom1*rescale_val;
       prev_denom2 = prev_denom2*rescale_val;
     }
-    return t*current_num/current_denom;
+    return val*current_num/current_denom;
   }
 }
 
@@ -356,23 +358,26 @@ ContFracApprox::compute_cf_coeffs() {
 
 // calculate cont_frac approx depending on offset
 double
-cont_frac::evaluate(const double val){
+cont_frac::evaluate(const double val, const size_t depth){
   //no offset
   if (upper_offset == 0 && lower_offset == 0)
-    return ContFrac_eval_no_offset(cf_coeffs, val);
+    return ContFrac_eval_no_offset(cf_coeffs, val, depth);
   //upper offset
   else if (upper_offset > 0)
-    return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, val);
+    return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, 
+				      val, depth);
   //lower offset
   else if (lower_offset > 0)
-    return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, val);
+    return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, 
+				      val, depth);
 }
 
 // compute ContFrac_eval for complex values to compute deriv when no offset
 static void
 ContFrac_eval_complex_no_offset(const vector<double> &cf_coeffs,
-			    const complex<double> perturbed_val,
-			    complex<double> &approx){
+				const complex<double> perturbed_val,
+				const size_t depth,
+				complex<double> &approx){
   const complex<double> i(0.0,1.0);
   if(norm(perturbed_val) == 0.0)
     approx = 0.0*i;
@@ -384,7 +389,7 @@ ContFrac_eval_complex_no_offset(const vector<double> &cf_coeffs,
     complex<double> current_denom(0.0, 0.0);
     complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
     
-    for(size_t j = 1; j < cf_coeffs.size(); j++){
+    for(size_t j = 1; j < depth; j++){
       //euler's recursion
       complex<double> coeff(cf_coeffs[j], 0.0);
       current_num = prev_num1 + coeff*perturbed_val*prev_num2;
@@ -415,9 +420,10 @@ ContFrac_eval_complex_no_offset(const vector<double> &cf_coeffs,
 // compute complex ContFrac_eval when upper_offset > 0
 static void
 ContFrac_eval_complex_upper_offset(const vector<double> &cf_coeffs,
-			       const vector<double> &offset_coeffs,
-			       const complex<double> perturbed_val,
-			       complex<double> &approx){
+				   const vector<double> &offset_coeffs,
+				   const complex<double> perturbed_val,
+				   const size_t depth,
+				   complex<double> &approx){
   const complex<double> i(0.0,1.0);
   if(norm(perturbed_val) == 0.0)
     approx = 0.0*i;
@@ -428,7 +434,7 @@ ContFrac_eval_complex_upper_offset(const vector<double> &cf_coeffs,
     complex<double> current_denom(0.0, 0.0);
     complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
 
-    for(size_t j = 1; j < cf_coeffs.size(); j++){
+    for(size_t j = 1; j < depth; j++){
       //eulers recursion
       complex<double> coeff(cf_coeffs[j], 0.0);
       current_num = prev_num1 + coeff*perturbed_val*prev_num2;
@@ -464,9 +470,9 @@ ContFrac_eval_complex_upper_offset(const vector<double> &cf_coeffs,
 // compute cf approx when lower_offset > 0
 static void
 ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
-			       const vector<double> &offset_coeffs,
-			       const complex<double> perturbed_val,
-			       complex<double> &approx) {
+				   const vector<double> &offset_coeffs,
+				   const complex<double> perturbed_val,
+				   complex<double> &approx) {
   const complex<double> i(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
     approx = 0.0*i;
