@@ -66,6 +66,8 @@ struct cont_frac {
 
 class ContFracApprox {
 public:
+  static const size_t MINIMUM_ALLOWED_DEGREE = 6;
+
   // Constructor
   ContFracApprox(const cont_frac &cf_instance) :
     cont_frac_estimate(cf_instance) {compute_cf_coeffs();}
@@ -81,7 +83,6 @@ public:
 
 private:
   cont_frac cont_frac_estimate;
-  static const size_t MINIMUM_ALLOWED_DEGREE = 6;
 };
 
 
