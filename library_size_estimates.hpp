@@ -21,8 +21,10 @@
 #define LIBRARY_SIZE_ESTIMATES_HPP
 
 #include "continued_fraction.hpp"
+#include "pade_approximant.hpp"
 
 #include <vector>
+#include <numeric>
 
 double
 chao87_lowerbound_librarysize(const std::vector<double> &counts_histogram);

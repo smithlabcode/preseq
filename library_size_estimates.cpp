@@ -20,8 +20,8 @@
 // computes bounds on library size
 // including lower bounds of Chao(Biometrics 1987) and 
 // Chao & Lee (JASA 1992)
-
 #include "library_size_estimates.hpp"
+
 #include "pade_approximant.hpp"
 #include "continued_fraction.hpp"
 
@@ -33,8 +33,6 @@
 using std::string;
 using std::vector;
 using std::max;
-
-using std::cerr;
 
 using smithlab::log_sum_log_vec;
 
@@ -50,14 +48,13 @@ upperbound_librarysize(ContFracApprox &ContFrac, size_t max_terms) {
   if (max_terms % 2 == 1)
     --max_terms;
   
-  vector<double> coeffs(max_terms, 0.0);
-  for(size_t j = 0; j < max_terms; j++)
-    coeffs[j] = ContFrac.cf.ps_coeffs[j];
+  vector<double> coeffs;
+  ContFrac.get_ps_coeffs(coeffs);
 
   bool ACCEPT_UPPER_BOUND = false;
   double upper_bound;
 
-  while (max_terms >= ContFrac.MIN_ALLOWED_APPROX
+  while (max_terms >= ContFrac.MINIMUM_ALLOWED_DEGREE
 	 && !ACCEPT_UPPER_BOUND) {
     vector<double> denom_vec;
     vector<double> num_vec;
@@ -113,14 +110,14 @@ lowerbound_librarysize(const vector<double> &counts_hist,
   while (n_terms > ContFracApprox::MINIMUM_ALLOWED_DEGREE) {
     
     cont_frac cf_estimate(coeffs, 2, 0);
-    ContFracApprox CFestimator(cf_estimate);
+    ContFracApprox CFestimator(cf_estimate, n_terms);
     // evaluate for the current "max_terms"
     possible_maxima.push_back(CFestimator.locate_local_max(0.0, max_val, 
 							   step_size,
 							   upper_bound, 
 							   distinct_reads));
 
-    possible_maxima_loc.push_back(CFestimator.cf_estimate.evaluate(possible_maxima.back()));
+    possible_maxima_loc.push_back(CFestimator.evaluate(possible_maxima.back()));
 
     //move down in terms
     n_terms -= 2;

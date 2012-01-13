@@ -126,7 +126,6 @@ static void
 extrapolate_distinct(const bool VERBOSE, 
 		     const vector<double> &counts_histogram,
 		     const double max_value, const double step_size,
-		     const double tolerance, const double deriv_delta, 
 		     const size_t initial_max_terms, 
 		     vector<double> &estimates) {
   // ensure that we will use an underestimate
@@ -265,7 +264,7 @@ main(const int argc, const char **argv) {
     
     // JUST A SANITY CHECK
     const size_t n_reads = read_locations.size();
-    const size_t vals_sum = accumulate(values.begin(), values.end(), 0ul);
+    const size_t values_sum = accumulate(values.begin(), values.end(), 0ul);
     assert(vals_sum == n_reads);
     
     const double max_val = max_extrapolation/static_cast<double>(vals_sum);
@@ -320,17 +319,17 @@ main(const int argc, const char **argv) {
       out << "Continued Fraction upper bound" << "\t" << upper_bound << endl;
     }
     else { 
-      extrapolate_distinct(VERBOSE, counts_histogram, max_time, time_step,
-			   tolerance, deriv_delta, max_terms, estimates);
+      extrapolate_distinct(VERBOSE, counts_histogram, max_value,
+			   val_step, initial_max_terms, estimates);
       
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
       
-      double t = 0.0;
-      for (size_t i = 0; i < estimates.size(); ++i, t += time_step)
+      double val = 0.0;
+      for (size_t i = 0; i < estimates.size(); ++i, val += val_step)
         out << std::fixed << std::setprecision(1) 
-	    << (t + 1.0)*vals_sum << '\t' << estimates[i] << endl;
+	    << (val + 1.0)*values_sum << '\t' << estimates[i] << endl;
     }
 
     if (VERBOSE) {

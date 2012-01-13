@@ -48,9 +48,11 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
-library_complexity: pade_approximant.o continued_fraction.o
+library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
 
 library_size_bootstrap: pade_approximant.o continued_fraction.o
+
+library_size_estimates.o: pade_approximant.o continued_fraction.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)

@@ -78,6 +78,10 @@ public:
   {cont_frac_estimate.set_ps_coeffs(coeffs); compute_cf_coeffs();}
   void set_depth(const size_t max_terms); 
 
+  // Accessors
+  void get_ps_coeffs(std::vector<double> &coeffs)
+  {cont_frac_estimate.get_ps_coeffs(coeffs);}
+
   // estimators
   double evaluate(const double val) 
   {return cont_frac_estimate.evaluate(val, depth);}
