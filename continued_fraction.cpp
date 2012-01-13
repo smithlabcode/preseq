@@ -362,17 +362,18 @@ ContFracApprox::compute_cf_coeffs() {
 // calculate cont_frac approx depending on offset
 double
 cont_frac::evaluate(const double val, const size_t depth){
-  //no offset
-  if (upper_offset == 0 && lower_offset == 0)
-    return ContFrac_eval_no_offset(cf_coeffs, val, depth);
   //upper offset
-  else if (upper_offset > 0)
+  if (upper_offset > 0)
     return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, 
 				      val, depth);
   //lower offset
   else if (lower_offset > 0)
     return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, 
 				      val, depth);
+  // no offset
+  else
+    return ContFrac_eval_no_offset(cf_coeffs, val, depth);
+
 }
 
 // compute ContFrac_eval for complex values to compute deriv when no offset
@@ -653,4 +654,10 @@ ContFracApprox::locate_local_max(const double min_val,
   }
 
   return current_max_loc;
+}
+
+void
+ContFracApprox::set_depth(const size_t max_terms){
+  depth = max_terms;
+  assert(depth >= MINIMUM_ALLOWED_DEGREE);
 }

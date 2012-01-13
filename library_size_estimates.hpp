@@ -31,7 +31,7 @@ double
 cl92_lowerbound_librarysize(const std::vector<double> &counts_histogram);
 
 double
-upperbound_librarysize(ContFracApprox &ContFrac, 
+upperbound_librarysize(const std::vector<double> &counts_hist, 
 		       size_t max_terms);
 
 double
