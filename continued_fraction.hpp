@@ -54,8 +54,8 @@ struct cont_frac {
   {return_coeffs = ps_coeffs;}
   
   // Evaluators
-  double evaluate(const double val);
-  double complex_deriv(const double val);
+  double evaluate(const double val, const size_t depth);
+  double complex_deriv(const double val, const size_t depth);
 
   size_t lower_offset;
   size_t upper_offset;
@@ -69,13 +69,17 @@ public:
   static const size_t MINIMUM_ALLOWED_DEGREE = 6;
 
   // Constructor
-  ContFracApprox(const cont_frac &cf_instance) :
-    cont_frac_estimate(cf_instance) {compute_cf_coeffs();}
+  ContFracApprox(const cont_frac &cf_instance, const size_t max_terms) :
+    cont_frac_estimate(cf_instance), depth(max_terms) {compute_cf_coeffs();}
 
   // Mutators
   void compute_cf_coeffs();
-  void set_ps_coeffs(std::vector<double> &coeffs) :
-    cont_frac_estimate.ps_coeffs(coeffs) {compute_cf_coeffs();}
+  void set_ps_coeffs(std::vector<double> &coeffs)
+  {cont_frac_estimate.set_ps_coeffs(coeffs); compute_cf_coeffs();}
+  double evaluate(const double val) 
+  {return cont_frac_estimate.evaluate(val, depth);}
+  double complex_deriv(const double val)
+  {return cont_frac_estimate.evaluate(val, depth);}
   double locate_local_max(const double lower_limit, 
 			  const double upper_limit,
 			  const double step_size, 
@@ -85,6 +89,9 @@ public:
 
 private:
   cont_frac cont_frac_estimate;
+  size_t depth;
+
+  double locate_zero_cf_deriv(const double val, const double prev_val);
 };
 
 
