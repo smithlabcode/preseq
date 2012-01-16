@@ -91,8 +91,8 @@ stable_estimate(const double t,
   // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
   const double distinct_per_step = init_distinct*step_size;
   bool IS_STABLE = false;
-  const double estimate = CFestimate.evaluate(t);
-  const double deriv = CFestimate.complex_deriv(t);
+  const double estimate = CFestimate.cont_frac_estimate.evaluate(t, CFestimate.get_depth());
+  const double deriv = CFestimate.cont_frac_estimate.complex_deriv(t, CFestimate.get_depth());
   // we are using an CF approx that acts like x in limit
   // derivative must be positive and be less than the initial derivative
   if (deriv <= init_distinct && deriv >= 0.0)
@@ -142,7 +142,7 @@ extrapolate_distinct(const bool VERBOSE,
 	stable_estimate(value, estimates.back(), 
 			step_size, hist_sum, CFestimate);
       if (STABLE_ESTIMATE)
-        estimates.push_back(hist_sum + CFestimate.evaluate(value));
+        estimates.push_back(hist_sum + CFestimate.cont_frac_estimate.evaluate(value, CFestimate.get_depth()));
       else {
 	// estimates are unacceptable, move down in order
         estimates.clear();
@@ -156,8 +156,8 @@ extrapolate_distinct(const bool VERBOSE,
     // output coeffs
     if (estimates.size() && VERBOSE) {
       vector<double> contfrac_coeffs, off_coeffs;
-      CFestimate.get_offset_coeffs(off_coeffs);
-      CFestimate.get_cf_coeffs(contfrac_coeffs);
+      off_coeffs = CFestimate.cont_frac_estimate.offset_coeffs;
+      contfrac_coeffs = CFestimate.cont_frac_estimate.cf_coeffs;
       for(size_t i = 0; i < off_coeffs.size(); ++i)
 	cerr << setw(12) << fixed << setprecision(2) 
 	     << off_coeffs[i] << "\t" 

@@ -32,14 +32,6 @@ struct cont_frac {
 	    const size_t in_lower, const size_t in_upper) :
     lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs) {}
   
-  // Accessors
-  void get_cf_coeffs(std::vector<double> &return_coeffs) const
-  {return_coeffs = cf_coeffs;}
-  void get_offset_coeffs(std::vector<double> &return_coeffs) const 
-  {return_coeffs = offset_coeffs;}
-  void get_ps_coeffs(std::vector<double> &return_coeffs) const
-  {return_coeffs = ps_coeffs;}
-  
   // Evaluators
   double evaluate(const double val, const size_t depth);
   double complex_deriv(const double val, const size_t depth);
@@ -62,30 +54,15 @@ public:
   // Mutators
   void compute_cf_coeffs();
   void set_depth(const size_t max_terms); 
-
-  // Accessors
-  void get_ps_coeffs(std::vector<double> &coeffs)
-  {cont_frac_estimate.get_ps_coeffs(coeffs);}
-  void get_cf_coeffs(std::vector<double> &coeffs)
-  {cont_frac_estimate.get_cf_coeffs(coeffs);}
-  void get_offset_coeffs(std::vector<double> &coeffs)
-  {cont_frac_estimate.get_offset_coeffs(coeffs);}
-
-  // estimators
-  double 
-  evaluate(const double val) 
-  {return cont_frac_estimate.evaluate(val, depth);}
-  double 
-  complex_deriv(const double val)
-  {return cont_frac_estimate.evaluate(val, depth);}
+  size_t get_depth() const {return depth;} 
   
   double
   locate_local_max(const double lower_limit, const double upper_limit,
 		   const double step_size, const double upper_bound,
 		   const double deriv_upper_bound);
   
-private:
   cont_frac cont_frac_estimate;
+private:
   size_t depth;
   
   double locate_zero_cf_deriv(const double val, const double prev_val);

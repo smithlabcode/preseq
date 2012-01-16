@@ -493,23 +493,25 @@ ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
       complex<double> coeff(cf_coeffs[j], 0.0);
       current_num = prev_num1 + coeff*perturbed_val*prev_num2;
       current_denom = prev_denom1 + coeff*perturbed_val*prev_denom2;
+      
       prev_num2 = prev_num1;
       prev_num1 = current_num;
+      
       prev_denom2 = prev_denom1;
       prev_denom1 = current_denom;
 
       //rescale to avoid over and underflow
       double rescale_val = norm(current_num) + norm(current_denom);
-      if(rescale_val > 1/TOLERANCE)
-	rescale_val = 1/rescale_val;
-      else if(rescale_val < TOLERANCE)
-	rescale_val = 1/rescale_val;
-      else
-	rescale_val = 1.0;
+      if (rescale_val > 1/TOLERANCE) rescale_val = 1/rescale_val;
+      else if(rescale_val < TOLERANCE) rescale_val = 1/rescale_val;
+      else rescale_val = 1.0;
+      
       current_num = current_num*rescale_val;
       current_denom = current_denom*rescale_val;
+      
       prev_num1 = prev_num1*rescale_val;
       prev_num2 = prev_num2*rescale_val;
+      
       prev_denom1 = prev_denom1*rescale_val;
       prev_denom2 = prev_denom2*rescale_val;
     }
@@ -559,9 +561,9 @@ double
 ContFracApprox::locate_zero_cf_deriv(const double val, 
 				     const double prev_val){
   double val_low = prev_val;
-  double deriv_low = complex_deriv(val_low);
+  double deriv_low = cont_frac_estimate.complex_deriv(val_low, depth);
   double val_high = val;
-  double deriv_high = complex_deriv(val_high);
+  double deriv_high = cont_frac_estimate.complex_deriv(val_high, depth);
   double val_mid = (val-prev_val)/2;
   double deriv_mid = std::numeric_limits<double>::max();
 
@@ -570,14 +572,14 @@ ContFracApprox::locate_zero_cf_deriv(const double val,
 
   while(diff > TOLERANCE && movement(val_low, val_high) > TOLERANCE){
     val_mid = (val_low + val_high)/2.0;
-    deriv_mid = complex_deriv(val_mid);
+    deriv_mid = cont_frac_estimate.complex_deriv(val_mid, depth);
 
     if((deriv_mid > 0 && deriv_low < 0) || (deriv_mid < 0 && deriv_low > 0))
       val_high = val_mid;
     else val_low = val_mid;
 
-    deriv_low = complex_deriv(val_low);
-    deriv_high = complex_deriv(val_high);
+    deriv_low = cont_frac_estimate.complex_deriv(val_low, depth);
+    deriv_high = cont_frac_estimate.complex_deriv(val_high, depth);
     diff = fabs((prev_deriv - deriv_mid)/prev_deriv);
     prev_deriv = deriv_mid;
   }
@@ -600,8 +602,8 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
 				 const double step_size, const double upper_bound,
 				 const double deriv_upper_bound) {
   double val = min_val;
-  double prev_approx = evaluate(val);
-  double prev_deriv = complex_deriv(val);
+  double prev_approx = cont_frac_estimate.evaluate(val, depth);
+  double prev_deriv = cont_frac_estimate.complex_deriv(val, depth);
   double current_approx, current_deriv;
   
   double current_max = prev_approx;
@@ -609,8 +611,8 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
 
   while(val <= max_val){
     val += step_size;
-    current_approx = evaluate(val);
-    current_deriv = complex_deriv(val);
+    current_approx = cont_frac_estimate.evaluate(val, depth);
+    current_deriv = cont_frac_estimate.complex_deriv(val, depth);
 
     // test stability to locate possible defects
     // do not use approx if estimate is not stable
@@ -619,8 +621,8 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
       // update max if it is greater
       if ((current_deriv < 0.0) && (prev_deriv > 0.0)){ 
 	double possible_max_loc = locate_zero_cf_deriv(val, val-step_size);
-	if(evaluate(possible_max_loc) > current_max){
-	  current_max = evaluate(possible_max_loc);
+	if(cont_frac_estimate.evaluate(possible_max_loc, depth) > current_max){
+	  current_max = cont_frac_estimate.evaluate(possible_max_loc, depth);
 	  current_max_loc = possible_max_loc;
 	}
       }
@@ -628,7 +630,7 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
     //exit while loop if Approx is unstable
     else {
       val = max_val; 
-      current_max = evaluate(min_val);
+      current_max = cont_frac_estimate.evaluate(min_val, depth);
       current_max_loc = min_val;
     }
   }

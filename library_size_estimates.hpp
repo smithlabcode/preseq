@@ -42,6 +42,4 @@ lowerbound_librarysize(const std::vector<double> &counts_hist,
                        const double step_size, const double max_val,
                        size_t max_terms);
 
-
-
 #endif

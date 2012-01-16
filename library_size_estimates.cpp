@@ -60,8 +60,8 @@ upperbound_librarysize(const vector<double> &counts_hist, size_t max_terms) {
     coeffs.push_back(pow(-1, i+2)*counts_hist[i+1]);
 
   bool ACCEPT_UPPER_BOUND = false;
-  double upper_bound;
-
+  double upper_bound = -std::numeric_limits<double>::max();
+  
   while (max_terms >= MINIMUM_ALLOWED_DEGREE
 	 && !ACCEPT_UPPER_BOUND) {
     vector<double> denom_vec;
@@ -125,7 +125,8 @@ lowerbound_librarysize(const vector<double> &counts_hist,
 							   upper_bound, 
 							   distinct_reads));
 
-    possible_maxima_loc.push_back(CFestimator.evaluate(possible_maxima.back()));
+    possible_maxima_loc.push_back(CFestimator.cont_frac_estimate.evaluate(possible_maxima.back(), 
+									  n_terms));
 
     //move down in terms
     n_terms -= 2;
