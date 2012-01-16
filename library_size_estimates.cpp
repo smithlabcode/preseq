@@ -20,15 +20,20 @@
 // computes bounds on library size
 // including lower bounds of Chao(Biometrics 1987) and 
 // Chao & Lee (JASA 1992)
+
+
+#include <numeric>
+#include <vector>
+#include <string>
+#include <iostream>
+#include <ostream>
+#include <cassert>
+
 #include "library_size_estimates.hpp"
 
 #include "pade_approximant.hpp"
 #include "continued_fraction.hpp"
-
 #include "smithlab_utils.hpp"
-
-#include <numeric>
-#include <vector>
 
 using std::string;
 using std::vector;
@@ -36,25 +41,28 @@ using std::max;
 
 using smithlab::log_sum_log_vec;
 
+static const size_t MIN_ALLOWED_DEGREE = 6;
+
 // compute the upperbound on library size by noting that p(x)/q(x)
 // is a constant in the limit if p & q are of equal degree.
 // furthermore if p & q are equal degree then the library_yield
 // estimates are liberal, i.e. they overestimate the library_yield
 // on average
 double
-upperbound_librarysize(ContFracApprox &ContFrac, size_t max_terms) {
+upperbound_librarysize(const vector<double> &counts_hist, size_t max_terms) {
   // need max_terms = L+M+1 to be even so that L+M is odd so that we
   //can take lim_{t \to \infty} [L+1, M]
   if (max_terms % 2 == 1)
     --max_terms;
   
   vector<double> coeffs;
-  ContFrac.get_ps_coeffs(coeffs);
+  for(size_t i = 0; i < max_terms; i++)
+    coeffs.push_back(pow(-1, i+2)*counts_hist[i+1]);
 
   bool ACCEPT_UPPER_BOUND = false;
   double upper_bound;
 
-  while (max_terms >= ContFrac.MINIMUM_ALLOWED_DEGREE
+  while (max_terms >= MIN_ALLOWED_DEGREE
 	 && !ACCEPT_UPPER_BOUND) {
     vector<double> denom_vec;
     vector<double> num_vec;
@@ -137,7 +145,7 @@ lowerbound_librarysize(const vector<double> &counts_hist,
 
 // Chao (Biometrics 1987) lower bound
 double
-compute_chao87_library_size_lower_bound(const vector<double> &counts_hist) {
+chao87_lowerbound_librarysize(const vector<double> &counts_hist) {
   assert(counts_hist.size() >= 2);
   return accumulate(counts_hist.begin(), counts_hist.end(), 0.0) +
     counts_hist[1]*counts_hist[1]/(2.0*counts_hist[2]);
@@ -146,7 +154,7 @@ compute_chao87_library_size_lower_bound(const vector<double> &counts_hist) {
 
 //Chao & Lee (JASA 1992) lower bound
 double 
-compute_cl92_library_size_lower_bound(const vector<double> &counts_hist) {
+cl92_lowerbound_librarysize(const vector<double> &counts_hist) {
   
   double sample_size = 0.0;
   for(size_t i = 0; i <  counts_hist.size(); i++)

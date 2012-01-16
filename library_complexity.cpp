@@ -37,6 +37,7 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::max;
+using std::ostream;
 
 using std::setw;
 using std::fixed;
@@ -90,11 +91,10 @@ cont_frac_distinct_stable(const bool VERBOSE, const double val,
 			  const double init_distinct,
                           ContFracApprox &CFestimate){
   // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
-  const double distinct_per_step = init_disinct*step_size;
+  const double distinct_per_step = init_distinct*step_size;
   bool IS_STABLE = false;
-  const double estimate = CFestimate.cont_frac_estimate.evaluate(val);
-  const double deriv =  
-    = CFestimate.cont_frac_estimate.complex_deriv(val);
+  const double estimate = CFestimate.evaluate(val);
+  const double deriv = CFestimate.complex_deriv(val);
   // we are using an CF approx that acts like x in limit
   // derivative must be positive and be less than the initial derivative
   if(deriv <= init_distinct && deriv >= 0.0){
@@ -103,7 +103,7 @@ cont_frac_distinct_stable(const bool VERBOSE, const double val,
   //make sure that the estimate is increasing in the time_step
   // and is below the initial distinct per step_size
   if (IS_STABLE && estimate >= prev_estim &&
-      current_val <= prev_estim + distinct_per_step) {
+     estimate <= prev_estim + distinct_per_step) {
     return IS_STABLE;  //estimate is stable, exit_success
   }
   else {
@@ -137,7 +137,7 @@ extrapolate_distinct(const bool VERBOSE,
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_histogram.size(); i++)
-    vals_sum += i*counts_histogram[i];
+    counts_sum += i*counts_histogram[i];
   
   vector<double> coeffs(max_terms, 0.0);
   for (size_t j = 0; j < max_terms; j++)
@@ -156,29 +156,36 @@ extrapolate_distinct(const bool VERBOSE,
     while (value <= max_value && STABLE_ESTIMATE) {
 
       STABLE_ESTIMATE = STABLE_ESTIMATE &&
-	cont_frac_distinct_stable(VERBOSE, val, prev_estim, 
+	cont_frac_distinct_stable(VERBOSE, value, estimates.back(), 
 				  step_size, hist_sum, CFestimate);
       if(STABLE_ESTIMATE)
-        estimates.push_back(values_size 
-			    + CFestimate.evaluate(val));
+        estimates.push_back(hist_sum 
+			    + CFestimate.evaluate(value));
       else{
 	// estimates are unacceptable, move down in order
         estimates.clear();
         max_terms -= 2;
 	CFestimate.set_depth(max_terms); 
       }
-      val += step_size;
+      value += step_size;
     }
 
     // if estimates.size() > 0 then the estimates are acceptable
     // output coeffs
     if (estimates.size() && VERBOSE){
       vector<double> contfrac_coeffs;
-      contfrac_estimate.get_cf_coeffs(contfrac_coeffs);
+      vector<double> off_coeffs;
+      CFestimate.get_offset_coeffs(off_coeffs);
+      CFestimate.get_cf_coeffs(contfrac_coeffs);
+      for(size_t i = 0; i < off_coeffs.size(); ++i)
+	cerr << setw(12) << fixed << setprecision(2) 
+	     << off_coeffs[i] << "\t" 
+	     << setw(12) << fixed << setprecision(2) << coeffs[i] << endl;
       for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
 	cerr << setw(12) << fixed << setprecision(2) 
 	     << contfrac_coeffs[i] << "\t" 
-	     << setw(12) << fixed << setprecision(2) << coeffs[i] << endl;
+	     << setw(12) << fixed << setprecision(2) 
+	     << coeffs[i+off_coeffs.size()] << endl;
     }
   }
 }
@@ -189,7 +196,7 @@ main(const int argc, const char **argv) {
   try {
     /* FILES */
     string outfile;
-    stirng stats_outfile;
+    string stats_outfile;
 
     size_t max_terms = 1000;
     double tolerance = 1e-20;
@@ -265,10 +272,10 @@ main(const int argc, const char **argv) {
     // JUST A SANITY CHECK
     const size_t n_reads = read_locations.size();
     const size_t values_sum = accumulate(values.begin(), values.end(), 0ul);
-    assert(vals_sum == n_reads);
+    assert(values_sum == n_reads);
     
-    const double max_val = max_extrapolation/static_cast<double>(vals_sum);
-    const double val_step = step_size/static_cast<double>(vals_sum);
+    const double max_val = max_extrapolation/static_cast<double>(values_sum);
+    const double val_step = step_size/static_cast<double>(values_sum);
     
     const size_t max_observed_count = 
       *std::max_element(values.begin(), values.end());
@@ -296,7 +303,6 @@ main(const int argc, const char **argv) {
     
     if (VERBOSE)
       cerr << "TOTAL READS     = " << read_locations.size() << endl
-	   << "DISTINCT READS  = " << distinct_reads << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
 	   << "COUNTS OF 1     = " << counts_histogram[1] << endl;
@@ -307,20 +313,20 @@ main(const int argc, const char **argv) {
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
       
-      out << "Chao_1987_lower_bound" << "\t" 
+      out << "Chao87_lower_bound" << "\t" 
 	  << chao87_lowerbound_librarysize(counts_histogram) << endl;
-      out << "ChaoLee estimate" << "\t" 
-	  << chao_lee_librarysize(counts_histogram) << endl;
+      out << "ChaoLee92_lower_bound" << "\t" 
+	  << cl92_lowerbound_librarysize(counts_histogram) << endl;
       const double upper_bound = 
-	upperbound_librarysize(counts_histogram, max_terms)+distinct_reads;
-      out << "Continued Fraction lower bound" << "\t"
+	upperbound_librarysize(counts_histogram, max_terms)+distinct_counts;
+      out << "cont_frac_lower_bound" << "\t"
 	  << lowerbound_librarysize(counts_histogram, upper_bound, 
 				    val_step, max_val, max_terms) << endl;
-      out << "Continued Fraction upper bound" << "\t" << upper_bound << endl;
+      out << "cont_frac_upper_bound" << "\t" << upper_bound << endl;
     }
     else { 
-      extrapolate_distinct(VERBOSE, counts_histogram, max_value,
-			   val_step, initial_max_terms, estimates);
+      extrapolate_distinct(VERBOSE, counts_histogram, max_val,
+			   val_step, max_terms, estimates);
       
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
@@ -332,16 +338,34 @@ main(const int argc, const char **argv) {
 	    << (val + 1.0)*values_sum << '\t' << estimates[i] << endl;
     }
 
-    if (VERBOSE) {
+
+    if (VERBOSE && stats_outfile.empty()) {
       // TODO: WITH BETTER OUTPUT
-      cerr << chao_lee_lowerbound_librarysize(counts_histogram) << endl
-	   << cl92_library_size_lowerbound(counts_histogram) << endl;
+      const double upper_bound = 
+	upperbound_librarysize(counts_histogram, max_terms)+distinct_counts;
+      cerr << "Chao87_lower_bound" << "\t" 
+	   << chao87_lowerbound_librarysize(counts_histogram) << endl;
+      cerr << "ChaoLee92_lower_bound" << "\t" 
+	   << cl92_lowerbound_librarysize(counts_histogram) << endl;
+      cerr << "cont_frac_lower_bound" << "\t"
+	   << lowerbound_librarysize(counts_histogram, upper_bound, 
+				     val_step, max_val, max_terms) << endl;
+      cerr << "cont_frac_upper_bound" << "\t" << upper_bound << endl;
     }
     if (!stats_outfile.empty()) {
-      // TOD: no recompute!!!!!!!
-      std::ostream stats_out(stats_outfile.c_str());
-      stats_out << chao_lee_lowerbound_librarysize(counts_histogram) << endl
-		<< cl92_library_size_lowerbound(counts_histogram) << endl;
+      std::ofstream stats_of;
+      stats_of.open(stats_outfile.c_str());
+      std::ostream stats_out(stats_of.rdbuf());
+      const double upper_bound = 
+	upperbound_librarysize(counts_histogram, max_terms)+distinct_counts;
+      stats_out << "Chao87_lower_bound" << "\t" 
+		<< chao87_lowerbound_librarysize(counts_histogram) << endl;
+      stats_out << "ChaoLee92_lower_bound" << "\t" 
+		<< cl92_lowerbound_librarysize(counts_histogram) << endl;
+      stats_out << "cont_frac_lower_bound" << "\t"
+		<< lowerbound_librarysize(counts_histogram, upper_bound, 
+					  val_step, max_val, max_terms) << endl;
+      stats_out << "cont_frac_upper_bound" << "\t" << upper_bound << endl;
       
     } 
     

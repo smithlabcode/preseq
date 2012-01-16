@@ -20,11 +20,11 @@
 #ifndef LIBRARY_SIZE_ESTIMATES_HPP
 #define LIBRARY_SIZE_ESTIMATES_HPP
 
-#include "continued_fraction.hpp"
-#include "pade_approximant.hpp"
-
 #include <vector>
 #include <numeric>
+
+#include "continued_fraction.hpp"
+#include "pade_approximant.hpp"
 
 double
 chao87_lowerbound_librarysize(const std::vector<double> &counts_histogram);
@@ -40,7 +40,7 @@ double
 lowerbound_librarysize(const std::vector<double> &counts_hist,
 		       const double upper_bound, //from upperbound_librarysize
                        const double step_size, const double max_val,
-                       size_t max_terms)
+                       size_t max_terms);
 
 
 

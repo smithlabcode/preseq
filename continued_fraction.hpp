@@ -81,6 +81,10 @@ public:
   // Accessors
   void get_ps_coeffs(std::vector<double> &coeffs)
   {cont_frac_estimate.get_ps_coeffs(coeffs);}
+  void get_cf_coeffs(std::vector<double> &coeffs)
+  {cont_frac_estimate.get_cf_coeffs(coeffs);}
+  void get_offset_coeffs(std::vector<double> &coeffs)
+  {cont_frac_estimate.get_offset_coeffs(coeffs);}
 
   // estimators
   double evaluate(const double val) 
