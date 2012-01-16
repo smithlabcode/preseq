@@ -25,16 +25,20 @@
 #include <numeric>
 #include <vector>
 #include <complex>
+#include <cassert>
 
-struct cont_frac {
+struct ContinuedFraction {
   // Constructor
-  cont_frac(const std::vector<double> &coeffs,
-	    const size_t in_lower, const size_t in_upper) :
+  ContinuedFraction(const std::vector<double> &coeffs,
+		    const size_t in_lower, const size_t in_upper) :
     lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs) {}
   
   // Evaluators
-  double evaluate(const double val, const size_t depth);
-  double complex_deriv(const double val, const size_t depth);
+  double
+  operator()(const double val, const size_t depth);
+  
+  double 
+  complex_deriv(const double val, const size_t depth);
   
   size_t lower_offset;
   size_t upper_offset;
@@ -43,17 +47,26 @@ struct cont_frac {
   std::vector<double> offset_coeffs;
 };
 
-class ContFracApprox {
+class ContinuedFractionApproximation {
 public:
   static const size_t MINIMUM_ALLOWED_DEGREE = 6;
-
+  
   // Constructor
-  ContFracApprox(const cont_frac &cf_instance, const size_t max_terms) :
-    cont_frac_estimate(cf_instance), depth(max_terms) {compute_cf_coeffs();}
+  ContinuedFractionApproximation(const ContinuedFraction &cf_instance, 
+				 const size_t max_terms) :
+    cont_frac_estimate(cf_instance), depth(max_terms) {
+    compute_cf_coeffs();
+  }
   
   // Mutators
   void compute_cf_coeffs();
-  void set_depth(const size_t max_terms); 
+  
+  void
+  set_depth(const size_t max_terms) {
+    depth = max_terms;
+    assert(depth >= MINIMUM_ALLOWED_DEGREE);
+  }
+  
   size_t get_depth() const {return depth;} 
   
   double
@@ -61,7 +74,7 @@ public:
 		   const double step_size, const double upper_bound,
 		   const double deriv_upper_bound);
   
-  cont_frac cont_frac_estimate;
+  ContinuedFraction cont_frac_estimate;
 private:
   size_t depth;
   

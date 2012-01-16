@@ -87,11 +87,11 @@ stable_estimate(const double t,
 		const double prev_estim, 
 		const double step_size,
 		const double init_distinct,
-		ContFracApprox &CFestimate){
+		ContinuedFractionApproximation &CFestimate){
   // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
   const double distinct_per_step = init_distinct*step_size;
   bool IS_STABLE = false;
-  const double estimate = CFestimate.cont_frac_estimate.evaluate(t, CFestimate.get_depth());
+  const double estimate = CFestimate.cont_frac_estimate(t, CFestimate.get_depth());
   const double deriv = CFestimate.cont_frac_estimate.complex_deriv(t, CFestimate.get_depth());
   // we are using an CF approx that acts like x in limit
   // derivative must be positive and be less than the initial derivative
@@ -125,11 +125,11 @@ extrapolate_distinct(const bool VERBOSE,
   
   vector<double> coeffs(max_terms, 0.0);
   for (size_t j = 0; j < max_terms; j++)
-    coeffs[j] = counts_histogram[j + 1]*pow(-1, j+2);
-
+    coeffs[j] = counts_histogram[j + 1]*pow(-1, j + 2);
+  
   // initialize the cont frac estimator
-  cont_frac cont_frac_estim(coeffs, 0, 0);
-  ContFracApprox CFestimate(cont_frac_estim, max_terms);
+  ContinuedFraction cont_frac_estim(coeffs, 0, 0);
+  ContinuedFractionApproximation CFestimate(cont_frac_estim, max_terms);
   
   estimates.clear();
   while (max_terms > CFestimate.MINIMUM_ALLOWED_DEGREE && estimates.empty()) {
@@ -142,7 +142,7 @@ extrapolate_distinct(const bool VERBOSE,
 	stable_estimate(value, estimates.back(), 
 			step_size, hist_sum, CFestimate);
       if (STABLE_ESTIMATE)
-        estimates.push_back(hist_sum + CFestimate.cont_frac_estimate.evaluate(value, CFestimate.get_depth()));
+        estimates.push_back(hist_sum + CFestimate.cont_frac_estimate(value, CFestimate.get_depth()));
       else {
 	// estimates are unacceptable, move down in order
         estimates.clear();
@@ -151,14 +151,11 @@ extrapolate_distinct(const bool VERBOSE,
       }
       value += step_size;
     }
-
-    // if estimates.size() > 0 then the estimates are acceptable
-    // output coeffs
-    if (estimates.size() && VERBOSE) {
-      vector<double> contfrac_coeffs, off_coeffs;
-      off_coeffs = CFestimate.cont_frac_estimate.offset_coeffs;
-      contfrac_coeffs = CFestimate.cont_frac_estimate.cf_coeffs;
-      for(size_t i = 0; i < off_coeffs.size(); ++i)
+    
+    if (!estimates.empty() && VERBOSE) {
+      vector<double> contfrac_coeffs(CFestimate.cont_frac_estimate.cf_coeffs);
+      vector<double> off_coeffs(CFestimate.cont_frac_estimate.offset_coeffs);
+      for (size_t i = 0; i < off_coeffs.size(); ++i)
 	cerr << setw(12) << fixed << setprecision(2) 
 	     << off_coeffs[i] << "\t" 
 	     << setw(12) << fixed << setprecision(2) << coeffs[i] << endl;
@@ -268,7 +265,7 @@ main(const int argc, const char **argv) {
       std::count_if(counts_histogram.begin(), counts_histogram.end(),
 		    bind2nd(std::greater<size_t>(), 0));
     
-    // initialize ContFracApprox 
+    // initialize ContinuedFractionApproximation 
     if (SMOOTH_HISTOGRAM) 
       smooth_histogram(smoothing_bandwidth, 
 		       smoothing_decay_factor, counts_histogram);

@@ -117,16 +117,16 @@ lowerbound_librarysize(const vector<double> &counts_hist,
   size_t n_terms = max_terms;
   while (n_terms > MINIMUM_ALLOWED_DEGREE) {
     
-    cont_frac cf_estimate(coeffs, 2, 0);
-    ContFracApprox CFestimator(cf_estimate, n_terms);
+    ContinuedFraction cf_estimate(coeffs, 2, 0);
+    ContinuedFractionApproximation CFestimator(cf_estimate, n_terms);
     // evaluate for the current "max_terms"
     possible_maxima.push_back(CFestimator.locate_local_max(0.0, max_val, 
 							   step_size,
 							   upper_bound, 
 							   distinct_reads));
 
-    possible_maxima_loc.push_back(CFestimator.cont_frac_estimate.evaluate(possible_maxima.back(), 
-									  n_terms));
+    possible_maxima_loc.push_back(CFestimator.cont_frac_estimate(possible_maxima.back(), 
+								 n_terms));
 
     //move down in terms
     n_terms -= 2;
