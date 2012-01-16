@@ -41,7 +41,7 @@ using std::max;
 
 using smithlab::log_sum_log_vec;
 
-static const size_t MIN_ALLOWED_DEGREE = 6;
+static const size_t MINIMUM_ALLOWED_DEGREE = 6;
 
 // compute the upperbound on library size by noting that p(x)/q(x)
 // is a constant in the limit if p & q are of equal degree.
@@ -62,7 +62,7 @@ upperbound_librarysize(const vector<double> &counts_hist, size_t max_terms) {
   bool ACCEPT_UPPER_BOUND = false;
   double upper_bound;
 
-  while (max_terms >= MIN_ALLOWED_DEGREE
+  while (max_terms >= MINIMUM_ALLOWED_DEGREE
 	 && !ACCEPT_UPPER_BOUND) {
     vector<double> denom_vec;
     vector<double> num_vec;
@@ -115,7 +115,7 @@ lowerbound_librarysize(const vector<double> &counts_hist,
   //==> larger lower bounds
   vector<double> possible_maxima_loc, possible_maxima;
   size_t n_terms = max_terms;
-  while (n_terms > ContFracApprox::MINIMUM_ALLOWED_DEGREE) {
+  while (n_terms > MINIMUM_ALLOWED_DEGREE) {
     
     cont_frac cf_estimate(coeffs, 2, 0);
     ContFracApprox CFestimator(cf_estimate, n_terms);
