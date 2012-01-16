@@ -337,7 +337,7 @@ ContFracApprox::compute_cf_coeffs() {
      cont_frac_estimate.lower_offset == 0){    
     vector<double> temp_cf_coeffs;
     ContinuedFraction_qd(cont_frac_estimate.ps_coeffs, temp_cf_coeffs);
-    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
+    cont_frac_estimate.cf_coeffs = temp_cf_coeffs;
   }
   else if(cont_frac_estimate.upper_offset > 0){
     vector<double> temp_cf_coeffs;
@@ -345,8 +345,8 @@ ContFracApprox::compute_cf_coeffs() {
     ContinuedFraction_upper_offset(cont_frac_estimate.ps_coeffs, 
 				   cont_frac_estimate.upper_offset, 
 				   temp_cf_coeffs, temp_offset_coeffs);
-    cont_frac_estimate.set_offset_coeffs(temp_offset_coeffs);
-    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
+    cont_frac_estimate.offset_coeffs = temp_offset_coeffs;
+    cont_frac_estimate.cf_coeffs = temp_cf_coeffs;
   }
   else if(cont_frac_estimate.lower_offset > 0){
     vector<double> temp_cf_coeffs;
@@ -354,8 +354,8 @@ ContFracApprox::compute_cf_coeffs() {
     ContinuedFraction_lower_offset(cont_frac_estimate.ps_coeffs, 
 				   cont_frac_estimate.lower_offset,
 				   temp_offset_coeffs, temp_cf_coeffs);
-    cont_frac_estimate.set_offset_coeffs(temp_offset_coeffs);
-    cont_frac_estimate.set_cf_coeffs(temp_cf_coeffs);
+    cont_frac_estimate.offset_coeffs = temp_offset_coeffs;
+    cont_frac_estimate.cf_coeffs = temp_cf_coeffs;
   }
 }
 
@@ -602,10 +602,8 @@ ContFracApprox::locate_zero_cf_deriv(const double val,
 
 // 
 static bool
-test_stability_local_max(const double approx,
-			  const double deriv_val,
-			  const double approx_upper_bound,
-			  const double deriv_upper_bound){
+test_stability_local_max(const double approx, const double deriv_val,
+			 const double approx_upper_bound, const double deriv_upper_bound) {
   return (deriv_val < deriv_upper_bound) &&
     (approx < approx_upper_bound);
 }
@@ -613,16 +611,14 @@ test_stability_local_max(const double approx,
 // search (min_val, max_val) for local max
 // return location of local max
 double
-ContFracApprox::locate_local_max(const double min_val,
-				 const double max_val,
-				 const double step_size,
-				 const double upper_bound,
-				 const double deriv_upper_bound){
+ContFracApprox::locate_local_max(const double min_val, const double max_val,
+				 const double step_size, const double upper_bound,
+				 const double deriv_upper_bound) {
   double val = min_val;
   double prev_approx = evaluate(val);
   double prev_deriv = complex_deriv(val);
   double current_approx, current_deriv;
-
+  
   double current_max = prev_approx;
   double current_max_loc = val;
 

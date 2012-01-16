@@ -29,21 +29,8 @@
 struct cont_frac {
   // Constructor
   cont_frac(const std::vector<double> &coeffs,
-		    const size_t in_lower, const size_t in_upper) :
-    lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs)
-  {;}
-
-  // Mutators
-  void set_lower_offset(const size_t l_o) {lower_offset = l_o; 
-    upper_offset = 0;}
-  void set_upper_offset(const size_t u_o) {upper_offset = u_o; 
-    lower_offset = 0;}
-  void set_ps_coeffs(const std::vector<double> &coeffs)
-  {ps_coeffs = coeffs;}
-  void set_cf_coeffs(const std::vector<double> &coeffs)
-  {cf_coeffs = coeffs;}
-  void set_offset_coeffs(const std::vector<double> &coeffs)
-  {offset_coeffs = coeffs;}
+	    const size_t in_lower, const size_t in_upper) :
+    lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs) {}
   
   // Accessors
   void get_cf_coeffs(std::vector<double> &return_coeffs) const
@@ -56,7 +43,7 @@ struct cont_frac {
   // Evaluators
   double evaluate(const double val, const size_t depth);
   double complex_deriv(const double val, const size_t depth);
-
+  
   size_t lower_offset;
   size_t upper_offset;
   std::vector<double> ps_coeffs;
@@ -74,8 +61,6 @@ public:
 
   // Mutators
   void compute_cf_coeffs();
-  void set_ps_coeffs(std::vector<double> &coeffs)
-  {cont_frac_estimate.set_ps_coeffs(coeffs); compute_cf_coeffs();}
   void set_depth(const size_t max_terms); 
 
   // Accessors
@@ -87,23 +72,23 @@ public:
   {cont_frac_estimate.get_offset_coeffs(coeffs);}
 
   // estimators
-  double evaluate(const double val) 
+  double 
+  evaluate(const double val) 
   {return cont_frac_estimate.evaluate(val, depth);}
-  double complex_deriv(const double val)
+  double 
+  complex_deriv(const double val)
   {return cont_frac_estimate.evaluate(val, depth);}
-  double locate_local_max(const double lower_limit, 
-			  const double upper_limit,
-			  const double step_size, 
-			  const double upper_bound,
-			  const double deriv_upper_bound);
-
-
+  
+  double
+  locate_local_max(const double lower_limit, const double upper_limit,
+		   const double step_size, const double upper_bound,
+		   const double deriv_upper_bound);
+  
 private:
   cont_frac cont_frac_estimate;
   size_t depth;
-
+  
   double locate_zero_cf_deriv(const double val, const double prev_val);
 };
-
 
 #endif

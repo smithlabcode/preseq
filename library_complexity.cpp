@@ -71,8 +71,7 @@ smooth_histogram(const size_t bandwidth,
 
 
 static void
-get_counts(const vector<SimpleGenomicRegion> &reads,
-           vector<size_t> &counts) {
+get_counts(const vector<SimpleGenomicRegion> &reads, vector<size_t> &counts) {
   counts.push_back(1);
   for (size_t i = 1; i < reads.size(); ++i)
     if (reads[i] == reads[i - 1]) counts.back()++;
@@ -133,8 +132,7 @@ extrapolate_distinct(const bool VERBOSE,
   ContFracApprox CFestimate(cont_frac_estim, max_terms);
   
   estimates.clear();
-  while (max_terms > CFestimate.MINIMUM_ALLOWED_DEGREE &&
-	 estimates.size() == 0) {
+  while (max_terms > CFestimate.MINIMUM_ALLOWED_DEGREE && estimates.empty()) {
     estimates.push_back(hist_sum);
     double value = step_size;
     bool STABLE_ESTIMATE = true;
@@ -143,10 +141,9 @@ extrapolate_distinct(const bool VERBOSE,
       STABLE_ESTIMATE = STABLE_ESTIMATE &&
 	stable_estimate(value, estimates.back(), 
 			step_size, hist_sum, CFestimate);
-      if(STABLE_ESTIMATE)
-        estimates.push_back(hist_sum 
-			    + CFestimate.evaluate(value));
-      else{
+      if (STABLE_ESTIMATE)
+        estimates.push_back(hist_sum + CFestimate.evaluate(value));
+      else {
 	// estimates are unacceptable, move down in order
         estimates.clear();
         max_terms -= 2;
@@ -157,9 +154,8 @@ extrapolate_distinct(const bool VERBOSE,
 
     // if estimates.size() > 0 then the estimates are acceptable
     // output coeffs
-    if (estimates.size() && VERBOSE){
-      vector<double> contfrac_coeffs;
-      vector<double> off_coeffs;
+    if (estimates.size() && VERBOSE) {
+      vector<double> contfrac_coeffs, off_coeffs;
       CFestimate.get_offset_coeffs(off_coeffs);
       CFestimate.get_cf_coeffs(contfrac_coeffs);
       for(size_t i = 0; i < off_coeffs.size(); ++i)
