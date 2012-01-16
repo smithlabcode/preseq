@@ -58,7 +58,7 @@ public:
   // Constructor
   ContFracApprox(const cont_frac &cf_instance, const size_t max_terms) :
     cont_frac_estimate(cf_instance), depth(max_terms) {compute_cf_coeffs();}
-
+  
   // Mutators
   void compute_cf_coeffs();
   void set_depth(const size_t max_terms); 

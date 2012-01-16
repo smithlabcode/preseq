@@ -333,8 +333,7 @@ void
 ContFracApprox::compute_cf_coeffs() {
   cont_frac_estimate.cf_coeffs.clear();
   cont_frac_estimate.offset_coeffs.clear();
-  if(cont_frac_estimate.upper_offset == 0 && 
-     cont_frac_estimate.lower_offset == 0){    
+  if (cont_frac_estimate.upper_offset == 0 && cont_frac_estimate.lower_offset == 0){    
     vector<double> temp_cf_coeffs;
     ContinuedFraction_qd(cont_frac_estimate.ps_coeffs, temp_cf_coeffs);
     cont_frac_estimate.cf_coeffs = temp_cf_coeffs;
@@ -364,16 +363,12 @@ double
 cont_frac::evaluate(const double val, const size_t depth){
   //upper offset
   if (upper_offset > 0)
-    return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, 
-				      val, depth);
+    return ContFrac_eval_upper_offset(cf_coeffs, offset_coeffs, val, depth);
   //lower offset
   else if (lower_offset > 0)
-    return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, 
-				      val, depth);
+    return ContFrac_eval_lower_offset(cf_coeffs, offset_coeffs, val, depth);
   // no offset
-  else
-    return ContFrac_eval_no_offset(cf_coeffs, val, depth);
-
+  else return ContFrac_eval_no_offset(cf_coeffs, val, depth);
 }
 
 // compute ContFrac_eval for complex values to compute deriv when no offset
@@ -483,9 +478,9 @@ ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
 				   const complex<double> perturbed_val,
 				   const size_t depth,
 				   complex<double> &approx) {
-  const complex<double> i(0.0,1.0);
+  const complex<double> imag(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
-    approx = 0.0*i;
+    approx = 0.0*imag;
   else{
     // initialize
     complex<double> current_num(0.0, 0.0);
@@ -518,16 +513,13 @@ ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
       prev_denom1 = prev_denom1*rescale_val;
       prev_denom2 = prev_denom2*rescale_val;
     }
-
+    
     complex<double> offset_terms(0.0, 0.0);
-    for(size_t i = 0; i < min(offset_coeffs.size(),
-			      depth); i++)
+    for(size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
       offset_terms += offset_coeffs[i]*pow(perturbed_val, i);
-    approx = 
-      perturbed_val/(offset_terms 
-		     + pow(perturbed_val, 
-			   min(offset_coeffs.size(),
-			       depth))*current_num/current_denom);
+    approx = perturbed_val/
+      (offset_terms + pow(perturbed_val, min(offset_coeffs.size(), depth))*
+       current_num/current_denom);
   }
 } 
 
@@ -535,29 +527,24 @@ ContFrac_eval_complex_lower_offset(const vector<double> &cf_coeffs,
 // df/dx = lim_{delta -> 0} Imag(f(val+i*delta))/delta
 double
 cont_frac::complex_deriv(const double val, const size_t depth){
-  vector<double> ContFracCoeffs;
-  get_cf_coeffs(ContFracCoeffs);
-  vector<double> ContFracOffCoeffs;
-  get_offset_coeffs(ContFracOffCoeffs);
-
+  vector<double> ContFracCoeffs(cf_coeffs);
+  vector<double> ContFracOffCoeffs(offset_coeffs);
+  
   const complex<double> i(0.0,1.0);
   complex<double> df(0.0, 0.0);
   complex<double> value(val, 0.0);
 
   if(upper_offset == 0 && lower_offset == 0)
-    ContFrac_eval_complex_no_offset(ContFracCoeffs, value + DERIV_DELTA*i, 
-				    depth, df);
-
+    ContFrac_eval_complex_no_offset(ContFracCoeffs, value + DERIV_DELTA*i, depth, df);
+  
   else if(upper_offset > 0)
     ContFrac_eval_complex_upper_offset(ContFracCoeffs, ContFracOffCoeffs,
-				       value + DERIV_DELTA*i, 
-				       depth, df);
+				       value + DERIV_DELTA*i, depth, df);
 
   else if(lower_offset > 0)
     ContFrac_eval_complex_lower_offset(ContFracCoeffs, ContFracOffCoeffs,
-				       value + DERIV_DELTA*i, 
-				       depth, df);
-
+				       value + DERIV_DELTA*i, depth, df);
+  
   return(imag(df)/DERIV_DELTA);
 }
 
@@ -585,19 +572,17 @@ ContFracApprox::locate_zero_cf_deriv(const double val,
     val_mid = (val_low + val_high)/2.0;
     deriv_mid = complex_deriv(val_mid);
 
-    if((deriv_mid > 0 && deriv_low < 0) ||
-       (deriv_mid < 0 && deriv_low > 0))
+    if((deriv_mid > 0 && deriv_low < 0) || (deriv_mid < 0 && deriv_low > 0))
       val_high = val_mid;
-    else 
-      val_low = val_mid;
+    else val_low = val_mid;
 
     deriv_low = complex_deriv(val_low);
     deriv_high = complex_deriv(val_high);
     diff = fabs((prev_deriv - deriv_mid)/prev_deriv);
     prev_deriv = deriv_mid;
   }
-
-  return(val_mid);
+  
+  return val_mid;
 }
 
 // 
@@ -629,12 +614,11 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
 
     // test stability to locate possible defects
     // do not use approx if estimate is not stable
-    if(test_stability_local_max(current_approx, current_deriv,
-				upper_bound, deriv_upper_bound)){
+    if (test_stability_local_max(current_approx, current_deriv,
+				 upper_bound, deriv_upper_bound)){
       // update max if it is greater
-      if((current_deriv < 0.0) && (prev_deriv > 0.0)){ 
-	double possible_max_loc = 
-	  locate_zero_cf_deriv(val, val-step_size);
+      if ((current_deriv < 0.0) && (prev_deriv > 0.0)){ 
+	double possible_max_loc = locate_zero_cf_deriv(val, val-step_size);
 	if(evaluate(possible_max_loc) > current_max){
 	  current_max = evaluate(possible_max_loc);
 	  current_max_loc = possible_max_loc;
@@ -642,7 +626,7 @@ ContFracApprox::locate_local_max(const double min_val, const double max_val,
       }
     }
     //exit while loop if Approx is unstable
-    else{
+    else {
       val = max_val; 
       current_max = evaluate(min_val);
       current_max_loc = min_val;
