@@ -79,94 +79,6 @@ get_counts(const vector<SimpleGenomicRegion> &reads, vector<size_t> &counts) {
 }
 
 
-// Checks if estimates are stable (derivative large) for the
-// particular approximation (degrees of num and denom) at a specific
-// point
-bool
-stable_estimate(const double t,
-		const double prev_estim, 
-		const double step_size,
-		const double init_distinct,
-		ContinuedFractionApproximation &CFestimate){
-  // stable if d/dt f(t) < vals_sum and f(t) <= prev_val+sample_per_time_step
-  const double distinct_per_step = init_distinct*step_size;
-  bool IS_STABLE = false;
-  const double estimate = CFestimate.cont_frac_estimate(t, CFestimate.get_depth());
-  const double deriv = CFestimate.cont_frac_estimate.complex_deriv(t, CFestimate.get_depth());
-  // we are using an CF approx that acts like x in limit
-  // derivative must be positive and be less than the initial derivative
-  if (deriv <= init_distinct && deriv >= 0.0)
-    IS_STABLE = true;
-  // make sure that the estimate is increasing in the time_step and is
-  // below the initial distinct per step_size
-  if (IS_STABLE && estimate >= prev_estim && estimate <= prev_estim + distinct_per_step)
-    return IS_STABLE;
-  else return false;
-}
-
-// Extrapolates the curve, for given values (step & max) and numbers
-// of terms
-static void
-extrapolate_distinct(const bool VERBOSE, 
-		     const vector<double> &counts_histogram,
-		     const double max_value, const double step_size,
-		     size_t max_terms, vector<double> &estimates) {
-  
-  // ensure that we will use an underestimate
-  max_terms = max_terms - (max_terms % 2 == 1);
-  
-  // hist_sum = number of distinct in initial sample
-  const double hist_sum = 
-    accumulate(counts_histogram.begin(), counts_histogram.end(), 0.0);
-  // counts_sum = number of total captures
-  double counts_sum  = 0.0;
-  for(size_t i = 0; i < counts_histogram.size(); i++)
-    counts_sum += i*counts_histogram[i];
-  
-  vector<double> coeffs(max_terms, 0.0);
-  for (size_t j = 0; j < max_terms; j++)
-    coeffs[j] = counts_histogram[j + 1]*pow(-1, j + 2);
-  
-  // initialize the cont frac estimator
-  ContinuedFraction cont_frac_estim(coeffs, 0, 0);
-  ContinuedFractionApproximation CFestimate(cont_frac_estim, max_terms);
-  
-  estimates.clear();
-  while (max_terms > CFestimate.MINIMUM_ALLOWED_DEGREE && estimates.empty()) {
-    estimates.push_back(hist_sum);
-    double value = step_size;
-    bool STABLE_ESTIMATE = true;
-    while (value <= max_value && STABLE_ESTIMATE) {
-
-      STABLE_ESTIMATE = STABLE_ESTIMATE &&
-	stable_estimate(value, estimates.back(), 
-			step_size, hist_sum, CFestimate);
-      if (STABLE_ESTIMATE)
-        estimates.push_back(hist_sum + CFestimate.cont_frac_estimate(value, CFestimate.get_depth()));
-      else {
-	// estimates are unacceptable, move down in order
-        estimates.clear();
-        max_terms -= 2;
-	CFestimate.set_depth(max_terms); 
-      }
-      value += step_size;
-    }
-    
-    if (!estimates.empty() && VERBOSE) {
-      vector<double> contfrac_coeffs(CFestimate.cont_frac_estimate.cf_coeffs);
-      vector<double> off_coeffs(CFestimate.cont_frac_estimate.offset_coeffs);
-      for (size_t i = 0; i < off_coeffs.size(); ++i)
-	cerr << setw(12) << fixed << setprecision(2) 
-	     << off_coeffs[i] << "\t" 
-	     << setw(12) << fixed << setprecision(2) << coeffs[i] << endl;
-      for (size_t i = 0; i < contfrac_coeffs.size(); ++i)
-	cerr << setw(12) << fixed << setprecision(2) 
-	     << contfrac_coeffs[i] << "\t" 
-	     << setw(12) << fixed << setprecision(2) 
-	     << coeffs[i+off_coeffs.size()] << endl;
-    }
-  }
-}
 
 int
 main(const int argc, const char **argv) {
@@ -176,18 +88,18 @@ main(const int argc, const char **argv) {
     string outfile;
     string stats_outfile;
 
-    size_t max_terms = 1000;
-    double tolerance = 1e-20;
+    size_t max_terms = 100;
     double max_extrapolation = 1e10;
     double step_size = 1e6;
-    double deriv_delta = 1e-8;
     size_t smoothing_bandwidth = 4;
     double smoothing_decay_factor = 15.0;
+
+    int diagonal = 0;
     
     /* FLAGS */
     bool VERBOSE = false;
-    bool SMOOTH_HISTOGRAM = false; 
-    bool LIBRARY_SIZE = false;
+    bool SMOOTH_HISTOGRAM = true; //false; 
+    // bool LIBRARY_SIZE = false;
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
@@ -200,20 +112,22 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("step",'s',"step size between extrapolations", 
                       false, step_size);
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, max_terms);
-    opt_parse.add_opt("tol", '\0', "general numerical tolerance",
-		      false, tolerance);
-    opt_parse.add_opt("delta", '\0', "derivative step size",
-                      false, deriv_delta);
-    opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
-                      false, SMOOTH_HISTOGRAM);
-    opt_parse.add_opt("bandwidth", '\0', "smoothing bandwidth",
-                      false, smoothing_bandwidth);
-    opt_parse.add_opt("decay", '\0', "smoothing decay factor",
-                      false, smoothing_decay_factor);
-    opt_parse.add_opt("library_size", '\0', "estimate library size "
-		      "(default: estimate distinct)", false, LIBRARY_SIZE);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
+    //     opt_parse.add_opt("tol", '\0', "general numerical tolerance",
+    // 		      false, tolerance);
+    //     opt_parse.add_opt("delta", '\0', "derivative step size",
+    //                       false, deriv_delta);
+    //     opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
+    //                       false, SMOOTH_HISTOGRAM);
+    //     opt_parse.add_opt("bandwidth", '\0', "smoothing bandwidth",
+    // 		      false, smoothing_bandwidth);
+    //     opt_parse.add_opt("decay", '\0', "smoothing decay factor",
+    // 		      false, smoothing_decay_factor);
+    //     opt_parse.add_opt("diag", 'd', "diagonal to use",
+    // 		      false, diagonal);
+    //     opt_parse.add_opt("library_size", '\0', "estimate library size "
+    // 		      "(default: estimate distinct)", false, LIBRARY_SIZE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -260,7 +174,7 @@ main(const int argc, const char **argv) {
     vector<double> counts_histogram(max_observed_count + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i)
       ++counts_histogram[values[i]];
-          
+    
     const size_t distinct_counts = 
       std::count_if(counts_histogram.begin(), counts_histogram.end(),
 		    bind2nd(std::greater<size_t>(), 0));
@@ -271,7 +185,7 @@ main(const int argc, const char **argv) {
 		       smoothing_decay_factor, counts_histogram);
     
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    size_t counts_before_first_zero = 0;
+    size_t counts_before_first_zero = 1;
     while (counts_before_first_zero < counts_histogram.size() && 
 	   counts_histogram[counts_before_first_zero] > 0)
       ++counts_before_first_zero;
@@ -281,39 +195,53 @@ main(const int argc, const char **argv) {
       cerr << "TOTAL READS     = " << read_locations.size() << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
-	   << "COUNTS OF 1     = " << counts_histogram[1] << endl;
+	   << "COUNTS OF 1     = " << counts_histogram[1] << endl
+	   << "MAX TERMS       = " << max_terms << endl;
     
+    /* Now do the work associated with the continued fraction or the
+       Pade table.
+     */
+    const ContinuedFractionApproximation cfa(diagonal, max_terms, step_size, max_extrapolation);
+    const ContinuedFraction cf(cfa.optimal_continued_fraction(counts_histogram));
+    assert(cf.degree > 0);
+
+    if (VERBOSE)
+      cerr << cf << endl;
+    
+    /* Here is where we actually compute the estimates and either
+       write them to a file or stdout, as specified by the user.
+    */
     vector<double> estimates;
-    extrapolate_distinct(VERBOSE, counts_histogram, max_val,
-			 val_step, max_terms, estimates);
+    cf.extrapolate_distinct(counts_histogram, max_val, val_step, estimates);
     
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-    
     double val = 0.0;
     for (size_t i = 0; i < estimates.size(); ++i, val += val_step)
       out << std::fixed << std::setprecision(1) 
 	  << (val + 1.0)*values_sum << '\t' << estimates[i] << endl;
     
+    
+    /* Finally output the bounds on the library size if either verbose
+       output is requested or this info was specifically requested.
+     */
     if (VERBOSE || !stats_outfile.empty()) {
-      // TODO: WITH BETTER OUTPUT
       std::ofstream stats_of;
       if (!stats_outfile.empty()) stats_of.open(stats_outfile.c_str());
       ostream stats_out(stats_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
       
-      const double upper_bound = 
-	upperbound_librarysize(counts_histogram, max_terms)+distinct_counts;
-      stats_out << "Chao87_lower_bound" << "\t" 
-		<< chao87_lowerbound_librarysize(counts_histogram) << endl;
-      stats_out << "ChaoLee92_lower_bound" << "\t" 
-		<< cl92_lowerbound_librarysize(counts_histogram) << endl;
-      stats_out << "cont_frac_lower_bound" << "\t"
-		<< lowerbound_librarysize(counts_histogram, upper_bound, 
-					  val_step, max_val, max_terms) << endl;
-      stats_out << "cont_frac_upper_bound" << "\t" << upper_bound << endl;
-    } 
-    
+      const double upper_bound = distinct_counts +
+	upperbound_librarysize(counts_histogram, max_terms);
+      
+      stats_out << "CHAO87_LOWER=" 
+		<< chao87_lowerbound_librarysize(counts_histogram) << endl
+		<< "CL92_LOWER=" 
+		<< cl92_lowerbound_librarysize(counts_histogram) << endl
+		<< "CF_LOWER="
+		<< cfa.lowerbound_librarysize(counts_histogram, upper_bound) << endl
+		<< "CF_UPPER=" << upper_bound << endl;
+    }
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;

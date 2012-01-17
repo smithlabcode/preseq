@@ -28,57 +28,52 @@
 #include <cassert>
 
 struct ContinuedFraction {
-  // Constructor
-  ContinuedFraction(const std::vector<double> &coeffs,
-		    const size_t in_lower, const size_t in_upper) :
-    lower_offset(in_lower), upper_offset(in_upper), ps_coeffs(coeffs) {}
+  ContinuedFraction() {}
+  ContinuedFraction(const std::vector<double> &ps_cf, 
+		    const int di, const size_t dg);
+  double operator()(const double val) const;
+  void extrapolate_distinct(const std::vector<double> &counts_hist,
+			    const double max_value, const double step_size,
+			    std::vector<double> &estimates) const;
+  double complex_deriv(const double val) const;
   
-  // Evaluators
-  double
-  operator()(const double val, const size_t depth);
-  
-  double 
-  complex_deriv(const double val, const size_t depth);
-  
-  size_t lower_offset;
-  size_t upper_offset;
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;
+  int diagonal_idx;
+  size_t degree;
 };
+
+std::ostream& 
+operator<<(std::ostream& the_stream, const ContinuedFraction &cf);
+
 
 class ContinuedFractionApproximation {
 public:
-  static const size_t MINIMUM_ALLOWED_DEGREE = 6;
-  
   // Constructor
-  ContinuedFractionApproximation(const ContinuedFraction &cf_instance, 
-				 const size_t max_terms) :
-    cont_frac_estimate(cf_instance), depth(max_terms) {
-    compute_cf_coeffs();
-  }
+  ContinuedFractionApproximation(const int di, const size_t mt, 
+				 const double ss, const double mv);
   
-  // Mutators
-  void compute_cf_coeffs();
-  
-  void
-  set_depth(const size_t max_terms) {
-    depth = max_terms;
-    assert(depth >= MINIMUM_ALLOWED_DEGREE);
-  }
-  
-  size_t get_depth() const {return depth;} 
+  ContinuedFraction
+  optimal_continued_fraction(const std::vector<double> &counts_hist) const;
   
   double
-  locate_local_max(const double lower_limit, const double upper_limit,
-		   const double step_size, const double upper_bound,
-		   const double deriv_upper_bound);
+  local_max(const ContinuedFraction &cf, const double upper_bound,
+	    const double deriv_upper_bound) const;
+  double 
+  lowerbound_librarysize(const std::vector<double> &counts_hist,
+			 const double upper_bound) const;
   
-  ContinuedFraction cont_frac_estimate;
 private:
-  size_t depth;
+
+  int diagonal_idx; // the diagonal to work with for estimates
+  size_t max_terms; // the maximum number of terms to try for a CF
+  double step_size; // the step size to use when training
+  double max_value; // the largest value to check when training
   
-  double locate_zero_cf_deriv(const double val, const double prev_val);
+  double locate_zero_cf_deriv(const ContinuedFraction &cf, 
+			      const double val, const double prev_val) const;
+  static const size_t MIN_ALLOWED_DEGREE = 6;
 };
 
 #endif
