@@ -42,8 +42,56 @@ using std::ostream;
 using std::setw;
 using std::fixed;
 using std::setprecision;
+using std::tr1::unordered_map;
 
 using smithlab::log_sum_log_vec;
+
+#ifdef HAVE_BAMTOOLS
+#include "api/BamReader.h"
+#include "api/BamAlignment.h"
+
+using BamTools::BamAlignment;
+using BamTools::SamHeader;
+using BamTools::RefVector;
+using BamTools::BamReader;
+using BamTools::RefData;
+
+static SimpleGenomicRegion
+BamAlignmentToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
+				  const BamAlignment &ba) {
+  const unordered_map<size_t, string>::const_iterator 
+    the_chrom(chrom_lookup.find(ba.RefID));
+  if (the_chrom == chrom_lookup.end())
+    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+  
+  const string chrom = the_chrom->second;
+  const size_t start = ba.Position;
+  const size_t end = start + ba.Length;
+  return SimpleGenomicRegion(chrom, start, end);
+}
+
+
+static void
+ReadBAMFormatInput(const string &infile, vector<SimpleGenomicRegion> &read_locations) {
+  
+  BamReader reader;
+  reader.Open(infile);
+  
+  // Get header and reference
+  string header = reader.GetHeaderText();
+  RefVector refs = reader.GetReferenceData();
+  
+  unordered_map<size_t, string> chrom_lookup;
+  for (size_t i = 0; i < refs.size(); ++i)
+    chrom_lookup[i] = refs[i].RefName;
+  
+  BamAlignment bam;
+  while (reader.GetNextAlignment(bam))
+    read_locations.push_back(BamAlignmentToSimpleGenomicRegion(chrom_lookup, bam));
+  reader.Close();
+}
+#endif
+
 
 static inline double
 weight_exponential(const double dist, double decay_factor) {
@@ -101,6 +149,10 @@ main(const int argc, const char **argv) {
     bool SMOOTH_HISTOGRAM = true; //false; 
     // bool LIBRARY_SIZE = false;
     
+#ifdef HAVE_BAMTOOLS
+    bool BAM_FORMAT_INPUT = false;
+#endif
+    
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
@@ -114,6 +166,10 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
+#ifdef HAVE_BAMTOOLS
+    opt_parse.add_opt("bam", 'b', "input is in BAM format", 
+		      false , BAM_FORMAT_INPUT);
+#endif
     //     opt_parse.add_opt("tol", '\0', "general numerical tolerance",
     // 		      false, tolerance);
     //     opt_parse.add_opt("delta", '\0', "derivative step size",
@@ -151,10 +207,15 @@ main(const int argc, const char **argv) {
     
     // READ IN THE DATA
     vector<SimpleGenomicRegion> read_locations;
-    ReadBEDFile(input_file_name, read_locations);
+#ifdef HAVE_BAMTOOLS
+    if (BAM_FORMAT_INPUT)
+      ReadBAMFormatInput(input_file_name, read_locations);
+    else 
+#endif
+      ReadBEDFile(input_file_name, read_locations);
     if (!check_sorted(read_locations))
       throw SMITHLABException("read_locations not sorted");
-    
+
     // OBTAIN THE COUNTS FOR DISTINCT READS
     vector<size_t> values;
     get_counts(read_locations, values);

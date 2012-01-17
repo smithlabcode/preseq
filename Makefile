@@ -28,15 +28,21 @@ PROGS =  library_complexity complexity_plot library_complexity_bootstrap
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-LIBS += -lgsl -lgslcblas 
+LIBS += -lgsl -lgslcblas
 
 CXX = g++
 CXXFLAGS = -Wall -fPIC -fmessage-length=50
 OPTFLAGS = -O2
-DEBUGFLAGS = -g -lefence -L$(HOME)/lib
+DEBUGFLAGS = -g -L$(HOME)/lib
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
+endif
+
+ifdef BAMTOOLS_ROOT
+INCLUDEDIRS += $(BAMTOOLS_ROOT)/include
+LIBS += -L$(BAMTOOLS_ROOT)/lib -lz -lbamtools
+CXXFLAGS += -DHAVE_BAMTOOLS
 endif
 
 ifdef OPT
@@ -49,10 +55,6 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
 library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
-
-library_complexity_bootstrap: pade_approximant.o continued_fraction.o
-
-library_size_estimates.o: pade_approximant.o continued_fraction.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
