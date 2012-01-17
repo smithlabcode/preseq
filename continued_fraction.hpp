@@ -36,6 +36,7 @@ struct ContinuedFraction {
 			    const double max_value, const double step_size,
 			    std::vector<double> &estimates) const;
   double complex_deriv(const double val) const;
+  bool is_valid() const {return !cf_coeffs.empty();}
   
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;

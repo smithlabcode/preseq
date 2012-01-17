@@ -633,7 +633,7 @@ check_estimates_stability(const vector<double> &estimates) {
  */
 ContinuedFraction
 ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> &counts_hist) const {
-
+  
   // ensure that we will use an underestimate
   const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
   
@@ -658,7 +658,9 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
     if (check_estimates_stability(estimates))
       return cf;
   }
-
+  
+  throw SMITHLABException("unable to fit continued fraction");
+  
   // no stable continued fraction: return crap
   return ContinuedFraction();
 }
@@ -693,7 +695,9 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   for (size_t n_terms = local_max_terms; n_terms > MIN_ALLOWED_DEGREE; n_terms -= 2) {
     // make a CF for this number of terms
     const ContinuedFraction cf(ps_coeffs, diagonal_idx, n_terms);
-    best = std::max(best, local_max(cf, upper_bound, distinct_reads));
+    const double candidate_best = local_max(cf, upper_bound, distinct_reads);
+    best = std::min(best, candidate_best);
+    std::cerr << n_terms << "\t" << candidate_best << std::endl;
   }
   return best;
 }

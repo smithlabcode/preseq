@@ -17,11 +17,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// computes bounds on library size
-// including lower bounds of Chao(Biometrics 1987) and 
-// Chao & Lee (JASA 1992)
-
-
 #include <numeric>
 #include <vector>
 #include <string>

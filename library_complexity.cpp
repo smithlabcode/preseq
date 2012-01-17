@@ -203,8 +203,7 @@ main(const int argc, const char **argv) {
      */
     const ContinuedFractionApproximation cfa(diagonal, max_terms, step_size, max_extrapolation);
     const ContinuedFraction cf(cfa.optimal_continued_fraction(counts_histogram));
-    assert(cf.degree > 0);
-
+    
     if (VERBOSE)
       cerr << cf << endl;
     
@@ -222,7 +221,6 @@ main(const int argc, const char **argv) {
       out << std::fixed << std::setprecision(1) 
 	  << (val + 1.0)*values_sum << '\t' << estimates[i] << endl;
     
-    
     /* Finally output the bounds on the library size if either verbose
        output is requested or this info was specifically requested.
      */
@@ -235,12 +233,12 @@ main(const int argc, const char **argv) {
 	upperbound_librarysize(counts_histogram, max_terms);
       
       stats_out << "CHAO87_LOWER=" 
-		<< chao87_lowerbound_librarysize(counts_histogram) << endl
-		<< "CL92_LOWER=" 
-		<< cl92_lowerbound_librarysize(counts_histogram) << endl
-		<< "CF_LOWER="
-		<< cfa.lowerbound_librarysize(counts_histogram, upper_bound) << endl
-		<< "CF_UPPER=" << upper_bound << endl;
+		<< chao87_lowerbound_librarysize(counts_histogram) << endl;
+      stats_out	<< "CL92_LOWER=" 
+		<< cl92_lowerbound_librarysize(counts_histogram) << endl;
+      stats_out << "CF_LOWER="
+		<< cfa.lowerbound_librarysize(counts_histogram, upper_bound) << endl;
+      stats_out << "CF_UPPER=" << upper_bound << endl;
     }
   }
   catch (SMITHLABException &e) {
