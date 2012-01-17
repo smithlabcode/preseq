@@ -23,7 +23,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  library_complexity complexity_plot library_size_bootstrap
+PROGS =  library_complexity complexity_plot library_complexity_bootstrap 
 
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
@@ -50,7 +50,7 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 
 library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
 
-library_size_bootstrap: pade_approximant.o continued_fraction.o
+library_complexity_bootstrap: pade_approximant.o continued_fraction.o
 
 library_size_estimates.o: pade_approximant.o continued_fraction.o
 

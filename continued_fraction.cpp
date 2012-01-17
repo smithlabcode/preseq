@@ -322,9 +322,9 @@ static void
 evaluate_complex_on_diagonal(const vector<double> &cf_coeffs,
 			     const complex<double> perturbed_val,
 			     const size_t depth, complex<double> &approx) {
-  const complex<double> i(0.0,1.0);
+  const complex<double> sqrt_neg1(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
-    approx = 0.0*i;
+    approx = 0.0*sqrt_neg1;
   
   else {
     
@@ -369,7 +369,7 @@ evaluate_complex_above_diagonal(const vector<double> &cf_coeffs,
 				const complex<double> perturbed_val,
 				const size_t depth, complex<double> &approx) {
   
-  const complex<double> imag(0.0,1.0);
+  const complex<double> sqrt_neg1(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
     approx = 0.0*imag;
   
@@ -423,7 +423,7 @@ evaluate_complex_below_diagonal(const vector<double> &cf_coeffs,
 				const complex<double> perturbed_val,
 				const size_t depth,
 				complex<double> &approx) {
-  const complex<double> imag(0.0,1.0);
+  const complex<double> sqrt_neg1(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
     approx = 0.0*imag;
   else{
@@ -477,20 +477,20 @@ ContinuedFraction::complex_deriv(const double val) const {
   vector<double> ContFracCoeffs(cf_coeffs);
   vector<double> ContFracOffCoeffs(offset_coeffs);
   
-  const complex<double> i(0.0,1.0);
+  const complex<double> sqrt_neg1(0.0,1.0);
   complex<double> df(0.0, 0.0);
   complex<double> value(val, 0.0);
   
   if (diagonal_idx == 0)
-    evaluate_complex_on_diagonal(ContFracCoeffs, value + DERIV_DELTA*i, degree, df);
+    evaluate_complex_on_diagonal(ContFracCoeffs, value + DERIV_DELTA*sqrt_neg1, degree, df);
   
   else if (diagonal_idx > 0)
     evaluate_complex_above_diagonal(ContFracCoeffs, ContFracOffCoeffs,
-				    value + DERIV_DELTA*i, degree, df);
+				    value + DERIV_DELTA*sqrt_neg1, degree, df);
   
   else if (diagonal_idx < 0)
     evaluate_complex_below_diagonal(ContFracCoeffs, ContFracOffCoeffs,
- 				    value + DERIV_DELTA*i, degree, df);
+ 				    value + DERIV_DELTA*sqrt_neg1, degree, df);
   
   return imag(df)/DERIV_DELTA;
 }
