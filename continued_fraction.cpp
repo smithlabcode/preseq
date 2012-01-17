@@ -371,7 +371,7 @@ evaluate_complex_above_diagonal(const vector<double> &cf_coeffs,
   
   const complex<double> sqrt_neg1(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
-    approx = 0.0*imag;
+    approx = 0.0*sqrt_neg1;
   
   else {
     //initialize
@@ -425,7 +425,7 @@ evaluate_complex_below_diagonal(const vector<double> &cf_coeffs,
 				complex<double> &approx) {
   const complex<double> sqrt_neg1(0.0,1.0);
   if (norm(perturbed_val) == 0.0)
-    approx = 0.0*imag;
+    approx = 0.0*sqrt_neg1;
   else{
     // initialize
     complex<double> current_num(0.0, 0.0);
