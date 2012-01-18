@@ -35,6 +35,7 @@ using std::min;
 
 const double TOLERANCE = 1e-20;
 const double DERIV_DELTA = 1e-8;
+const double Continued_FractionApproximation::MAX_VAL_SEARCH_LWR_BND = 1e4;
 
 static double
 get_rescale_value(const double numerator, const double denominator) {
@@ -147,7 +148,7 @@ ContinuedFraction::ContinuedFraction(const vector<double> &ps_cf,
   if (diagonal_idx == 0)
     quotdiff_algorithm(ps_coeffs, cf_coeffs);
   else if (diagonal_idx > 0)
-    quotdiff_above_diagonal(ps_coeffs, diagonal_idx, cf_coeffs, offset_coeffs);
+    quotdiff_above_diagonal(ps_coeffs, diagonal_idx, offset_coeffs, cf_coeffs);
   else // if(cont_frac_estimate.lower_offset > 0) {
     quotdiff_below_diagonal(ps_coeffs, -diagonal_idx, offset_coeffs, cf_coeffs);
   // notice the "-" above...
@@ -604,7 +605,7 @@ ContinuedFractionApproximation::local_max(const ContinuedFraction &cf,
 					  const double upper_bound,
 					  const double deriv_upper) const {
   double current_max = cf(0.0);
-  for (double val = step_size; val <= max_value; val += step_size)
+  for (double val = step_size; val <= MAX_VAL_SEARCH_LWR_BND; val += step_size)
     current_max = std::max(current_max, cf(locate_zero_cf_deriv(cf, val, val - step_size)));
   return current_max;
 }
@@ -652,7 +653,7 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
     
     // compute the estimates for the desired set of points
     vector<double> estimates;
-    cf.extrapolate_distinct(counts_hist, max_value, step_size, estimates);
+    cf.extrapolate_distinct(counts_hist, MAX_VAL_SEARCH_LWR_BND, step_size, estimates);
     
     // return the continued fraction if it is stable
     if (check_estimates_stability(estimates))

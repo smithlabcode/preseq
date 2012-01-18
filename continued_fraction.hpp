@@ -71,10 +71,12 @@ private:
   size_t max_terms; // the maximum number of terms to try for a CF
   double step_size; // the step size to use when training
   double max_value; // the largest value to check when training
-  
+
   double locate_zero_cf_deriv(const ContinuedFraction &cf, 
 			      const double val, const double prev_val) const;
   static const size_t MIN_ALLOWED_DEGREE = 6;
+  double MAX_VAL_SEARCH_LWR_BND; //the largest value to search for lowerbound  
+
 };
 
 #endif
