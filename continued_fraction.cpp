@@ -18,7 +18,9 @@
  */
 
 #include "continued_fraction.hpp"
+#include "ZTP.hpp"
 #include <smithlab_utils.hpp>
+#include <RNG.hpp>
 
 #include <vector>
 #include <cmath>
@@ -35,6 +37,7 @@ using std::min;
 
 const double TOLERANCE = 1e-20;
 const double DERIV_DELTA = 1e-8;
+
 
 
 static double
@@ -56,6 +59,69 @@ get_rescale_value(const complex<double> numerator, const complex<double> denomin
     return 1.0/rescale_val;
   return 1.0;
 }
+
+/*
+// to bootstrap histogram
+static void
+resample_histogram(const vector<double> &hist_in,
+                  vector<double> &hist_out) {
+
+ Runif rng;
+ const double n_samples = std::accumulate(hist_in.begin(), hist_in.end(), 0.0);
+
+ vector<double> cumulants(1, 0.0);
+ for (size_t i = 0; i < hist_in.size(); ++i)
+   cumulants.push_back(cumulants.back() + hist_in[i]);
+
+ hist_out.resize(hist_in.size(), 0.0);
+ for (size_t i = 0; i < n_samples; ++i) {
+   const size_t idx = std::lower_bound(cumulants.begin(), cumulants.end(), rng.runif(0.0, n_samples)) - cumulants.begin();
+   hist_out[idx-1]++;
+ }
+}
+
+// smooth histogram a local ZTP, bin width ~ log(val)
+static void
+smooth_histogram(vector<double> &hist_in){
+  assert(hist_in.size() > 0);
+  //new hist should be larger in size since we are smoothing max vals in both directions
+  vector<double> weighted_hist(hist_in.size() + 
+			       static_cast<size_t>(round(log(hist_in.size()))), 0.0);
+  double total_weight = 0.0; // make sure total weight is conserved
+  for(size_t i = 0; i < hist_in.size(); i++)
+    total_weight += i*hist_in[i];
+
+  for(size_t i = 1; i < hist_in.size(); i++){
+//bin_width = floor(1+log(i)), start smoothing at i = 2
+    const size_t bin_radius = 
+      static_cast<size_t>(floor((2+log(i))/2)); 
+    if(bin_radius > 0){
+      vector<double> local_hist(i+bin_radius, 0.0);
+      double local_weight = 0.0;
+      for(size_t j = i - bin_radius; j <= i + bin_radius; ++j){
+	local_hist[j] = hist_in[j];
+	local_weight += hist_in[j];
+      }
+      if(local_weight > 0){ // smooth only if there is weight in window
+	ZeroTruncatedPoisson local_distro(1.0);
+	local_distro.estimateParams(local_hist, false);
+	vector<double> log_local_probs;
+	for(size_t j = i - bin_radius; j <= i + bin_radius; ++j)
+	  log_local_probs.push_back(local_distro.logLikelihood(j));
+	const double local_probs_sum = 
+	  exp(smithlab::log_sum_log_vec(log_local_probs, log_local_probs.size()));
+	for(size_t j = i - bin_radius; j <= i + bin_radius; ++j)
+	  weighted_hist[j] += 
+	    local_weight*exp(log_local_probs[j - i + bin_radius])/local_probs_sum;
+      }
+    }
+    // no smoothing, set weighted_hist to hist_in
+    else
+      weighted_hist[i] = hist_in[i];      
+  }
+  hist_in.swap(weighted_hist);
+}
+*/
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -548,9 +614,7 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
 // calculate cf_coeffs depending on offset
 ContinuedFractionApproximation::ContinuedFractionApproximation(const int di, const size_t mt, 
 							       const double ss, const double mv) :
-  diagonal_idx(di), max_terms(mt), step_size(ss), max_value(mv) {
-  std::cerr << max_terms << std::endl;  
-}
+  diagonal_idx(di), max_terms(mt), step_size(ss), max_value(mv) {}
 
 
 static inline double
@@ -634,20 +698,20 @@ check_estimates_stability(const vector<double> &estimates) {
  */
 ContinuedFraction
 ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> &counts_hist) const {
-  
+  //do this outside
   // ensure that we will use an underestimate
-  const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
-  
+  //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
+
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     counts_sum += i*counts_hist[i];
   
-  vector<double> ps_coeffs(local_max_terms, 0.0);
-  for (size_t j = 0; j < local_max_terms; j++)
+  vector<double> ps_coeffs(max_terms, 0.0);
+  for (size_t j = 0; j < max_terms; j++)
     ps_coeffs[j] = counts_hist[j + 1]*pow(-1, j + 2);
 
-  for (size_t n_terms = local_max_terms; n_terms >= MIN_ALLOWED_DEGREE; n_terms -= 2) {
+  for (size_t n_terms = max_terms; n_terms >= MIN_ALLOWED_DEGREE; n_terms -= 2) {
     // make a CF for this number of terms
     const ContinuedFraction cf(ps_coeffs, diagonal_idx, n_terms);
     
@@ -660,10 +724,10 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
       return cf;
   }
   
-  throw SMITHLABException("unable to fit continued fraction");
+  //  throw SMITHLABException("unable to fit continued fraction");
   
-  // no stable continued fraction: return crap
-  return ContinuedFraction();
+  // no stable continued fraction: return null
+  return ContinuedFraction();  
 }
 
 
