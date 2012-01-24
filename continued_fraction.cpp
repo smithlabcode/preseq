@@ -79,49 +79,8 @@ resample_histogram(const vector<double> &hist_in,
    hist_out[idx-1]++;
  }
 }
-
-// smooth histogram a local ZTP, bin width ~ log(val)
-static void
-smooth_histogram(vector<double> &hist_in){
-  assert(hist_in.size() > 0);
-  //new hist should be larger in size since we are smoothing max vals in both directions
-  vector<double> weighted_hist(hist_in.size() + 
-			       static_cast<size_t>(round(log(hist_in.size()))), 0.0);
-  double total_weight = 0.0; // make sure total weight is conserved
-  for(size_t i = 0; i < hist_in.size(); i++)
-    total_weight += i*hist_in[i];
-
-  for(size_t i = 1; i < hist_in.size(); i++){
-//bin_width = floor(1+log(i)), start smoothing at i = 2
-    const size_t bin_radius = 
-      static_cast<size_t>(floor((2+log(i))/2)); 
-    if(bin_radius > 0){
-      vector<double> local_hist(i+bin_radius, 0.0);
-      double local_weight = 0.0;
-      for(size_t j = i - bin_radius; j <= i + bin_radius; ++j){
-	local_hist[j] = hist_in[j];
-	local_weight += hist_in[j];
-      }
-      if(local_weight > 0){ // smooth only if there is weight in window
-	ZeroTruncatedPoisson local_distro(1.0);
-	local_distro.estimateParams(local_hist, false);
-	vector<double> log_local_probs;
-	for(size_t j = i - bin_radius; j <= i + bin_radius; ++j)
-	  log_local_probs.push_back(local_distro.logLikelihood(j));
-	const double local_probs_sum = 
-	  exp(smithlab::log_sum_log_vec(log_local_probs, log_local_probs.size()));
-	for(size_t j = i - bin_radius; j <= i + bin_radius; ++j)
-	  weighted_hist[j] += 
-	    local_weight*exp(log_local_probs[j - i + bin_radius])/local_probs_sum;
-      }
-    }
-    // no smoothing, set weighted_hist to hist_in
-    else
-      weighted_hist[i] = hist_in[i];      
-  }
-  hist_in.swap(weighted_hist);
-}
 */
+
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -136,8 +95,8 @@ static void
 quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
   
   const size_t depth = ps_coeffs.size();
-  vector< vector<double> > q_table(depth, vector<double>(depth, 0.0));
-  vector< vector<double> > e_table(depth, vector<double>(depth, 0.0));
+  vector< vector<double> > q_table(depth, vector<double>(depth+1, 0.0));
+  vector< vector<double> > e_table(depth, vector<double>(depth+1, 0.0));
 
   for (size_t i = 0; i < q_table[1].size(); i++)
     q_table[1][i] = ps_coeffs[i + 1]/ps_coeffs[i];
@@ -242,7 +201,8 @@ evaluate_above_diagonal(const vector<double> &cf_coeffs,
   double prev_denom1 = 1.0;
   double prev_denom2 = 1.0; 
   
-  for (size_t i = 1; i < depth; i++) {
+  for (size_t i = 1; i < min(cf_coeffs.size(),
+			     depth - offset_coeffs.size()); i++) {
     // initialize
     current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
     current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
@@ -267,10 +227,10 @@ evaluate_above_diagonal(const vector<double> &cf_coeffs,
   }
 
   double offset_part = 0.0;
-  for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
+  for (size_t i = 0; i < offset_coeffs.size(); i++)
     offset_part += offset_coeffs[i]*pow(val, i);
   
-  return val*(offset_part + pow(val, min(offset_coeffs.size(), depth))*
+  return val*(offset_part + pow(val, min(depth, offset_coeffs.size()))*
 	      current_num/current_denom);
 } 
 
@@ -290,7 +250,8 @@ evaluate_below_diagonal(const vector<double> &cf_coeffs,
   double prev_denom1 = 1.0;
   double prev_denom2 = 1.0; 
 
-  for (size_t i = 1; i < depth; i++) {
+  for (size_t i = 1; i < min(cf_coeffs.size(),
+			     depth - offset_coeffs.size()); i++) {
 
     // recursion
     current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
@@ -315,11 +276,11 @@ evaluate_below_diagonal(const vector<double> &cf_coeffs,
   }
   
   double offset_terms = 0.0;
-  for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
+  for (size_t i = 0; i < offset_coeffs.size(); i++)
     offset_terms += offset_coeffs[i]*pow(val, i);
   
   // recall that if lower_offset > 0, we are working with 1/f, invert approx
-  return val/(offset_terms + pow(val, min(offset_coeffs.size(), depth))*
+  return val/(offset_terms + pow(val, min(offset_coeffs.size(),depth))*
 	      current_num/current_denom);
 }
 
@@ -339,7 +300,7 @@ evaluate_on_diagonal(const vector<double> &cf_coeffs,
   double prev_denom1 = 1.0;
   double prev_denom2 = 1.0; 
 
-  for (size_t i = 1; i < depth; i++) {
+  for (size_t i = 1; i < min(cf_coeffs.size(), depth); i++) {
     // recursion
     current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
     current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
@@ -401,7 +362,7 @@ evaluate_complex_on_diagonal(const vector<double> &cf_coeffs,
     complex<double> current_denom(0.0, 0.0);
     complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
     
-    for (size_t j = 1; j < depth; j++) {
+    for (size_t j = 1; j < min(cf_coeffs.size(), depth); j++) {
       //euler's recursion
       complex<double> coeff(cf_coeffs[j], 0.0);
       current_num = prev_num1 + coeff*perturbed_val*prev_num2;
@@ -447,7 +408,8 @@ evaluate_complex_above_diagonal(const vector<double> &cf_coeffs,
     complex<double> current_denom(0.0, 0.0);
     complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
 
-    for (size_t j = 1; j < depth; j++) {
+    for (size_t j = 1; j < min(depth - offset_coeffs.size(),
+			       cf_coeffs.size()); j++) {
       
       //eulers recursion
       complex<double> coeff(cf_coeffs[j], 0.0);
@@ -500,7 +462,8 @@ evaluate_complex_below_diagonal(const vector<double> &cf_coeffs,
     complex<double> current_denom(0.0, 0.0);
     complex<double> prev_denom1(1.0, 0.0), prev_denom2(1.0, 0.0);
 
-    for (size_t j = 1; j < cf_coeffs.size(); j++) {
+    for (size_t j = 1; j < min(depth - offset_coeffs.size(),
+			       cf_coeffs.size()); j++) {
       
       // euler's recursion
       complex<double> coeff(cf_coeffs[j], 0.0);
@@ -702,14 +665,18 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
 
+  if(!(max_terms < counts_hist.size()))
+     cerr << "max_terms \t" << max_terms << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+  assert(max_terms < counts_hist.size());
+
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     counts_sum += i*counts_hist[i];
   
-  vector<double> ps_coeffs(max_terms, 0.0);
-  for (size_t j = 0; j < max_terms; j++)
-    ps_coeffs[j] = counts_hist[j + 1]*pow(-1, j + 2);
+  vector<double> ps_coeffs;
+  for (size_t j = 1; j < max_terms; j++)
+    ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
 
   for (size_t n_terms = max_terms; n_terms >= MIN_ALLOWED_DEGREE; n_terms -= 2) {
     // make a CF for this number of terms
@@ -748,10 +715,12 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   
   // make sure we are using appropriate order estimate
   const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
+
+  assert(local_max_terms < counts_hist.size());
   
-  vector<double> ps_coeffs(local_max_terms, 0.0);
-  for (size_t j = 0; j < local_max_terms; j++)
-    ps_coeffs[j] = counts_hist[j + 1]*pow(-1, j + 2);
+  vector<double> ps_coeffs;
+  for (size_t j = 1; j < local_max_terms; j++)
+    ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
   
   // iterate over max_terms to find largest local max as lower bound
   // theortically larger max_terms will be better approximations ==>
