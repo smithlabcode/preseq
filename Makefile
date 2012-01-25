@@ -23,17 +23,17 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  library_complexity complexity_plot library_complexity_bootstrap 
+PROGS =  library_complexity complexity_plot library_complexity_bootstrap library_complexity_copy
 
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-LIBS += -lgsl -lgslcblas
+LIBS += -lgsl -lgslcblas 
 
 CXX = g++
 CXXFLAGS = -Wall -fPIC -fmessage-length=50
 OPTFLAGS = -O2
-DEBUGFLAGS = -g -L$(HOME)/lib
+DEBUGFLAGS = -g -lefence -lpthread -L/home/cmb-01/as/andrewds/lib/
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
@@ -55,6 +55,10 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
 library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
+
+continued_fraction.o: ZTP.o
+
+library_complexity_copy: pade_approximant.o continued_fraction.o library_size_estimates.o ZTP.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)

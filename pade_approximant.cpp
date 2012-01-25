@@ -31,6 +31,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cmath>
+#include <limits>
 
 using std::string;
 using std::vector;

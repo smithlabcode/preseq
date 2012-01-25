@@ -23,6 +23,7 @@
 #include <iostream>
 #include <ostream>
 #include <cassert>
+#include <limits>
 
 #include "smithlab_utils.hpp"
 
