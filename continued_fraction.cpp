@@ -99,7 +99,7 @@ quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
   vector< vector<double> > q_table(depth, vector<double>(depth+1, 0.0));
   vector< vector<double> > e_table(depth, vector<double>(depth+1, 0.0));
 
-  for (size_t i = 0; i < q_table[1].size(); i++)
+  for (size_t i = 0; i < depth-1; i++)
     q_table[1][i] = ps_coeffs[i + 1]/ps_coeffs[i];
   
   for (size_t j = 0; j < depth-1; j++)
@@ -548,8 +548,7 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
 // Extrapolates the curve, for given values (step & max) and numbers
 // of terms
 void
-ContinuedFraction::extrapolate_distinct(const bool VERBOSE,
-					const vector<double> &counts_hist,
+ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
 					const double max_value, const double step_size,
 					vector<double> &estimates) const {
   const double hist_sum = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
@@ -557,11 +556,6 @@ ContinuedFraction::extrapolate_distinct(const bool VERBOSE,
   estimates.push_back(hist_sum);
   for (double t = step_size; t <= max_value; t += step_size)
     estimates.push_back(hist_sum + operator()(t));
-  if(VERBOSE){
-    for(size_t  i = 0; i < estimates.size(); i++)
-      cerr << estimates[i] << "\t";
-    cerr << endl;
-  }
 }
 
 
@@ -691,7 +685,7 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
     
     // compute the estimates for the desired set of points
     vector<double> estimates;
-    cf.extrapolate_distinct(false, counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
     
     // return the continued fraction if it is stable
     if (check_estimates_stability(estimates))

@@ -32,8 +32,7 @@ struct ContinuedFraction {
   ContinuedFraction(const std::vector<double> &ps_cf, 
 		    const int di, const size_t dg);
   double operator()(const double val) const;
-  void extrapolate_distinct(const bool VERBOSE,
-			    const std::vector<double> &counts_hist,
+  void extrapolate_distinct(const std::vector<double> &counts_hist,
 			    const double max_value, const double step_size,
 			    std::vector<double> &estimates) const;
   double complex_deriv(const double val) const;
