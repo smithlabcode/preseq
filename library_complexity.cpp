@@ -366,12 +366,6 @@ main(const int argc, const char **argv) {
 		      false, smoothing_val);
     opt_parse.add_opt("smoothing_bandwidth",'w'," ",
 		      false, smoothing_bandwidth);
-    opt_parse.add_opt("decay_factor",'c',"smoothing_ decay_factor",
-		      false, smoothing_decay_factor);
-    opt_parse.add_opt("bin_radius",'r',"bin size radius multiplier",
-		      false, bin_radius);
-    opt_parse.add_opt("start_indx",'x',"start index of smoothing",
-		      false, start_indx);
     opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals",
 		      false, alpha);
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
