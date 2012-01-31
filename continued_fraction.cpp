@@ -630,11 +630,10 @@ ContinuedFractionApproximation::locate_zero_cf_deriv(const ContinuedFraction &cf
 // return location of local max
 double
 ContinuedFractionApproximation::local_max(const ContinuedFraction &cf,
-					  const double upper_bound,
 					  const double deriv_upper) const {
   double current_max = cf(0.0);
-  for (double val = SEARCH_STEP_SIZE; val <= SEARCH_MAX_VAL; val += SEARCH_STEP_SIZE)
-    current_max = std::max(current_max, cf(locate_zero_cf_deriv(cf, val, val - SEARCH_STEP_SIZE)));
+  for (double val = 100*SEARCH_STEP_SIZE; val <= SEARCH_MAX_VAL; val += 100*SEARCH_STEP_SIZE)
+    current_max = std::max(current_max, cf(locate_zero_cf_deriv(cf, val, val - 100*SEARCH_STEP_SIZE)));
   return current_max;
 }
 
@@ -643,6 +642,7 @@ ContinuedFractionApproximation::local_max(const ContinuedFraction &cf,
  * particular approximation (degrees of num and denom) at a specific
  * point
  */
+//remember to revert
 static bool
 check_estimates_stability(const vector<double> &estimates) {
   // make sure that the estimate is increasing in the time_step and
@@ -652,6 +652,14 @@ check_estimates_stability(const vector<double> &estimates) {
 	(i >= 2 && (estimates[i] - estimates[i - 1] >
 		    estimates[i - 1] - estimates[i - 2])))
       return false;
+  
+
+  // fake check
+  /*  for(size_t i = 1; i < estimates.size(); ++i)
+    if(estimates[i] < 0.0 || estimates[i] > 1e9)
+      return false;
+  */
+
   return true;
 }
 
@@ -706,7 +714,8 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
  * conservative approx, this is a lower bound on library_size
  */
 double
-ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
+ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
+						       const vector<double> &counts_hist,
 						       const double upper_bound) const {
   
   // the derivative must always be less than the number of distinct
@@ -726,13 +735,16 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   // iterate over max_terms to find largest local max as lower bound
   // theortically larger max_terms will be better approximations ==>
   // larger lower bounds
-  double best = std::numeric_limits<double>::max();
-  for (size_t n_terms = local_max_terms; n_terms > MIN_ALLOWED_DEGREE; n_terms -= 2) {
+  double candidate_lower_bound = std::numeric_limits<double>::max();
+  size_t n_terms = local_max_terms;
+  while(n_terms > MIN_ALLOWED_DEGREE) {
     // make a CF for this number of terms
-    const ContinuedFraction cf(ps_coeffs, diagonal_idx, n_terms);
-    const double candidate_best = local_max(cf, upper_bound, distinct_reads);
-    best = std::min(best, candidate_best);
-    std::cerr << n_terms << "\t" << candidate_best << std::endl;
+    const ContinuedFraction cf(ps_coeffs, -2, n_terms);
+    candidate_lower_bound = std::min(candidate_lower_bound, local_max(cf, distinct_reads));
+    if(VERBOSE)
+      std::cerr << n_terms << "\t" << candidate_lower_bound << "\t" 
+		<< upper_bound << std::endl;
+    n_terms -= 2;
   }
-  return best;
+  return candidate_lower_bound;
 }

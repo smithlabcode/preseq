@@ -37,6 +37,7 @@ struct ContinuedFraction {
 			    std::vector<double> &estimates) const;
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
+  size_t return_degree() const {return degree;}
   
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -59,10 +60,11 @@ public:
   optimal_continued_fraction(const std::vector<double> &counts_hist) const;
   
   double
-  local_max(const ContinuedFraction &cf, const double upper_bound,
+  local_max(const ContinuedFraction &cf,
 	    const double deriv_upper_bound) const;
   double 
-  lowerbound_librarysize(const std::vector<double> &counts_hist,
+  lowerbound_librarysize(const bool VERBOSE,
+			 const std::vector<double> &counts_hist,
 			 const double upper_bound) const;
   
 private:
@@ -76,7 +78,7 @@ private:
 			      const double val, const double prev_val) const;
   static const size_t MIN_ALLOWED_DEGREE = 6;
   static const double SEARCH_MAX_VAL = 500; //largest value to search for lowerbound and stability
-  static const double SEARCH_STEP_SIZE = 0.05; //step size for search of lowerbound and stability
+  static const double SEARCH_STEP_SIZE = 0.02; //step size for search of lowerbound and stability
 
 };
 

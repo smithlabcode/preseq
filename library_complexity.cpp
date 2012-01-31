@@ -18,8 +18,6 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-
 #include "pade_approximant.hpp"
 #include "continued_fraction.hpp"
 #include "library_size_estimates.hpp"
@@ -27,6 +25,9 @@
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
 #include <GenomicRegion.hpp>
+#include <RNG.hpp>
+#include <gsl/gsl_cdf.h>
+#include <gsl/gsl_randist.h>
 
 #include <fstream>
 #include <numeric>
@@ -93,37 +94,232 @@ ReadBAMFormatInput(const string &infile, vector<SimpleGenomicRegion> &read_locat
 #endif
 
 
+static void
+get_counts(const vector<SimpleGenomicRegion> &reads, vector<double> &counts) {
+  counts.push_back(1);
+  for (size_t i = 1; i < reads.size(); ++i)
+    if (reads[i] == reads[i - 1]) counts.back()++;
+    else counts.push_back(1);
+}
+
+
 static inline double
 weight_exponential(const double dist, double decay_factor) {
   return std::pow(0.5, decay_factor*dist);
 }
 
-
+// want #reads in hist_in = reads in hist_out
 static void
-smooth_histogram(const size_t bandwidth,
-                 const double decay_factor, vector<double> &hist) {
-  vector<double> updated_hist(hist);
-  for (size_t i = 0; i < hist.size(); ++i) {
-    double total_prob = 0.0, total_weight = 0.0;
-    for (size_t j = ((i >= bandwidth/2) ? i - bandwidth/2 : 0);
-         j < std::min(i + bandwidth/2, hist.size()); ++j) {
-      const double dist = std::abs(int(i) - int(j));
-      const double w = weight_exponential(dist, decay_factor);
-      total_prob += w*hist[j];
-      total_weight += w;
-    }
-    updated_hist[i] = total_prob/total_weight;
-  }
-  updated_hist.swap(hist);
+renormalize_hist(const vector<double> &hist_in,
+		 vector<double> &hist_out){
+ double out_vals_sum = 0.0;
+ for(size_t i = 0; i < hist_out.size(); i++)
+   out_vals_sum += i*hist_out[i];
+ double in_vals_sum = 0.0;
+ for(size_t i = 0; i < hist_in.size(); i++)
+   in_vals_sum += i*hist_in[i];
+ for(size_t  i =0; i < hist_out.size(); i++)
+   hist_out[i] = hist_out[i]*in_vals_sum/out_vals_sum;
+}
+
+//additive smoothing
+static void
+smooth_hist_laplace(const vector<double> &hist_in,
+		    const double additive_term,
+		    const size_t bandwidth,
+		    vector<double> &hist_out){
+  size_t hist_out_size = hist_in.size() + bandwidth;
+  vector<double> updated_hist(hist_out_size, additive_term);
+  updated_hist[0] = 0;
+  for(size_t i = 0; i < hist_in.size(); i++)
+    updated_hist[i] += hist_in[i];
+
+  renormalize_hist(hist_in, updated_hist);
+  hist_out.swap(updated_hist);
 }
 
 
-static void
-get_counts(const vector<SimpleGenomicRegion> &reads, vector<size_t> &counts) {
-  counts.push_back(1);
-  for (size_t i = 1; i < reads.size(); ++i)
-    if (reads[i] == reads[i - 1]) counts.back()++;
-    else counts.push_back(1);
+void
+resample_values(const vector<double> &in_values,
+		const gsl_rng *rng,
+		vector<double> &out_values){
+  out_values.clear();
+  const double orig_number_captures = accumulate(in_values.begin(), 
+						 in_values.end(), 0.0);
+  double sampled_number_captures = 0.0;
+  while(sampled_number_captures < orig_number_captures){
+    double u = gsl_rng_uniform(rng);
+    while(u == 1.0)
+      u = gsl_rng_uniform(rng);
+    const size_t sample_indx  = 
+      static_cast<size_t>(floor(in_values.size()*u));
+    sampled_number_captures += in_values[sample_indx];
+    if(sampled_number_captures > orig_number_captures)
+      out_values.push_back(static_cast<double>(sampled_number_captures 
+					      - orig_number_captures));
+    // ensure that number of captures is constant in resampling
+    else
+      out_values.push_back(in_values[sample_indx]);
+  } 
+}
+
+static bool
+check_estimates(const vector<double> &estimates) {
+  // make sure that the estimate is increasing in the time_step and
+  // is below the initial distinct per step_size
+  if(!finite(accumulate(estimates.begin(), estimates.end(), 0.0)) || 
+     estimates.size() == 0)
+    return false;
+
+    for (size_t i = 1; i < estimates.size(); ++i)
+    if (estimates[i] < estimates[i - 1] ||
+	(i >= 2 && (estimates[i] - estimates[i - 1] >
+		    estimates[i - 1] - estimates[i - 2])) ||
+	estimates[i] < 0.0)
+      return false;
+  
+
+  return true;
+}
+
+void
+laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_values, 
+				const double smoothing_val,
+				const size_t bootstraps, const size_t orig_max_terms,
+				const size_t diagonal, const double step_size,
+				const double max_extrapolation, const double max_val,
+				const double val_step, const size_t bandwidth,
+				vector<double> &lower_bound_size,
+				vector<double> &upper_bound_size,
+				vector< vector<double> > &lower_estimates){
+  // clear returning vectors
+  upper_bound_size.clear();
+  lower_bound_size.clear();
+  lower_estimates.clear();
+
+  //setup rng
+  gsl_rng_env_setup();
+  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+  const int seed = time(0) + getpid();
+  srand(seed);
+  gsl_rng_set(rng, rand()); 
+  
+
+  if(VERBOSE) cerr << "lower" << endl;
+  int iter = 0;
+  while(lower_estimates.size() < bootstraps){
+    if(VERBOSE) cerr << iter << "\t" << lower_estimates.size() << endl;
+    iter++;
+
+    vector<double> lower_boot_estimates;
+
+    bool ACCEPT_ESTIMATES = false;
+
+    vector<double> boot_values;
+
+    //  resample_histogram(rng, smooth_hist, boot_hist);
+
+    resample_values(orig_values, rng, boot_values);
+
+    const size_t max_observed_count = 
+      *std::max_element(boot_values.begin(), boot_values.end());
+
+    // BUILD THE HISTOGRAM
+    vector<double> boot_hist(max_observed_count + 1, 0.0);
+    for (size_t i = 0; i < boot_values.size(); ++i)
+      ++boot_hist[boot_values[i]];
+
+
+    //resize boot_hist to remove excess zeros
+    while(boot_hist.back() == 0)
+      boot_hist.pop_back();
+
+    vector<double> smooth_boot_hist;
+    smooth_hist_laplace(boot_hist, smoothing_val, bandwidth, smooth_boot_hist);
+
+    if(VERBOSE){
+      cerr << "boot_hist \t" << boot_hist.size() << endl;
+      for(size_t i = 0; i < boot_hist.size(); i++)
+	cerr << boot_hist[i] << "\t";
+      cerr << endl;
+
+      cerr << "smoothed boot_hist \t" << smooth_boot_hist.size() << endl;
+      for(size_t i = 0; i < smooth_boot_hist.size(); i++)
+	cerr << smooth_boot_hist[i] << "\t";
+      cerr << endl;
+    }
+
+    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+      size_t counts_before_first_zero = 1;
+      while (counts_before_first_zero < smooth_boot_hist.size()  && 
+	     smooth_boot_hist[counts_before_first_zero] > 0)
+	++counts_before_first_zero;
+      size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);  
+
+   //refit curve for lower bound
+      max_terms = max_terms - (max_terms % 2 == 1);
+
+    //refit curve for lower bound
+      const ContinuedFractionApproximation lower_cfa(diagonal, max_terms, 
+						     step_size, max_extrapolation);
+      const ContinuedFraction lower_cf(lower_cfa.optimal_continued_fraction(smooth_boot_hist));
+
+      lower_boot_estimates.clear();
+      if(lower_cf.is_valid())
+	lower_cf.extrapolate_distinct(smooth_boot_hist, max_val, 
+				      val_step, lower_boot_estimates);
+
+      //sanity check
+      ACCEPT_ESTIMATES = check_estimates(lower_boot_estimates);
+      if(VERBOSE) cerr << ACCEPT_ESTIMATES << endl;
+      
+      if(ACCEPT_ESTIMATES){
+	const double distinct  = accumulate(boot_hist.begin(), 
+					    boot_hist.end(), 0.0);
+	lower_estimates.push_back(lower_boot_estimates);
+
+      //library_size estimates
+	upper_bound_size.push_back(upperbound_librarysize(smooth_boot_hist, 
+							  lower_cf.return_degree())
+				   + distinct);
+	if(VERBOSE)
+	  cerr << "upper_bound \t" << upper_bound_size.back() << endl;
+	lower_bound_size.push_back(lower_cfa.lowerbound_librarysize(VERBOSE,
+								    smooth_boot_hist,
+								    upper_bound_size.back())
+				   + distinct);
+      }
+				   
+  }
+
+}
+
+void
+return_median_and_alphaCI(const vector< vector<double> > &estimates,
+			const double alpha, 
+			vector<double> &mean_estimates,
+			vector<double> &lower_CI, 
+			vector<double> &upper_CI){
+  const size_t lower_alpha_percentile = 
+    static_cast<size_t>(floor(alpha*estimates.size()/2));
+
+  const size_t upper_alpha_percentile = estimates.size() - lower_alpha_percentile;
+
+  for(size_t i = 0; i < estimates[0].size(); i++){
+    // estimates is in wrong order, work locally on const val
+    vector<double> estimates_row(estimates.size(), 0.0);
+    for(size_t k = 0; k < estimates_row.size(); ++k)
+      estimates_row[k] = estimates[k][i];
+      
+    //   const double mean = compute_mean(estimates_row);
+    //   mean_estimates.push_back(mean);
+    //sort to get confidence interval
+    sort(estimates_row.begin(), estimates_row.end());
+    mean_estimates.push_back(estimates_row[estimates.size()/2 - 1]); //median
+    lower_CI.push_back(estimates_row[lower_alpha_percentile]);
+    upper_CI.push_back(estimates_row[upper_alpha_percentile]);
+  }
+
 }
 
 
@@ -136,18 +332,19 @@ main(const int argc, const char **argv) {
     string outfile;
     string stats_outfile;
 
-    size_t max_terms = 100;
+    size_t orig_max_terms = 100;
     double max_extrapolation = 1e10;
     double step_size = 1e6;
     size_t smoothing_bandwidth = 4;
-    double smoothing_decay_factor = 15.0;
-
-    int diagonal = 0;
+    double smoothing_val = 1e-4;
+    size_t bootstraps = 1000;
+    int diagonal = -1;
+    double alpha = 0.05;
     
     /* FLAGS */
     bool VERBOSE = false;
     bool SMOOTH_HISTOGRAM = true; //false; 
-    // bool LIBRARY_SIZE = false;
+    bool LIBRARY_SIZE = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -163,7 +360,21 @@ main(const int argc, const char **argv) {
                       false, max_extrapolation);
     opt_parse.add_opt("step",'s',"step size between extrapolations", 
                       false, step_size);
-    opt_parse.add_opt("terms",'t',"maximum number of terms", false, max_terms);
+    opt_parse.add_opt("bootstraps",'b',"number of bootstraps",
+		      false, bootstraps);
+    opt_parse.add_opt("smoothing_val",'m',"value to smooth by in additive smoothing",
+		      false, smoothing_val);
+    opt_parse.add_opt("smoothing_bandwidth",'w'," ",
+		      false, smoothing_bandwidth);
+    opt_parse.add_opt("decay_factor",'c',"smoothing_ decay_factor",
+		      false, smoothing_decay_factor);
+    opt_parse.add_opt("bin_radius",'r',"bin size radius multiplier",
+		      false, bin_radius);
+    opt_parse.add_opt("start_indx",'x',"start index of smoothing",
+		      false, start_indx);
+    opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals",
+		      false, alpha);
+    opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS
@@ -180,10 +391,10 @@ main(const int argc, const char **argv) {
     // 		      false, smoothing_bandwidth);
     //     opt_parse.add_opt("decay", '\0', "smoothing decay factor",
     // 		      false, smoothing_decay_factor);
-    //     opt_parse.add_opt("diag", 'd', "diagonal to use",
-    // 		      false, diagonal);
-    //     opt_parse.add_opt("library_size", '\0', "estimate library size "
-    // 		      "(default: estimate distinct)", false, LIBRARY_SIZE);
+         opt_parse.add_opt("diag", 'd', "diagonal to use",
+    		      false, diagonal);
+         opt_parse.add_opt("library_size", '\0', "estimate library size "
+    		      "(default: estimate distinct)", false, LIBRARY_SIZE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -217,7 +428,7 @@ main(const int argc, const char **argv) {
       throw SMITHLABException("read_locations not sorted");
 
     // OBTAIN THE COUNTS FOR DISTINCT READS
-    vector<size_t> values;
+    vector<double> values;
     get_counts(read_locations, values);
     
     // JUST A SANITY CHECK
@@ -240,67 +451,98 @@ main(const int argc, const char **argv) {
       std::count_if(counts_histogram.begin(), counts_histogram.end(),
 		    bind2nd(std::greater<size_t>(), 0));
     
-    // initialize ContinuedFractionApproximation 
-    if (SMOOTH_HISTOGRAM) 
-      smooth_histogram(smoothing_bandwidth, 
-		       smoothing_decay_factor, counts_histogram);
-    
-    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    size_t counts_before_first_zero = 1;
-    while (counts_before_first_zero < counts_histogram.size() && 
-	   counts_histogram[counts_before_first_zero] > 0)
-      ++counts_before_first_zero;
-    max_terms = std::min(max_terms, counts_before_first_zero);     
-    
     if (VERBOSE)
       cerr << "TOTAL READS     = " << read_locations.size() << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
 	   << "COUNTS OF 1     = " << counts_histogram[1] << endl
-	   << "MAX TERMS       = " << max_terms << endl;
+	   << "MAX TERMS       = " << orig_max_terms << endl;
+
+    vector<double> laplace_counts_hist(counts_histogram);
+    if (SMOOTH_HISTOGRAM)
+      smooth_hist_laplace(counts_histogram, smoothing_val, smoothing_bandwidth, laplace_counts_hist);
     
-    /* Now do the work associated with the continued fraction or the
-       Pade table.
-     */
-    const ContinuedFractionApproximation cfa(diagonal, max_terms, step_size, max_extrapolation);
-    const ContinuedFraction cf(cfa.optimal_continued_fraction(counts_histogram));
+
+    if(VERBOSE){
+      cerr << "orig_hist \t" << counts_histogram.size() << endl;
+      for(size_t i = 0; i < counts_histogram.size(); i++)
+	cerr << counts_histogram[i] << "\t";
+      cerr << endl;
+
+      cerr << "laplace_smoothed_hist \t" << laplace_counts_hist.size() << endl;
+      for(size_t i = 0; i < laplace_counts_hist.size(); i++)
+	cerr << laplace_counts_hist[i] << "\t";
+      cerr << endl;
+    }
     
-    if (VERBOSE)
-      cerr << cf << endl;
-    
-    /* Here is where we actually compute the estimates and either
-       write them to a file or stdout, as specified by the user.
-    */
-    vector<double> estimates;
-    cf.extrapolate_distinct(counts_histogram, max_val, val_step, estimates);
-    
+
+ 
+
+  
+    if(VERBOSE) cerr << "laplace resampling" << endl;
+    vector<vector <double> > lower_laplace_boot_estimates;
+    vector<double> lower_librarysize;
+    vector<double> upper_librarysize;
+    laplace_bootstrap_smoothed_hist(VERBOSE, values, smoothing_val, bootstraps, orig_max_terms,
+				    diagonal, step_size, max_extrapolation, max_val,
+				    val_step, smoothing_bandwidth, 
+				    lower_librarysize, upper_librarysize,
+				    lower_laplace_boot_estimates);
+
+    if(VERBOSE) cerr << "compute confidence intervals" << endl;
+
+    vector<double> lower_laplace_smooth_boot_mean;
+    vector<double> lower_laplace_smooth_boot_lowerCI;
+    vector<double> lower_laplace_smooth_boot_upperCI;
+    return_median_and_alphaCI(lower_laplace_boot_estimates, alpha, lower_laplace_smooth_boot_mean,
+			    lower_laplace_smooth_boot_lowerCI, lower_laplace_smooth_boot_upperCI);
+
+    if(VERBOSE) cerr << "outputing" << endl;
+
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     double val = 0.0;
-    for (size_t i = 0; i < estimates.size(); ++i, val += val_step)
+    out << "reads" << '\t' << "lower_laplace_mean" << '\t' 
+	<< "lower_laplace_lowerCI" << '\t' << "lower_laplace_upper_CI" << "\t" 
+	<< endl;
+    for (size_t i = 0; i < lower_laplace_smooth_boot_mean.size(); ++i, val += val_step)
       out << std::fixed << std::setprecision(1) 
-	  << (val + 1.0)*values_sum << '\t' << estimates[i] << endl;
-    
-    /* Finally output the bounds on the library size if either verbose
-       output is requested or this info was specifically requested.
-     */
-    if (VERBOSE || !stats_outfile.empty()) {
+	  << (val + 1.0)*values_sum << '\t' << lower_laplace_smooth_boot_mean[i] << '\t'
+	  << lower_laplace_smooth_boot_lowerCI[i] << '\t' << lower_laplace_smooth_boot_upperCI[i] 
+	  << endl;
+
+  if (VERBOSE || !stats_outfile.empty()) {
       std::ofstream stats_of;
       if (!stats_outfile.empty()) stats_of.open(stats_outfile.c_str());
       ostream stats_out(stats_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
-      
-      const double upper_bound = distinct_counts +
-	upperbound_librarysize(counts_histogram, max_terms);
-      
-      stats_out << "CHAO87_LOWER=" 
-		<< chao87_lowerbound_librarysize(counts_histogram) << endl;
-      stats_out	<< "CL92_LOWER=" 
-		<< cl92_lowerbound_librarysize(counts_histogram) << endl;
-      stats_out << "CF_LOWER="
-		<< cfa.lowerbound_librarysize(counts_histogram, upper_bound) << endl;
-      stats_out << "CF_UPPER=" << upper_bound << endl;
-    }
+      sort(upper_librarysize.begin(), upper_librarysize.end());
+      sort(lower_librarysize.begin(), lower_librarysize.end());
+      stats_out << "CF_UPPER_MEAN\t" << 
+	accumulate(upper_librarysize.begin(), upper_librarysize.end(), 0.0)/upper_librarysize.size() 
+	<< endl;
+      stats_out << "CF_UPPER_LOWER" << 100*(1-alpha) << "%CI\t"
+		<< upper_librarysize[static_cast<size_t>(floor(alpha*upper_librarysize.size()/2))]
+		<< endl;
+     stats_out << "CF_UPPER_UPPER" << 100*(1-alpha) << "%CI\t"
+	       << upper_librarysize[upper_librarysize.size() - 
+				    static_cast<size_t>(floor(alpha*upper_librarysize.size()/2))]
+		<< endl;
+      stats_out << "CF_LOWER_MEAN\t" << 
+	accumulate(lower_librarysize.begin(), lower_librarysize.end(), 0.0)/lower_librarysize.size() 
+	<< endl;
+      stats_out << "CF_LOWER_LOWER" << 100*(1-alpha) << "%CI\t"
+		<< lower_librarysize[static_cast<size_t>(floor(alpha*lower_librarysize.size()/2))]
+		<< endl;
+     stats_out << "CF_LOWER_UPPER" << 100*(1-alpha) << "%CI\t"
+	       << lower_librarysize[lower_librarysize.size() - 
+				    static_cast<size_t>(floor(alpha*lower_librarysize.size()/2))]
+		<< endl;
+  }
+
+
+
+
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
