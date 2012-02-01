@@ -18,7 +18,6 @@
  */
 
 #include "continued_fraction.hpp"
-#include "ZTP.hpp"
 #include <smithlab_utils.hpp>
 #include <RNG.hpp>
 

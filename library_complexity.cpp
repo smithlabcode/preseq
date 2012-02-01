@@ -303,7 +303,7 @@ return_median_and_alphaCI(const vector< vector<double> > &estimates,
   const size_t lower_alpha_percentile = 
     static_cast<size_t>(floor(alpha*estimates.size()/2));
 
-  const size_t upper_alpha_percentile = estimates.size() - lower_alpha_percentile;
+  const size_t upper_alpha_percentile = estimates.size() - lower_alpha_percentile - 1;
 
   for(size_t i = 0; i < estimates[0].size(); i++){
     // estimates is in wrong order, work locally on const val
