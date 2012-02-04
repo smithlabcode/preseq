@@ -279,7 +279,7 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
 	  upperbound_librarysize(boot_hist, lower_cf.return_degree()) + distinct;
 	const double lower_bound = 
 	  lower_cfa.lowerbound_librarysize(VERBOSE, smooth_boot_hist, upper_bound);
-	if(finite(lower_bound) && finite(upper_bound)){
+	if(finite(lower_bound) && lower_bound > 0 && finite(upper_bound)){
 	  lower_estimates.push_back(lower_boot_estimates);
 	  upper_bound_size.push_back(upper_bound);
 	  lower_bound_size.push_back(lower_bound);
