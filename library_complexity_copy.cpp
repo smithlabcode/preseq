@@ -186,7 +186,7 @@ void
 laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_values, 
 				const double smoothing_val,
 				const size_t bootstraps, const size_t orig_max_terms,
-				const size_t diagonal, const double step_size,
+				const int diagonal, const double step_size,
 				const double max_extrapolation, const double max_val,
 				const double val_step, const size_t bandwidth,
 				vector<double> &lower_bound_size,

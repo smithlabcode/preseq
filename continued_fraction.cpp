@@ -745,5 +745,8 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
 		<< upper_bound << std::endl;
     n_terms -= 2;
   }
-  return candidate_lower_bound;
+  if(candidate_lower_bound < upper_bound)
+    return candidate_lower_bound;
+  else
+    return -std::numeric_limits<double>::max();
 }

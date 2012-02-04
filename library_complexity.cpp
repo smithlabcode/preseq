@@ -186,7 +186,7 @@ void
 laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_values, 
 				const double smoothing_val,
 				const size_t bootstraps, const size_t orig_max_terms,
-				const size_t diagonal, const double step_size,
+				const int diagonal, const double step_size,
 				const double max_extrapolation, const double max_val,
 				const double val_step, const size_t bandwidth,
 				vector<double> &lower_bound_size,
@@ -268,29 +268,25 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
       if(lower_cf.is_valid())
 	lower_cf.extrapolate_distinct(smooth_boot_hist, max_val, 
 				      val_step, lower_boot_estimates);
-
+      
       //sanity check
       ACCEPT_ESTIMATES = check_estimates(lower_boot_estimates);
       if(VERBOSE) cerr << ACCEPT_ESTIMATES << endl;
-      
       if(ACCEPT_ESTIMATES){
 	const double distinct  = accumulate(boot_hist.begin(), 
 					    boot_hist.end(), 0.0);
-	lower_estimates.push_back(lower_boot_estimates);
-
-      //library_size estimates
-	upper_bound_size.push_back(upperbound_librarysize(smooth_boot_hist, 
-							  lower_cf.return_degree())
-				   + distinct);
-	if(VERBOSE)
-	  cerr << "upper_bound \t" << upper_bound_size.back() << endl;
-	lower_bound_size.push_back(lower_cfa.lowerbound_librarysize(VERBOSE,
-								    smooth_boot_hist,
-								    upper_bound_size.back())
-				   + distinct);
+	const double upper_bound =
+	  upperbound_librarysize(boot_hist, lower_cf.return_degree()) + distinct;
+	const double lower_bound = 
+	  lower_cfa.lowerbound_librarysize(VERBOSE, smooth_boot_hist, upper_bound);
+	if(finite(lower_bound) && finite(upper_bound)){
+	  lower_estimates.push_back(lower_boot_estimates);
+	  upper_bound_size.push_back(upper_bound);
+	  lower_bound_size.push_back(lower_bound);
+	  if(VERBOSE)
+	    cerr << "upper_bound \t" << upper_bound_size.back() << endl;
+	}
       }
-				   
-  }
 
 }
 
