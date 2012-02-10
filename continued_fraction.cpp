@@ -739,7 +739,7 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
   while(n_terms > MIN_ALLOWED_DEGREE) {
     // make a CF for this number of terms
     const ContinuedFraction cf(ps_coeffs, -2, n_terms);
-    candidate_lower_bound = std::min(candidate_lower_bound, local_max(cf, distinct_reads));
+    candidate_lower_bound = std::min(candidate_lower_bound, local_max(cf, distinct_reads) + distinct_reads);
     if(VERBOSE)
       std::cerr << n_terms << "\t" << candidate_lower_bound << "\t" 
 		<< upper_bound << std::endl;
