@@ -23,8 +23,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  library_complexity complexity_plot library_complexity_bootstrap library_complexity_copy test_sampling library_complexity_single compare_all_extraps compare_library_size compare_extrap
-
+PROGS =  library_complexity complexity_plot library_complexity_copy
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
