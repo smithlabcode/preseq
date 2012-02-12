@@ -250,44 +250,44 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
     }
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-      size_t counts_before_first_zero = 1;
-      while (counts_before_first_zero < smooth_boot_hist.size()  && 
-	     smooth_boot_hist[counts_before_first_zero] > 0)
-	++counts_before_first_zero;
-      size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);  
+    size_t counts_before_first_zero = 1;
+    while (counts_before_first_zero < smooth_boot_hist.size()  && 
+	   smooth_boot_hist[counts_before_first_zero] > 0)
+      ++counts_before_first_zero;
+    size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);  
 
    //refit curve for lower bound
-      max_terms = max_terms - (max_terms % 2 == 1);
+    max_terms = max_terms - (max_terms % 2 == 1);
 
     //refit curve for lower bound
-      const ContinuedFractionApproximation lower_cfa(diagonal, max_terms, 
+    const ContinuedFractionApproximation lower_cfa(diagonal, max_terms, 
 						     step_size, max_extrapolation);
-      const ContinuedFraction lower_cf(lower_cfa.optimal_continued_fraction(smooth_boot_hist));
+    const ContinuedFraction lower_cf(lower_cfa.optimal_continued_fraction(smooth_boot_hist));
 
-      lower_boot_estimates.clear();
-      if(lower_cf.is_valid())
-	lower_cf.extrapolate_distinct(smooth_boot_hist, max_val, 
-				      val_step, lower_boot_estimates);
+    lower_boot_estimates.clear();
+    if(lower_cf.is_valid())
+      lower_cf.extrapolate_distinct(smooth_boot_hist, max_val, 
+				    val_step, lower_boot_estimates);
       
       //sanity check
-      ACCEPT_ESTIMATES = check_estimates(lower_boot_estimates);
-      if(VERBOSE) cerr << ACCEPT_ESTIMATES << endl;
-      if(ACCEPT_ESTIMATES){
-	const double distinct  = accumulate(boot_hist.begin(), 
-					    boot_hist.end(), 0.0);
-	const double upper_bound =
-	  upperbound_librarysize(boot_hist, lower_cf.return_degree()) + distinct;
-	const double lower_bound = 
-	  lower_cfa.lowerbound_librarysize(VERBOSE, smooth_boot_hist, upper_bound);
-	if(finite(lower_bound) && lower_bound > 0 && finite(upper_bound)){
-	  lower_estimates.push_back(lower_boot_estimates);
-	  upper_bound_size.push_back(upper_bound);
-	  lower_bound_size.push_back(lower_bound);
-	  if(VERBOSE)
-	    cerr << "upper_bound \t" << upper_bound_size.back() << endl;
-	}
+    ACCEPT_ESTIMATES = check_estimates(lower_boot_estimates);
+    if(VERBOSE) cerr << ACCEPT_ESTIMATES << endl;
+    if(ACCEPT_ESTIMATES){
+      const double distinct  = accumulate(boot_hist.begin(), 
+					  boot_hist.end(), 0.0);
+      const double upper_bound =
+	upperbound_librarysize(boot_hist, lower_cf.return_degree()) + distinct;
+      const double lower_bound = 
+	lower_cfa.lowerbound_librarysize(VERBOSE, smooth_boot_hist, upper_bound);
+      if(finite(lower_bound) && lower_bound > 0 && finite(upper_bound)){
+	lower_estimates.push_back(lower_boot_estimates);
+	upper_bound_size.push_back(upper_bound);
+	lower_bound_size.push_back(lower_bound);
+	if(VERBOSE)
+	  cerr << "upper_bound \t" << upper_bound_size.back() << endl;
       }
-
+    }
+  }
 }
 
 void
@@ -502,7 +502,7 @@ main(const int argc, const char **argv) {
 	  << lower_laplace_smooth_boot_lowerCI[i] << '\t' << lower_laplace_smooth_boot_upperCI[i] 
 	  << endl;
 
-  if (VERBOSE || !stats_outfile.empty()) {
+    if (VERBOSE || !stats_outfile.empty()) {
       std::ofstream stats_of;
       if (!stats_outfile.empty()) stats_of.open(stats_outfile.c_str());
       ostream stats_out(stats_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
@@ -528,11 +528,7 @@ main(const int argc, const char **argv) {
 	       << lower_librarysize[lower_librarysize.size() - 
 				    static_cast<size_t>(floor(alpha*lower_librarysize.size()/2))]
 		<< endl;
-  }
-
-
-
-
+    }
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
