@@ -56,8 +56,6 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 
 library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
 
-continued_fraction.o: ZTP.o
-
 library_complexity_copy: pade_approximant.o continued_fraction.o library_size_estimates.o ZTP.o
 
 library_complexity_single: pade_approximant.o continued_fraction.o library_size_estimates.o 
