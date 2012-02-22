@@ -290,16 +290,22 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
   }
 }
 
-void
-return_median_and_alphaCI(const vector< vector<double> > &estimates,
-			const double alpha, 
-			vector<double> &mean_estimates,
-			vector<double> &lower_CI, 
-			vector<double> &upper_CI){
-  const size_t lower_alpha_percentile = 
-    static_cast<size_t>(floor(alpha*estimates.size()/2));
+double
+compute_var(const vector<double> &estimates){
+  const double sample_size = static_cast<double>(estimates.size());
+  double mean = 
+    accumulate(estimates.begin(), estimates.end(), 0.0)/sample_size;
+  double variance = 0.0;
+  for(size_t i = 0; i < estimates.size(); i++)
+    variance += (estimates[i] - mean)*(estimates[i] - mean)/sample_size;
+  return variance; 
+}
 
-  const size_t upper_alpha_percentile = estimates.size() - lower_alpha_percentile - 1;
+
+void
+return_median_and_variance(const vector< vector<double> > &estimates,
+			   vector<double> &median_estimates,
+			   vector<double> &var_estimates){
 
   for(size_t i = 0; i < estimates[0].size(); i++){
     // estimates is in wrong order, work locally on const val
@@ -311,12 +317,25 @@ return_median_and_alphaCI(const vector< vector<double> > &estimates,
     //   mean_estimates.push_back(mean);
     //sort to get confidence interval
     sort(estimates_row.begin(), estimates_row.end());
-    mean_estimates.push_back(estimates_row[estimates.size()/2 - 1]); //median
-    lower_CI.push_back(estimates_row[lower_alpha_percentile]);
-    upper_CI.push_back(estimates_row[upper_alpha_percentile]);
+    median_estimates.push_back(estimates_row[estimates.size()/2 - 1]); //median
+    var_estimates.push_back(return_var(estimates_row));
   }
 
 }
+
+
+double
+alpha_log_confint_multiplier(const double estimate,
+			     const double initial_distinct,
+			     const double variance,
+			     const double alpha){
+  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha);
+  cerr << alpha << " percentile \t" << inv_norm_alpha << endl;
+  return exp(inv_norm_alpha*sqrt(log(1.0 + 
+				     variance/pow(estimate - 
+						  initial_distinct, 2))));
+}
+
 
 
 
@@ -470,22 +489,20 @@ main(const int argc, const char **argv) {
 
   
     if(VERBOSE) cerr << "laplace resampling" << endl;
-    vector<vector <double> > lower_laplace_boot_estimates;
+    vector<vector <double> > laplace_boot_estimates;
     vector<double> lower_librarysize;
     vector<double> upper_librarysize;
     laplace_bootstrap_smoothed_hist(VERBOSE, values, smoothing_val, bootstraps, orig_max_terms,
 				    diagonal, step_size, max_extrapolation, max_val,
 				    val_step, smoothing_bandwidth, 
 				    lower_librarysize, upper_librarysize,
-				    lower_laplace_boot_estimates);
+				    laplace_boot_estimates);
 
     if(VERBOSE) cerr << "compute confidence intervals" << endl;
 
-    vector<double> lower_laplace_smooth_boot_mean;
-    vector<double> lower_laplace_smooth_boot_lowerCI;
-    vector<double> lower_laplace_smooth_boot_upperCI;
-    return_median_and_alphaCI(lower_laplace_boot_estimates, alpha, lower_laplace_smooth_boot_mean,
-			    lower_laplace_smooth_boot_lowerCI, lower_laplace_smooth_boot_upperCI);
+    vector<double> median_estimates;
+    vector<double> var_estimates;
+    return_median_and_alphaCI(laplace_boot_estimates, median_estimates, var_estimates);
 
     if(VERBOSE) cerr << "outputing" << endl;
 
@@ -496,11 +513,9 @@ main(const int argc, const char **argv) {
     out << "reads" << '\t' << "lower_laplace_mean" << '\t' 
 	<< "lower_laplace_lowerCI" << '\t' << "lower_laplace_upper_CI" << "\t" 
 	<< endl;
-    for (size_t i = 0; i < lower_laplace_smooth_boot_mean.size(); ++i, val += val_step)
+    for (size_t i = 0; i < median_estimates.size(); ++i, val += val_step)
       out << std::fixed << std::setprecision(1) 
-	  << (val + 1.0)*values_sum << '\t' << lower_laplace_smooth_boot_mean[i] << '\t'
-	  << lower_laplace_smooth_boot_lowerCI[i] << '\t' << lower_laplace_smooth_boot_upperCI[i] 
-	  << endl;
+	  << (val + 1.0)*values_sum << '\t' ;
 
     if (VERBOSE || !stats_outfile.empty()) {
       std::ofstream stats_of;
