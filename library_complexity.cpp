@@ -290,7 +290,7 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
   }
 }
 
-double
+static inline double
 compute_var(const vector<double> &estimates){
   const double sample_size = static_cast<double>(estimates.size());
   double mean = 
@@ -302,10 +302,23 @@ compute_var(const vector<double> &estimates){
 }
 
 
-void
-return_median_and_variance(const vector< vector<double> > &estimates,
-			   vector<double> &median_estimates,
-			   vector<double> &var_estimates){
+static inline double
+alpha_log_confint_multiplier(const double estimate,
+			     const double initial_distinct,
+			     const double variance,
+			     const double alpha){
+  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
+  return exp(inv_norm_alpha*sqrt(log(1.0 + 
+				     variance/pow(estimate - 
+						  initial_distinct, 2))));
+}
+
+static void
+return_median_and_alphaCI(const vector< vector<double> > &estimates,
+			  const double alpha, const double initial_distinct,
+			  vector<double> &median_estimates,
+			  vector<double> &lower_alphaCI,
+			  vector<double> &upper_alphaCI){
 
   for(size_t i = 0; i < estimates[0].size(); i++){
     // estimates is in wrong order, work locally on const val
@@ -318,23 +331,19 @@ return_median_and_variance(const vector< vector<double> > &estimates,
     //sort to get confidence interval
     sort(estimates_row.begin(), estimates_row.end());
     median_estimates.push_back(estimates_row[estimates.size()/2 - 1]); //median
-    var_estimates.push_back(return_var(estimates_row));
+    const double variance = compute_var(estimates_row);
+    const double confint_multiplier = 
+      alpha_log_confint_multiplier(median_estimates.back(), initial_distinct,
+				   variance, alpha);
+    upper_alphaCI.push_back(initial_distinct + 
+			    (median_estimates.back() - initial_distinct)*confint_multiplier);
+    lower_alphaCI.push_back(initial_distinct + 
+			    (median_estimates.back() - initial_distinct)/confint_multiplier);		    
   }
 
 }
 
 
-double
-alpha_log_confint_multiplier(const double estimate,
-			     const double initial_distinct,
-			     const double variance,
-			     const double alpha){
-  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha);
-  cerr << alpha << " percentile \t" << inv_norm_alpha << endl;
-  return exp(inv_norm_alpha*sqrt(log(1.0 + 
-				     variance/pow(estimate - 
-						  initial_distinct, 2))));
-}
 
 
 
@@ -352,13 +361,13 @@ main(const int argc, const char **argv) {
     double step_size = 1e6;
     size_t smoothing_bandwidth = 4;
     double smoothing_val = 1e-4;
-    size_t bootstraps = 1000;
+    size_t bootstraps = 100;
     int diagonal = -1;
     double alpha = 0.05;
     
     /* FLAGS */
     bool VERBOSE = false;
-    bool SMOOTH_HISTOGRAM = true; //false; 
+    bool SMOOTH_HISTOGRAM = false;  
     bool LIBRARY_SIZE = false;
     
 #ifdef HAVE_BAMTOOLS
@@ -439,6 +448,7 @@ main(const int argc, const char **argv) {
     // OBTAIN THE COUNTS FOR DISTINCT READS
     vector<double> values;
     get_counts(read_locations, values);
+    const double initial_distinct = static_cast<double>(values.size());
     
     // JUST A SANITY CHECK
     const size_t n_reads = read_locations.size();
@@ -467,42 +477,38 @@ main(const int argc, const char **argv) {
 	   << "COUNTS OF 1     = " << counts_histogram[1] << endl
 	   << "MAX TERMS       = " << orig_max_terms << endl;
 
-    vector<double> laplace_counts_hist(counts_histogram);
-    if (SMOOTH_HISTOGRAM)
-      smooth_hist_laplace(counts_histogram, smoothing_val, smoothing_bandwidth, laplace_counts_hist);
-    
 
     if(VERBOSE){
       cerr << "orig_hist \t" << counts_histogram.size() << endl;
       for(size_t i = 0; i < counts_histogram.size(); i++)
 	cerr << counts_histogram[i] << "\t";
       cerr << endl;
-
-      cerr << "laplace_smoothed_hist \t" << laplace_counts_hist.size() << endl;
-      for(size_t i = 0; i < laplace_counts_hist.size(); i++)
-	cerr << laplace_counts_hist[i] << "\t";
-      cerr << endl;
     }
     
 
- 
+    if(!SMOOTH_HISTOGRAM){
+      smoothing_val = 0.0;
+      smoothing_bandwidth = 0;
+    }
 
   
     if(VERBOSE) cerr << "laplace resampling" << endl;
-    vector<vector <double> > laplace_boot_estimates;
+    vector<vector <double> > boot_estimates;
     vector<double> lower_librarysize;
     vector<double> upper_librarysize;
     laplace_bootstrap_smoothed_hist(VERBOSE, values, smoothing_val, bootstraps, orig_max_terms,
 				    diagonal, step_size, max_extrapolation, max_val,
 				    val_step, smoothing_bandwidth, 
 				    lower_librarysize, upper_librarysize,
-				    laplace_boot_estimates);
+				    boot_estimates);
 
     if(VERBOSE) cerr << "compute confidence intervals" << endl;
 
     vector<double> median_estimates;
-    vector<double> var_estimates;
-    return_median_and_alphaCI(laplace_boot_estimates, median_estimates, var_estimates);
+    vector<double> upper_alphaCI;
+    vector<double> lower_alphaCI;
+    return_median_and_alphaCI(boot_estimates, alpha, initial_distinct,
+			      median_estimates, lower_alphaCI, upper_alphaCI);
 
     if(VERBOSE) cerr << "outputing" << endl;
 
@@ -510,38 +516,43 @@ main(const int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     double val = 0.0;
-    out << "reads" << '\t' << "lower_laplace_mean" << '\t' 
-	<< "lower_laplace_lowerCI" << '\t' << "lower_laplace_upper_CI" << "\t" 
+    out << "reads" << '\t' << "median_estimates" << '\t' 
+	<< "lowerCI" << '\t' << "upperCI" << "\t" 
 	<< endl;
     for (size_t i = 0; i < median_estimates.size(); ++i, val += val_step)
       out << std::fixed << std::setprecision(1) 
-	  << (val + 1.0)*values_sum << '\t' ;
+	  << (val + 1.0)*values_sum << '\t' << median_estimates[i] << '\t'
+	  << lower_alphaCI[i] << '\t' << upper_alphaCI[i] << endl;
 
     if (VERBOSE || !stats_outfile.empty()) {
       std::ofstream stats_of;
       if (!stats_outfile.empty()) stats_of.open(stats_outfile.c_str());
       ostream stats_out(stats_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
-      sort(upper_librarysize.begin(), upper_librarysize.end());
-      sort(lower_librarysize.begin(), lower_librarysize.end());
-      stats_out << "CF_UPPER_MEAN\t" << 
-	accumulate(upper_librarysize.begin(), upper_librarysize.end(), 0.0)/upper_librarysize.size() 
-	<< endl;
-      stats_out << "CF_UPPER_LOWER" << 100*(1-alpha) << "%CI\t"
-		<< upper_librarysize[static_cast<size_t>(floor(alpha*upper_librarysize.size()/2))]
+      const double cf_upper_size_var = compute_var(upper_librarysize);
+      const double cf_upper_size_mean = 
+	accumulate(upper_librarysize.begin(), upper_librarysize.end(), 0.0)/upper_librarysize.size();
+      const double cf_upper_size_alpha_multiplier = 
+	alpha_log_confint_multiplier(cf_upper_size_mean, initial_distinct, 
+				     cf_upper_size_var, alpha);
+      stats_out << "LIBRARY_SIZE_UPPERBOUND_MEAN\t" << cf_upper_size_mean << endl;
+      stats_out << "LIBRARY_SIZE_UPPERBOUND_LOWER" << 100*(1-alpha) << "%CI\t"
+		<< initial_distinct + (cf_upper_size_mean - initial_distinct)/cf_upper_size_alpha_multiplier
 		<< endl;
-     stats_out << "CF_UPPER_UPPER" << 100*(1-alpha) << "%CI\t"
-	       << upper_librarysize[upper_librarysize.size() - 
-				    static_cast<size_t>(floor(alpha*upper_librarysize.size()/2))]
+      stats_out << "LIBRARY_SIZE_UPPERBOUND_UPPER" << 100*(1-alpha) << "%CI\t"
+		<< initial_distinct + (cf_upper_size_mean - initial_distinct)*cf_upper_size_alpha_multiplier
 		<< endl;
-      stats_out << "CF_LOWER_MEAN\t" << 
-	accumulate(lower_librarysize.begin(), lower_librarysize.end(), 0.0)/lower_librarysize.size() 
-	<< endl;
-      stats_out << "CF_LOWER_LOWER" << 100*(1-alpha) << "%CI\t"
-		<< lower_librarysize[static_cast<size_t>(floor(alpha*lower_librarysize.size()/2))]
+      const double cf_lower_size_var = compute_var(lower_librarysize);
+      const double cf_lower_size_mean = 
+	accumulate(lower_librarysize.begin(), lower_librarysize.end(), 0.0)/lower_librarysize.size();
+      const double cf_lower_size_alpha_multiplier = 
+	alpha_log_confint_multiplier(cf_lower_size_mean, initial_distinct, 
+				     cf_lower_size_var, alpha);
+      stats_out << "LIBRARY_SIZE_LOWERBOUND_MEAN\t" << cf_lower_size_mean << endl;
+      stats_out << "LIBRARY_SIZE_LOWERBOUND_LOWER" << 100*(1-alpha) << "%CI\t"
+		<< initial_distinct + (cf_lower_size_mean - initial_distinct)/cf_lower_size_alpha_multiplier
 		<< endl;
-     stats_out << "CF_LOWER_UPPER" << 100*(1-alpha) << "%CI\t"
-	       << lower_librarysize[lower_librarysize.size() - 
-				    static_cast<size_t>(floor(alpha*lower_librarysize.size()/2))]
+      stats_out << "LIBRARY_SIZE_LOWERBOUND_UPPER" << 100*(1-alpha) << "%CI\t"
+		<< initial_distinct + (cf_lower_size_mean - initial_distinct)*cf_lower_size_alpha_multiplier
 		<< endl;
     }
   }
