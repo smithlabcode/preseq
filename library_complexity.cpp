@@ -406,8 +406,8 @@ main(const int argc, const char **argv) {
     // 		      false, tolerance);
     //     opt_parse.add_opt("delta", '\0', "derivative step size",
     //                       false, deriv_delta);
-    //     opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
-    //                       false, SMOOTH_HISTOGRAM);
+    opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
+		      false, SMOOTH_HISTOGRAM);
     //     opt_parse.add_opt("bandwidth", '\0', "smoothing bandwidth",
     // 		      false, smoothing_bandwidth);
     //     opt_parse.add_opt("decay", '\0', "smoothing decay factor",
