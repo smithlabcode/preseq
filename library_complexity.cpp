@@ -378,23 +378,26 @@ main(const int argc, const char **argv) {
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false , outfile);
-    opt_parse.add_opt("stats", 'S', "stats output file", 
+    opt_parse.add_opt("stats", 'S', "library size output file", 
 		      false , stats_outfile);
-    opt_parse.add_opt("extrapolation_length",'e',"maximum extrapolation length", 
+    opt_parse.add_opt("extrapolation_length",'e',
+		      "maximum extrapolation length, default 1e10", 
                       false, max_extrapolation);
-    opt_parse.add_opt("step",'s',"step size between extrapolations", 
+    opt_parse.add_opt("step",'s',"step size between extrapolations, default 1e6", 
                       false, step_size);
-    opt_parse.add_opt("bootstraps",'b',"number of bootstraps",
+    opt_parse.add_opt("bootstraps",'b',"number of bootstraps, default 100",
 		      false, bootstraps);
     opt_parse.add_opt("smoothing_val",'m',"value to smooth by in additive smoothing",
 		      false, smoothing_val);
     opt_parse.add_opt("smoothing_bandwidth",'w'," ",
 		      false, smoothing_bandwidth);
-    opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals",
+    opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals, default 0.05",
 		      false, alpha);
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
+    opt_parse.add_opt("diag", 'd', "diagonal to use",
+    		      false, diagonal);
 #ifdef HAVE_BAMTOOLS
     opt_parse.add_opt("bam", 'b', "input is in BAM format", 
 		      false , BAM_FORMAT_INPUT);
@@ -409,10 +412,8 @@ main(const int argc, const char **argv) {
     // 		      false, smoothing_bandwidth);
     //     opt_parse.add_opt("decay", '\0', "smoothing decay factor",
     // 		      false, smoothing_decay_factor);
-         opt_parse.add_opt("diag", 'd', "diagonal to use",
-    		      false, diagonal);
-         opt_parse.add_opt("library_size", '\0', "estimate library size "
-    		      "(default: estimate distinct)", false, LIBRARY_SIZE);
+
+
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
