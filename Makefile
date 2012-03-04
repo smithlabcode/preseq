@@ -17,9 +17,11 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-ifndef SMITHLAB_CPP
-$(error Must define SMITHLAB_CPP variable)
-endif
+#ifndef SMITHLAB_CPP
+#$(error Must define SMITHLAB_CPP variable)
+#endif
+
+SMITHLAB_CPP = ./smithlab_cpp/
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
