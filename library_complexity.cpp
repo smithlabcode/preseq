@@ -354,13 +354,13 @@ main(const int argc, const char **argv) {
   try {
     /* FILES */
     string outfile;
-    string stats_outfile;
+    string library_size_outfile;
 
     size_t orig_max_terms = 100;
     double max_extrapolation = 1e10;
     double step_size = 1e6;
     size_t smoothing_bandwidth = 4;
-    double smoothing_val = 1e-4;
+    double smoothing_val = 1e-3;
     size_t bootstraps = 100;
     int diagonal = -1;
     double alpha = 0.05;
@@ -368,7 +368,6 @@ main(const int argc, const char **argv) {
     /* FLAGS */
     bool VERBOSE = false;
     bool SMOOTH_HISTOGRAM = false;  
-    bool LIBRARY_SIZE = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -378,8 +377,8 @@ main(const int argc, const char **argv) {
     OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false , outfile);
-    opt_parse.add_opt("stats", 'S', "library size output file", 
-		      false , stats_outfile);
+    opt_parse.add_opt("LIBRARY_SIZE", 'L', "library size output file", 
+		      false , library_size_outfile);
     opt_parse.add_opt("extrapolation_length",'e',
 		      "maximum extrapolation length, default 1e10", 
                       false, max_extrapolation);
@@ -387,31 +386,18 @@ main(const int argc, const char **argv) {
                       false, step_size);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps, default 100",
 		      false, bootstraps);
-    opt_parse.add_opt("smoothing_val",'m',"value to smooth by in additive smoothing",
-		      false, smoothing_val);
-    opt_parse.add_opt("smoothing_bandwidth",'w'," ",
-		      false, smoothing_bandwidth);
     opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals, default 0.05",
 		      false, alpha);
     opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
-    opt_parse.add_opt("diag", 'd', "diagonal to use",
-    		      false, diagonal);
 #ifdef HAVE_BAMTOOLS
     opt_parse.add_opt("bam", 'b', "input is in BAM format", 
 		      false , BAM_FORMAT_INPUT);
 #endif
-    //     opt_parse.add_opt("tol", '\0', "general numerical tolerance",
-    // 		      false, tolerance);
-    //     opt_parse.add_opt("delta", '\0', "derivative step size",
-    //                       false, deriv_delta);
+
     opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
 		      false, SMOOTH_HISTOGRAM);
-    //     opt_parse.add_opt("bandwidth", '\0', "smoothing bandwidth",
-    // 		      false, smoothing_bandwidth);
-    //     opt_parse.add_opt("decay", '\0', "smoothing decay factor",
-    // 		      false, smoothing_decay_factor);
 
 
     vector<string> leftover_args;
@@ -525,10 +511,10 @@ main(const int argc, const char **argv) {
 	  << (val + 1.0)*values_sum << '\t' << median_estimates[i] << '\t'
 	  << lower_alphaCI[i] << '\t' << upper_alphaCI[i] << endl;
 
-    if (VERBOSE || !stats_outfile.empty()) {
+    if (VERBOSE || !library_size_outfile.empty()) {
       std::ofstream stats_of;
-      if (!stats_outfile.empty()) stats_of.open(stats_outfile.c_str());
-      ostream stats_out(stats_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
+      if (!library_size_outfile.empty()) stats_of.open(library_size_outfile.c_str());
+      ostream stats_out(library_size_outfile.empty() ? cerr.rdbuf() : stats_of.rdbuf());
       const double cf_upper_size_var = compute_var(upper_librarysize);
       const double cf_upper_size_mean = 
 	accumulate(upper_librarysize.begin(), upper_librarysize.end(), 0.0)/upper_librarysize.size();

@@ -25,7 +25,7 @@ SMITHLAB_CPP = ./smithlab_cpp/
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  library_complexity complexity_plot library_complexity_copy
+PROGS =  library_complexity complexity_plot
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
