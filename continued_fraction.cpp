@@ -723,7 +723,7 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
     accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   
   // make sure we are using appropriate order estimate
-  const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
+  const size_t local_max_terms = max_terms - (max_terms % 2 == 0);
 
   assert(local_max_terms < counts_hist.size());
   
