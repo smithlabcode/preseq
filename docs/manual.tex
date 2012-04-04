@@ -15,6 +15,74 @@
 \maketitle
 
 \chapter{Quick Start}
+\label{chap:quickstart}
+
+The LibraryComplexity package is aimed at predicting
+the yield and number of distinct reads from a genomic library
+from an initial sequencing experiment.  The estimates
+can then be used to examine the utility of further
+sequencing, optimize the sequencing depth,
+or to screen multiple libraries to avoid low complexity
+samples.
+
+\section{Installation}
+\label{sec:install}
+
+\subsection*{Download}
+
+LibraryComplexity is availible at
+\url{http://smithlab.cmb.usc.edu/software/librarycomplexity/}.
+
+\subsection*{System Requirements}
+
+LibraryComplexity runs on Unix-type system
+with GNU Scientific Library (GSL) and
+GNU Complilation Collection (GCC) (if you would like to compile it
+yourself).  It has been tested on Linux and 
+Mac OS-X.
+
+\subsection*{Installation}
+
+Download the source code and decompress
+it with 
+\begin{verbatim}
+ $ tar xvfz library_complexity.tar.gz
+\end{verbatim}
+% 
+Enter the library\_complexity directory and run
+\begin{verbatim}
+$ make
+\end{verbatim}
+If compiled successfully, the executable files are available
+in \textbf{library\_complexity/}.
+
+\section{Using LibraryComplexity}
+\label{sec:usage}
+
+\subsection*{Basic usage:}
+
+To generate the complexity plot of a genomic
+library from a sorted read file in .bed or .bam format,
+use the program \textit{complexity\_plot}.  Use
+-o to specify the output name.
+
+To estimate the future yield 
+and bounds on the number of distinct reads
+of a genomic library
+using an initial experiment in .bed or .bam format,
+use the program \textit{library\_complexity}.
+Use -o to specify the output of the yield
+estimates and -L to specify the output of
+the bounds.  The option -v will cause the bounds
+to be printed to the screen.  The options
+-e and -s set the maximum number of 
+total reads from which yield estimates are desired
+and the number of reads between estimates, respectively.
+For confidence intervals of the estimates, -b controls
+the number of resamples to take and -a controls the confidence
+level.  The last parameter is a .bed or .bam
+file sorted by chromosome and genomic position.
+
 
 
 
