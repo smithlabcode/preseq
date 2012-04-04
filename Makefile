@@ -1,9 +1,7 @@
-#    This file is part of the methpipe system
+#    Copyright (C) 2011 University of Southern California and
+#                       Andrew D. Smith and Timothy Daley
 #
-#    Copyright (C) 2010 University of Southern California and
-#                       Andrew D. Smith
-#
-#    Authors: Andrew D. Smith
+#    Authors: Timothy Daley and Andrew D. Smith
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -19,21 +17,61 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+
+ifndef ROOT
 ROOT = $(shell pwd)
+endif
+
+ifndef SMITHLAB_CPP
+SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
+endif
 
 
-all:
-	@make -C src ROOT=$(ROOT) OPT=1
+SOURCES = $(wildcard *.cpp)
+OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
+PROGS =  library_complexity complexity_plot
+INCLUDEDIRS = $(SMITHLAB_CPP)
+INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-install:
-	@make -C src ROOT=$(ROOT) OPT=1 install
+LIBS += -lgsl -lgslcblas 
+
+CXX = g++
+CXXFLAGS = -Wall -fPIC -fmessage-length=50
+OPTFLAGS = -O2
+DEBUGFLAGS = -g -lefence -lpthread -L/home/cmb-01/as/andrewds/lib/
+
+ifdef DEBUG
+CXXFLAGS += $(DEBUGFLAGS)
+endif
+
+ifdef BAMTOOLS_ROOT
+INCLUDEDIRS += $(BAMTOOLS_ROOT)/include
+LIBS += -L$(BAMTOOLS_ROOT)/lib -lz -lbamtools
+CXXFLAGS += -DHAVE_BAMTOOLS
+endif
+
+ifdef OPT
+CXXFLAGS += $(OPTFLAGS)
+endif
+
+all: $(PROGS)
+
+$(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
+	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
+
+library_complexity: pade_approximant.o continued_fraction.o library_size_estimates.o
+
+%.o: %.cpp %.hpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
+
+%: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
+
+install: $(PROGS)
+	@mkdir -p $(ROOT)/bin
+	@install -m 755 $(PROGS) $(ROOT)/bin
 
 clean:
-	@make -C src ROOT=$(ROOT) clean
-.PHONY: clean
+	@-rm -f $(PROGS) *.o *~
 
-distclean: clean
-	@rm -rf $(ROOT)/bin
-	@rm -rf $(ROOT)/lib
-	@rm -rf $(ROOT)/include
-.PHONY: distclean
+.PHONY: clean
