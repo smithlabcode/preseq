@@ -392,7 +392,7 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS
-    opt_parse.add_opt("bam", 'b', "input is in BAM format", 
+    opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false , BAM_FORMAT_INPUT);
 #endif
 
