@@ -36,6 +36,51 @@ using std::endl;
 using std::cerr;
 using std::sort;
 
+#ifdef HAVE_BAMTOOLS
+#include "api/BamReader.h"
+#include "api/BamAlignment.h"
+using BamTools::BamAlignment;
+using BamTools::SamHeader;
+using BamTools::RefVector;
+using BamTools::BamReader;
+using BamTools::RefData;
+
+static SimpleGenomicRegion
+BamAlignmentToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
+				  const BamAlignment &ba) {
+  const unordered_map<size_t, string>::const_iterator 
+    the_chrom(chrom_lookup.find(ba.RefID));
+  if (the_chrom == chrom_lookup.end())
+    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+  
+  const string chrom = the_chrom->second;
+  const size_t start = ba.Position;
+  const size_t end = start + ba.Length;
+  return SimpleGenomicRegion(chrom, start, end);
+}
+
+
+static void
+ReadBAMFormatInput(const string &infile, vector<SimpleGenomicRegion> &read_locations) {
+  
+  BamReader reader;
+  reader.Open(infile);
+  
+  // Get header and reference
+  string header = reader.GetHeaderText();
+  RefVector refs = reader.GetReferenceData();
+  
+  unordered_map<size_t, string> chrom_lookup;
+  for (size_t i = 0; i < refs.size(); ++i)
+    chrom_lookup[i] = refs[i].RefName;
+  
+  BamAlignment bam;
+  while (reader.GetNextAlignment(bam))
+    read_locations.push_back(BamAlignmentToSimpleGenomicRegion(chrom_lookup, bam));
+  reader.Close();
+}
+#endif
+
 static size_t
 sample_and_unique(const gsl_rng *rng,
 		  const size_t sample_size, 
@@ -80,6 +125,12 @@ int main(int argc, const char **argv) {
 		      false , step_size);
     opt_parse.add_opt("verbose", 'v', "print more run information", 
 		      false , VERBOSE);
+#ifdef HAVE_BAMTOOLS
+    opt_parse.add_opt("bam", 'b', "input is in BAM format", 
+		      false , BAM_FORMAT_INPUT);
+#endif
+
+
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -110,6 +161,12 @@ int main(int argc, const char **argv) {
     if (VERBOSE)
       cerr << "loading mapped locations" << endl;
     vector<SimpleGenomicRegion> regions;
+#ifdef HAVE_BAMTOOLS
+    if (BAM_FORMAT_INPUT)
+      ReadBAMFormatInput(input_file_name, regions);
+    else 
+#endif
+
     ReadBEDFile(input_file_name, regions);
     if (!check_sorted(regions))
       throw SMITHLABException("regions not sorted");
