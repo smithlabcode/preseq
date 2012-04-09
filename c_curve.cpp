@@ -182,6 +182,7 @@ int main(int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
+    out << "total_reads" << "\t" << "distinct_reads" << endl;
     for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;

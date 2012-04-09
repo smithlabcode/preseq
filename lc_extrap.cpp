@@ -503,7 +503,7 @@ main(const int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     double val = 0.0;
-    out << "reads" << '\t' << "median_estimates" << '\t' 
+    out << "total_reads" << '\t' << "average_distinct" << '\t' 
 	<< "lowerCI" << '\t' << "upperCI" << "\t" 
 	<< endl;
     for (size_t i = 0; i < median_estimates.size(); ++i, val += val_step)
