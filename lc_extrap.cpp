@@ -256,8 +256,8 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE, const vector<double> &orig_v
       ++counts_before_first_zero;
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);  
 
-   //refit curve for lower bound
-    max_terms = max_terms - (max_terms % 2 == 1);
+   //refit curve for lower bound (degree of approx is 1 less than max_terms)
+    max_terms = max_terms - (max_terms % 2 == 0);
 
     //refit curve for lower bound
     const ContinuedFractionApproximation lower_cfa(diagonal, max_terms, 

@@ -165,6 +165,34 @@ quotdiff_below_diagonal(const vector<double> &coeffs, const size_t offset,
   quotdiff_algorithm(holding_coeffs, cf_coeffs);
 }
 
+// output new ContinuedFraction with decreased degree
+// and coeffs equal to the old, but decreased in degree
+ContinuedFraction
+ContinuedFraction::decrease_degree(const ContinuedFraction &CF,
+				   const size_t decrement){
+  // create return ContinuedFraction
+  ContinuedFraction decreasedCF;
+  // properties of orig CF to decrement
+  vector<double> decreased_ps_coeffs(CF.ps_coeffs);
+  vector<double> decreased_cf_coeffs(CF.cf_coeffs);
+  // decrease order
+  for(size_t i = 0; i < decrement; i++){
+    decreased_ps_coeffs.pop_back();
+    decreased_cf_coeffs.pop_back();
+  }
+
+  // just a copy
+  vector<double> decreased_offset_coeffs(CF.offset_coeffs);
+
+  // set return ContinuedFraction
+  decreasedCF.ps_coeffs = decreased_ps_coeffs;
+  decreasedCF.cf_coeffs = decreased_cf_coeffs;
+  decreasedCF.offset_coeffs = decreased_offset_coeffs;
+  decreasedCF.diagonal_idx = CF.diagonal_idx;
+  decreasedCF.degree = CF.degree - decrement;
+
+  return decreasedCF;
+}
 
 ContinuedFraction::ContinuedFraction(const vector<double> &ps_cf, 
 				     const int di, const size_t dg) :
@@ -686,17 +714,21 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
   for (size_t j = 1; j < max_terms; j++)
     ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
 
-  for (size_t n_terms = max_terms; n_terms >= MIN_ALLOWED_DEGREE; n_terms -= 2) {
-    // make a CF for this number of terms
-    const ContinuedFraction cf(ps_coeffs, diagonal_idx, n_terms);
-    
+  ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
+  ContinuedFraction new_cf;
+
+  while(old_cf.degree >= MIN_ALLOWED_DEGREE) {    
     // compute the estimates for the desired set of points
     vector<double> estimates;
-    cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    old_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
     
     // return the continued fraction if it is stable
     if (check_estimates_stability(estimates))
-      return cf;
+      return old_cf;
+
+    // if not cf not acceptable, decrease degree
+    new_cf = old_cf.decrease_degree(old_cf, 2);
+    old_cf = new_cf;
   }
   
   //  throw SMITHLABException("unable to fit continued fraction");
@@ -722,8 +754,9 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
   const double distinct_reads = 
     accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   
-  // make sure we are using appropriate order estimate
-  const size_t local_max_terms = max_terms - (max_terms % 2 == 0);
+  // make sure we are using appropriate order estimate,
+  // degree of approx is 1 less than local_max_terms
+  const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
 
   assert(local_max_terms < counts_hist.size());
   
@@ -735,15 +768,19 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
   // theortically larger max_terms will be better approximations ==>
   // larger lower bounds
   double candidate_lower_bound = std::numeric_limits<double>::max();
-  size_t n_terms = local_max_terms;
+  size_t n_terms = local_max_terms - 1;
+  ContinuedFraction old_cf(ps_coeffs, -2, n_terms);
+  ContinuedFraction new_cf;
+
   while(n_terms > MIN_ALLOWED_DEGREE) {
-    // make a CF for this number of terms
-    const ContinuedFraction cf(ps_coeffs, -2, n_terms);
-    candidate_lower_bound = std::min(candidate_lower_bound, local_max(cf, distinct_reads) + distinct_reads);
+    candidate_lower_bound = std::min(candidate_lower_bound, local_max(old_cf, distinct_reads) + distinct_reads);
     if(VERBOSE)
       std::cerr << n_terms << "\t" << candidate_lower_bound << "\t" 
 		<< upper_bound << std::endl;
-    n_terms -= 2;
+    // lower degree of ContinuedFraction
+    new_cf = old_cf.decrease_degree(old_cf, 2);
+    n_terms = new_cf.degree;
+    old_cf = new_cf;
   }
   if(candidate_lower_bound < upper_bound)
     return candidate_lower_bound;

@@ -27,7 +27,7 @@
 #include <complex>
 #include <cassert>
 
-struct ContinuedFraction {
+struct ContinuedFraction{
   ContinuedFraction() {}
   ContinuedFraction(const std::vector<double> &ps_cf, 
 		    const int di, const size_t dg);
@@ -38,6 +38,9 @@ struct ContinuedFraction {
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
+
+  static ContinuedFraction decrease_degree(const ContinuedFraction &CF,
+					   const size_t decrement);
   
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
