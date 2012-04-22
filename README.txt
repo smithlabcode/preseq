@@ -1,22 +1,23 @@
 This is the README file for the first release of Rational Function 
-Complexity. Rational Function Complexity is a tool for estimating the 
-yield of distinct reads from high-throughput sequencing technology.
+Complexity. Rational Function Complexity is a tool for estimating 
+bounds on the number of distinct reads contained in a sequencing 
+library and the yield obtained from a high-throughput sequencing
+experiment.
 
 CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
 tdaley@usc.edu
-http://smithlab.cmb.usc.edu/plone
+http://smithlab.cmb.usc.edu
 
 SYSTEM REQUIREMENTS:
 ========================================================================
-The Rational Function Complexity software will only run on UNIX-like 
-operating systems, and was developed on Linux systems. The Rational
-Function Complexity software requires a fairly recent C++ compiler 
-(i.e. it must include tr1 headers).  Rational Function Complexity has 
-been compiled and tested on Linux and OS X operating systems using GCC 
-v4.1 or greater. Also, Rational Function Complexity will only run on 
-64-bit machines.
+The Rational Function Complexity software will only run on 64-bit
+UNIX-like operating systems and was developed on Linux systems. The 
+Rational Function Complexity software requires a fairly recent C++ 
+compiler (i.e. it must include tr1 headers).  
+Rational Function Complexity has been compiled and tested on Linux 
+and Mac OS X operating systems using GCC v4.1 or greater. 
 
 INSTALLATION:
 ========================================================================
@@ -33,8 +34,9 @@ USAGE EXAMPLES:
 Each program included in this software package will print a list of
 options if executed without any command line arguments. Many of the
 programs use similar options (for example, output files are specified
-with '-o'). For the most basic usage of lc_extrap to bound the number
-of distinct reads and the expected yield, use the command:
+with '-o'). To predict the yield of a future experiment, use lc_extrap.
+For the most basic usage of lc_extrap to bound the number
+of distinct reads and compute the expected yield, use the command:
 
   lc_extrap -o yield_estimates.txt -L size_estimates.txt input.bed
 
@@ -42,13 +44,27 @@ If the input file is in .bam format, use the command:
 
   lc_extrap -B -o yield_estimates.txt -L size_estimates.txt input.bed
 
-The yield estimates will appear in yield_estimates.txt, and will 
-be a column of future experiment sizes in total reads, a column of the 
-corresponding expected distinct reads, followed by two columns giving
-the corresponding confidence intervals.  The bounds on the number
-of distinct reads will appear as size_estimates.txt, and will give
-a column giving the upper and lower bounds, and corresponding confidence
-intervals.
+The yield estimates will appear in yield_estimates.txt, and will be a 
+column of future experiment sizes in total_reads, a column of the 
+corresponding expected distinct reads in average_distinct, followed by 
+two columns giving the corresponding confidence intervals.  The bounds 
+on the number of distinct reads will appear as size_estimates.txt, and 
+will give a column giving the upper and lower bounds, and corresponding 
+confidence intervals.
+
+To investigate the past yield of an experiment, use c_curve.  For the
+most basic usage, use the command:
+
+  c_curve -o estimates.txt input.bed
+
+If the input file is in .bam format, use the command:
+
+  c_curve -B -o estimates.txt input.bed
+
+The estimates will appear in estimates.txt with two columns.  The
+first column gives the total number of reads in a theoretically
+smaller experiment and the second gives the corresponding number of
+distinct reads.
 
 HISTORY
 ========================================================================

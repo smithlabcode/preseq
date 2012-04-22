@@ -113,16 +113,16 @@ int main(int argc, const char **argv) {
 
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("complexity_plot", "",
-			   "<bed-format-file>");
+    OptionParser opt_parse("c_curve", "",
+			   "<sorted-bed-file> or <sorted-bam-file>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
-    opt_parse.add_opt("lower", 'l', "lower limit for samples", 
-		      false , lower_limit);
-    opt_parse.add_opt("upper", 'u', "upper limit for samples", 
-		      false , upper_limit);
-    opt_parse.add_opt("step", 's', "step size for samples", 
-		      false , step_size);
+    //    opt_parse.add_opt("lower", 'l', "lower limit for samples", 
+    //		      false , lower_limit);
+    //    opt_parse.add_opt("upper", 'u', "upper limit for samples", 
+    //		      false , upper_limit);
+    //    opt_parse.add_opt("step", 's', "step size for samples", 
+    //		      false , step_size);
     opt_parse.add_opt("verbose", 'v', "print more run information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS

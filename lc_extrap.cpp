@@ -363,7 +363,7 @@ main(const int argc, const char **argv) {
     double smoothing_val = 1e-3;
     size_t bootstraps = 100;
     int diagonal = -1;
-    double alpha = 0.05;
+    double c_level = 0.95;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -374,7 +374,7 @@ main(const int argc, const char **argv) {
 #endif
     
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse(argv[0], "", "<sorted-bed-file>");
+    OptionParser opt_parse(argv[0], "", "<sorted-bed-file> or <sorted-bam-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false , outfile);
     opt_parse.add_opt("LIBRARY_SIZE", 'L', "library size output file", 
@@ -382,13 +382,13 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("extrapolation_length",'e',
 		      "maximum extrapolation length, default 1e10", 
                       false, max_extrapolation);
-    opt_parse.add_opt("step",'s',"step size between extrapolations, default 1e6", 
+    opt_parse.add_opt("step",'s',"step size between extrapolation points, default 1e6", 
                       false, step_size);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps, default 100",
 		      false, bootstraps);
-    opt_parse.add_opt("alpha", 'a', "alpha for confidence intervals, default 0.05",
-		      false, alpha);
-    opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
+    opt_parse.add_opt("c_level", 'c', "confidence level for confidence intervals, default 0.95",
+		      false, c_level);
+    //    opt_parse.add_opt("terms",'t',"maximum number of terms", false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS
@@ -396,8 +396,8 @@ main(const int argc, const char **argv) {
 		      false , BAM_FORMAT_INPUT);
 #endif
 
-    opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
-		      false, SMOOTH_HISTOGRAM);
+    //    opt_parse.add_opt("smooth",'\0',"smooth histogram (default: no smoothing)",
+    //		      false, SMOOTH_HISTOGRAM);
 
 
     vector<string> leftover_args;
@@ -494,7 +494,7 @@ main(const int argc, const char **argv) {
     vector<double> median_estimates;
     vector<double> upper_alphaCI;
     vector<double> lower_alphaCI;
-    return_median_and_alphaCI(boot_estimates, alpha, initial_distinct,
+    return_median_and_alphaCI(boot_estimates, 1.0 - c_level, initial_distinct,
 			      median_estimates, lower_alphaCI, upper_alphaCI);
 
     if(VERBOSE) cerr << "outputing" << endl;
@@ -520,12 +520,12 @@ main(const int argc, const char **argv) {
 	accumulate(upper_librarysize.begin(), upper_librarysize.end(), 0.0)/upper_librarysize.size();
       const double cf_upper_size_alpha_multiplier = 
 	alpha_log_confint_multiplier(cf_upper_size_mean, initial_distinct, 
-				     cf_upper_size_var, alpha);
+				     cf_upper_size_var, 1.0 - c_level);
       stats_out << "LIBRARY_SIZE_UPPERBOUND_MEAN\t" << cf_upper_size_mean << endl;
-      stats_out << "LIBRARY_SIZE_UPPERBOUND_LOWER" << 100*(1-alpha) << "%CI\t"
+      stats_out << "LIBRARY_SIZE_UPPERBOUND_LOWER" << 100*c_level << "%CI\t"
 		<< initial_distinct + (cf_upper_size_mean - initial_distinct)/cf_upper_size_alpha_multiplier
 		<< endl;
-      stats_out << "LIBRARY_SIZE_UPPERBOUND_UPPER" << 100*(1-alpha) << "%CI\t"
+      stats_out << "LIBRARY_SIZE_UPPERBOUND_UPPER" << 100*c_level << "%CI\t"
 		<< initial_distinct + (cf_upper_size_mean - initial_distinct)*cf_upper_size_alpha_multiplier
 		<< endl;
       const double cf_lower_size_var = compute_var(lower_librarysize);
@@ -533,12 +533,12 @@ main(const int argc, const char **argv) {
 	accumulate(lower_librarysize.begin(), lower_librarysize.end(), 0.0)/lower_librarysize.size();
       const double cf_lower_size_alpha_multiplier = 
 	alpha_log_confint_multiplier(cf_lower_size_mean, initial_distinct, 
-				     cf_lower_size_var, alpha);
+				     cf_lower_size_var, 1.0 - c_level);
       stats_out << "LIBRARY_SIZE_LOWERBOUND_MEAN\t" << cf_lower_size_mean << endl;
-      stats_out << "LIBRARY_SIZE_LOWERBOUND_LOWER" << 100*(1-alpha) << "%CI\t"
+      stats_out << "LIBRARY_SIZE_LOWERBOUND_LOWER" << 100*c_level << "%CI\t"
 		<< initial_distinct + (cf_lower_size_mean - initial_distinct)/cf_lower_size_alpha_multiplier
 		<< endl;
-      stats_out << "LIBRARY_SIZE_LOWERBOUND_UPPER" << 100*(1-alpha) << "%CI\t"
+      stats_out << "LIBRARY_SIZE_LOWERBOUND_UPPER" << 100*c_level << "%CI\t"
 		<< initial_distinct + (cf_lower_size_mean - initial_distinct)*cf_lower_size_alpha_multiplier
 		<< endl;
     }
