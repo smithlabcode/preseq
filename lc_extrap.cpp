@@ -142,7 +142,7 @@ smooth_hist_laplace(const vector<double> &hist_in,
   hist_out.swap(updated_hist);
 }
 
-
+/*
 void
 resample_values(const vector<double> &in_values,
 		const gsl_rng *rng,
@@ -166,6 +166,43 @@ resample_values(const vector<double> &in_values,
       out_values.push_back(in_values[sample_indx]);
   } 
 }
+*/
+
+void
+resample_values(const vector<double> &full_values,
+		const gsl_rng *rng,
+		const size_t estimated_sample_size,
+		const double total_sampled_reads,
+		vector<double> &sample_values){
+  sample_values.clear();
+  vector<double> temp_sample(estimated_sample_size, 0.0);
+  gsl_ran_sample(rng, (double *)&temp_sample.front(), estimated_sample_size,
+		 (double *)&full_values.front(), full_values.size(), sizeof(double));
+  double temp_sample_sum = accumulate(temp_sample.begin(), temp_sample.end(), 0.0);
+
+  // too few reads, add some
+  if(temp_sample_sum < estimated_sample_size){
+    while(temp_sample_sum < estimated_sample_size){
+      temp_sample.push_back(full_values[rand() % full_values.size()]);
+      temp_sample_sum += temp_sample.back();
+    }
+  }
+  // too many reads, delete some
+  if(temp_sample_sum > estimated_sample_size){
+    while(temp_sample_sum > estimated_sample_size){
+      double deleted_val = temp_sample.back();
+      temp_sample.pop_back();
+      temp_sample_sum -= deleted_val;
+    }
+  }
+  
+  // just right
+  temp_sample.push_back(total_sampled_reads - temp_sample_sum);
+  // assert(accumulate(temp_sample.begin(), temp_sample.end(), 0.0) == total_sampled_reads);
+  sample_values.swap(temp_sample);
+}
+
+
 
 static bool
 check_estimates(const vector<double> &estimates) {
@@ -212,12 +249,14 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE,
   gsl_rng_env_setup();
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(rng, rand()); 
-  
+
+  const double vals_sum = accumulate(orig_values.begin(), orig_values.end(), 0.0);
+
   for (size_t iter = 0; 
        iter < 2*bootstraps && lower_estimates.size() < bootstraps; ++iter) {
     
     vector<double> boot_values;
-    resample_values(orig_values, rng, boot_values);
+    resample_values(orig_values, rng, orig_values.size(), vals_sum, boot_values);
     
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(boot_values.begin(), 
