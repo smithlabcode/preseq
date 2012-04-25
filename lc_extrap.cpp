@@ -278,8 +278,8 @@ laplace_bootstrap_smoothed_hist(const bool VERBOSE,
       else if (VERBOSE) cerr << '_';
     }
     else if (VERBOSE) cerr << '_';
-    //    if(iter == 2*bootstrap - 1)
-
+    if(iter == 2*bootstraps - 1)
+      throw SMITHLABException("too many iterations, poor sample");
   }
   if (VERBOSE)
     cerr << endl;
@@ -445,6 +445,10 @@ main(const int argc, const char **argv) {
     
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
+
+    // catch if all reads are distinct
+    if(max_observed_count < 8)
+      throw SMITHLABException("sample not sufficiently distinct, unable to estimate");
     
     // BUILD THE HISTOGRAM
     vector<double> counts_hist(max_observed_count + 1, 0.0);
