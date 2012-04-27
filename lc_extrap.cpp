@@ -651,7 +651,8 @@ main(const int argc, const char **argv) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
       for(size_t i = 0; i < counts_hist.size(); i++)
-	cerr << i << '\t' << counts_hist[i] << endl;
+	if(counts_hist[i] > 0)
+	  cerr << i << '\t' << counts_hist[i] << endl;
       cerr << endl;
     }
     
