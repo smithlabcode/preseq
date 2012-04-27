@@ -771,17 +771,32 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
   size_t n_terms = local_max_terms - 1;
   ContinuedFraction old_cf(ps_coeffs, -2, n_terms);
   ContinuedFraction new_cf;
+  ContinuedFraction optimal_cf;
 
   while(n_terms > MIN_ALLOWED_DEGREE) {
-    candidate_lower_bound = std::min(candidate_lower_bound, local_max(old_cf, distinct_reads) + distinct_reads);
-    if(VERBOSE)
-      std::cerr << n_terms << "\t" << candidate_lower_bound << "\t" 
-		<< upper_bound << std::endl;
+    const double new_lower_bound = local_max(old_cf, distinct_reads) + distinct_reads;
+    if(new_lower_bound < candidate_lower_bound){
+      candidate_lower_bound = new_lower_bound;
+
+      optimal_cf = old_cf;
+    }
     // lower degree of ContinuedFraction
     new_cf = old_cf.decrease_degree(old_cf, 2);
     n_terms = new_cf.degree;
     old_cf = new_cf;
   }
+
+  if(VERBOSE){
+    cerr << "LOWER_BOUND_CONTINUED_FRACTION_OFFSET_COEFFS" << endl;
+    vector<double> off_coeffs(optimal_cf.offset_coeffs);
+    for(size_t j = 0; j < off_coeffs.size(); j++)
+      cerr << off_coeffs[j] << endl;
+    cerr << "LOWER_BOUND_CONTINUED_FRACTION_COEFF" << endl;
+    vector<double> cf_coefs(optimal_cf.cf_coeffs);
+    for(size_t j = 0; j < cf_coefs.size(); j++)
+      cerr << cf_coefs[j] << endl;
+  }
+
   if(candidate_lower_bound < upper_bound)
     return candidate_lower_bound;
   else

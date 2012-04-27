@@ -33,13 +33,8 @@ double
 cl92_lowerbound_librarysize(const std::vector<double> &counts_histogram);
 
 double
-upperbound_librarysize(const std::vector<double> &counts_hist, 
+upperbound_librarysize(const bool VERBOSE,
+		       const std::vector<double> &counts_hist, 
 		       size_t max_terms);
-
-double
-lowerbound_librarysize(const std::vector<double> &counts_hist,
-		       const double upper_bound, //from upperbound_librarysize
-                       const double step_size, const double max_val,
-                       size_t max_terms);
 
 #endif

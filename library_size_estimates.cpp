@@ -34,6 +34,8 @@
 using std::string;
 using std::vector;
 using std::max;
+using std::cerr;
+using std::endl;
 
 using smithlab::log_sum_log_vec;
 
@@ -45,7 +47,8 @@ static const size_t MIN_ALLOWED_DEGREE = 6;
  * liberal, i.e. they overestimate the library_yield on average
  */
 double
-upperbound_librarysize(const vector<double> &counts_hist, size_t max_terms) {
+upperbound_librarysize(const bool VERBOSE, const vector<double> &counts_hist, 
+		       size_t max_terms) {
   // need max_terms = L + M + 1 to be even so that L + M is odd so
   // that we can take lim_{t \to \infty} [L+1, M]
   
@@ -71,8 +74,20 @@ upperbound_librarysize(const vector<double> &counts_hist, size_t max_terms) {
     // lim(xp(x)/q(x)) = p_{numer_size-1}/q_{denom_size} coefficients
     // are in order of degree
     const double upper_bound = numers.back()/denoms.back();
-    if (accept_approx && upper_bound > 0.0 && std::isfinite(upper_bound))
+    if (accept_approx && upper_bound > 0.0 && std::isfinite(upper_bound)){
+      if(VERBOSE){
+	cerr << "UPPER_BOUND_NUMERATOR_COEFFICIENTS" <<  endl;
+	for(size_t j = 0; j < numers.size(); j++)
+	  cerr << numers[j] << endl;
+	cerr << "UPPER_BOUND_DENOMINATOR_COEFFICIENTS" << endl;
+	for(size_t j = 0; j < denoms.size(); j++)
+	  cerr << denoms[j] << endl;
+      }
+
+      // use highest order acceptable approximation
       return upper_bound;
+
+    }
   }
   return -std::numeric_limits<double>::max();
 }
