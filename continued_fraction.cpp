@@ -576,13 +576,25 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
 // of terms
 void
 ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
-					const double max_value, const double step_size,
+					const double max_value, 
+					const double step_size,
 					vector<double> &estimates) const {
   const double hist_sum = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   estimates.clear();
   estimates.push_back(hist_sum);
   for (double t = step_size; t <= max_value; t += step_size)
     estimates.push_back(hist_sum + operator()(t));
+}
+
+void
+ContinuedFraction::extrapolate_saturation(const vector<double> &counts_hist,
+					  const double vals_sum,
+					  const double max_value,
+					  const double step_size,
+					  vector<double> &saturation_estimates) const {
+  saturation_estimates.clear();
+  for(double t = 0.0; t <= max_value; t += step_size)
+    saturation_estimates.push_back(complex_deriv(t)/vals_sum);
 }
 
 

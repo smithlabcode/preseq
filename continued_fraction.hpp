@@ -35,6 +35,11 @@ struct ContinuedFraction{
   void extrapolate_distinct(const std::vector<double> &counts_hist,
 			    const double max_value, const double step_size,
 			    std::vector<double> &estimates) const;
+  void extrapolate_saturation(const std::vector<double> &counts_hist,
+			      const double vals_sum,
+			      const double max_value, 
+			      const double step_size,
+			      std::vector<double> &saturation) const;
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
