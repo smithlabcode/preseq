@@ -239,6 +239,86 @@ check_saturation_estimates(const vector<double> estimates){
 }
 
 void
+bootstrap_saturation_deriv(const bool VERBOSE, const vector<double> &orig_values,
+			   const size_t bootstraps, const size_t orig_max_terms, 
+			   const int diagonal, const double step_size, 
+			   const double max_extrapolation, 
+			   const double max_val, const double val_step, 
+			   vector< vector<double> > &full_estimates){
+  full_estimates.clear();
+
+  //setup rng
+  srand(time(0) + getpid());
+  gsl_rng_env_setup();
+  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+  gsl_rng_set(rng, rand()); 
+
+  const size_t max_observed_count = 
+    static_cast<size_t>(*std::max_element(orig_values.begin(), 
+					  orig_values.end()));
+    
+  vector<double> orig_hist(max_observed_count + 1, 0.0);
+  for (size_t i = 0; i < orig_values.size(); ++i)
+    ++orig_hist[static_cast<size_t>(orig_values[i])];
+
+
+  const double vals_sum =
+     accumulate(orig_values.begin(), orig_values.end(), 0.0);
+
+  for (size_t iter = 0; 
+       iter < 2*bootstraps && full_estimates.size() < bootstraps; ++iter) {
+    
+    //    vector<double> boot_values;
+    //  resample_values(orig_values, rng, orig_values.size(), vals_sum, boot_values);
+    
+    //  const size_t max_observed_count = 
+    //     static_cast<size_t>(*std::max_element(boot_values.begin(), 
+    //					    boot_values.end()));
+    
+    // BUILD THE HISTOGRAM
+    //  vector<double> hist(max_observed_count + 1, 0.0);
+    //  for (size_t i = 0; i < boot_values.size(); ++i)
+    //   ++hist[static_cast<size_t>(boot_values[i])];
+
+    vector<double> hist;
+    resample_hist(orig_values, orig_hist, rng, vals_sum, 
+		  orig_values.size(), hist);
+    
+    //resize boot_hist to remove excess zeros
+    while(hist.back() == 0)
+      hist.pop_back();
+    
+    // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+    size_t counts_before_first_zero = 1;
+    while (counts_before_first_zero < hist.size() &&
+	   hist[counts_before_first_zero] > 0)
+      ++counts_before_first_zero;
+    
+    size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);
+    // refit curve for lower bound (degree of approx is 1 less than
+    // max_terms)
+    max_terms = max_terms - (max_terms % 2 == 0);
+    
+    //refit curve for lower bound
+    const ContinuedFractionApproximation 
+      lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
+    
+    const ContinuedFraction 
+      lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
+
+    vector<double> saturation_estimates;
+    if(lower_cf.is_valid())
+      lower_cf.extrapolate_yield_deriv(hist, vals_sum,
+				      max_val, val_step,
+				      saturation_estimates);
+    if(check_saturation_estimates(saturation_estimates))
+      full_estimates.push_back(saturation_estimates);
+
+  }
+  cerr << "deriv estimates size =" << full_estimates.size();
+}
+
+void
 bootstrap_saturation(const bool VERBOSE, const vector<double> &orig_values,
 		     const size_t bootstraps, const size_t orig_max_terms, 
 		     const int diagonal, const double step_size, 
@@ -304,17 +384,22 @@ bootstrap_saturation(const bool VERBOSE, const vector<double> &orig_values,
       lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
     
     const ContinuedFraction 
-      lower_cf(lower_cfa.optimal_continued_fraction(hist));
+      lower_cf(lower_cfa.optimal_cont_frac_satur(hist));
 
     vector<double> saturation_estimates;
-    if(lower_cf.is_valid())
+    if(lower_cf.is_valid()){
       lower_cf.extrapolate_saturation(hist, vals_sum,
 				      max_val, val_step,
 				      saturation_estimates);
+      saturation_estimates.insert(saturation_estimates.begin(),
+				  hist[1]/vals_sum);
+    }
     if(check_saturation_estimates(saturation_estimates))
       full_estimates.push_back(saturation_estimates);
 
   }
+
+  cerr << "cf estimates size = " << full_estimates.size() << endl;
 }
 
 void 
@@ -340,7 +425,7 @@ single_estimates(const bool VERBOSE, const vector<double> &hist,
     lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
     
   const ContinuedFraction 
-    lower_cf(lower_cfa.optimal_continued_fraction(hist));
+    lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
   if(lower_cf.is_valid())
     lower_cf.extrapolate_saturation(hist, vals_sum,
 				    max_val, val_step,
@@ -524,6 +609,13 @@ main(const int argc, const char **argv) {
       if(VERBOSE)
 	cerr << "[BOOTSTRAP ESTIMATES]" << endl;
 
+      vector< vector<double> > full_deriv_estimates;
+      bootstrap_saturation_deriv(VERBOSE, values,  
+			   bootstraps, orig_max_terms, diagonal, 
+			   step_size, max_extrapolation, 
+			   max_val, val_step, 
+			   full_deriv_estimates);
+
       vector< vector<double> > full_estimates;
       bootstrap_saturation(VERBOSE, values,  
 			   bootstraps, orig_max_terms, diagonal, 
@@ -532,7 +624,14 @@ main(const int argc, const char **argv) {
 			   full_estimates);
 
       if(VERBOSE)
-	cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
+	cerr << "[COMPUTING DERIV CONFIDENCE INTERVALS]" << endl;
+
+      vector<double> mean_deriv_estimates, upper_alphaCI_deriv, lower_alphaCI_deriv;
+      compute_mean_and_alphaCI(full_deriv_estimates, 1.0 - c_level,
+			       mean_deriv_estimates, lower_alphaCI_deriv,
+			       upper_alphaCI_deriv);
+
+      cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
 
       vector<double> mean_estimates, upper_alphaCI, lower_alphaCI;
       compute_mean_and_alphaCI(full_estimates, 1.0 - c_level,
@@ -556,7 +655,10 @@ main(const int argc, const char **argv) {
 	out << (val + 1.0)*values_sum << '\t' 
 	    << mean_estimates[i] << '\t'
 	    << lower_alphaCI[i] << '\t'
-	    << upper_alphaCI[i] << endl;
+	    << upper_alphaCI[i] << '\t'
+	    << mean_deriv_estimates[i] << '\t'
+	    << lower_alphaCI_deriv[i] << '\t' 
+	    << upper_alphaCI_deriv[i] << endl;
     }
     else{
       if(VERBOSE)

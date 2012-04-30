@@ -40,6 +40,12 @@ struct ContinuedFraction{
 			      const double max_value, 
 			      const double step_size,
 			      std::vector<double> &saturation) const;
+  void extrapolate_yield_deriv(const std::vector<double> &counts_hist,
+			       const double vals_sum,
+			       const double max_value, 
+			       const double step_size,
+			       std::vector<double> &saturation) const;
+
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
@@ -64,8 +70,11 @@ public:
   ContinuedFractionApproximation(const int di, const size_t mt, 
 				 const double ss, const double mv);
   
+  //find best cont frac approx
   ContinuedFraction
-  optimal_continued_fraction(const std::vector<double> &counts_hist) const;
+  optimal_cont_frac_yield(const std::vector<double> &counts_hist) const;
+  ContinuedFraction
+  optimal_cont_frac_satur(const std::vector<double> &counts_hist) const;
   
   double
   local_max(const ContinuedFraction &cf,

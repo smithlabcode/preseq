@@ -593,6 +593,18 @@ ContinuedFraction::extrapolate_saturation(const vector<double> &counts_hist,
 					  const double step_size,
 					  vector<double> &saturation_estimates) const {
   saturation_estimates.clear();
+  for(double t = step_size; t <= max_value; t += step_size)
+    saturation_estimates.push_back(operator()(t)/(t*vals_sum));
+}
+
+
+void
+ContinuedFraction::extrapolate_yield_deriv(const vector<double> &counts_hist,
+					   const double vals_sum,
+					   const double max_value,
+					   const double step_size,
+					   vector<double> &saturation_estimates) const {
+  saturation_estimates.clear();
   for(double t = 0.0; t <= max_value; t += step_size)
     saturation_estimates.push_back(complex_deriv(t)/vals_sum);
 }
@@ -681,9 +693,8 @@ ContinuedFractionApproximation::local_max(const ContinuedFraction &cf,
  * particular approximation (degrees of num and denom) at a specific
  * point
  */
-//remember to revert
 static bool
-check_estimates_stability(const vector<double> &estimates) {
+check_yield_estimates_stability(const vector<double> &estimates) {
   // make sure that the estimate is increasing in the time_step and
   // is below the initial distinct per step_size
   for (size_t i = 1; i < estimates.size(); ++i)
@@ -705,16 +716,17 @@ check_estimates_stability(const vector<double> &estimates) {
 
 /* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
  * continued fraction by checking for stability of estimates at
- * specific points.
+ * specific points for yield.
  */
 ContinuedFraction
-ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> &counts_hist) const {
+ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &counts_hist) const {
   //do this outside
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
 
   if(!(max_terms < counts_hist.size()))
-     cerr << "max_terms \t" << max_terms << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+     cerr << "max_terms \t" << max_terms 
+	  << "\tcounts_hist.size \t" << counts_hist.size() << endl;
   assert(max_terms < counts_hist.size());
 
   // counts_sum = number of total captures
@@ -735,7 +747,76 @@ ContinuedFractionApproximation::optimal_continued_fraction(const vector<double> 
     old_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
     
     // return the continued fraction if it is stable
-    if (check_estimates_stability(estimates))
+    if (check_yield_estimates_stability(estimates))
+      return old_cf;
+
+    // if not cf not acceptable, decrease degree
+    new_cf = old_cf.decrease_degree(old_cf, 2);
+    old_cf = new_cf;
+  }
+  
+  //  throw SMITHLABException("unable to fit continued fraction");
+  
+  // no stable continued fraction: return null
+  return ContinuedFraction();  
+}
+
+/* Checks if estimates are stable (derivative large) for the
+ * particular approximation (degrees of num and denom) at a specific
+ * point
+ */
+static bool
+check_satur_estimates_stability(const vector<double> &estimates) {
+  // make sure that the estimate is increasing in the time_step and
+  // is below the initial distinct per step_size
+  for (size_t i = 1; i < estimates.size(); ++i)
+    if (estimates[i] > estimates[i - 1] ||
+	estimates[i] < 0.0 ||
+	estimates[i] >= 1.0)
+      return false;
+  
+
+  // fake check
+  /*  for(size_t i = 1; i < estimates.size(); ++i)
+    if(estimates[i] < 0.0 || estimates[i] > 1e9)
+      return false;
+  */
+
+  return true;
+}
+
+/* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
+ * continued fraction by checking for stability of estimates at
+ * specific points for saturation estimates.
+ */
+ContinuedFraction
+ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &counts_hist) const { 
+
+  if(!(max_terms < counts_hist.size()))
+     cerr << "max_terms \t" << max_terms 
+	  << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+  assert(max_terms < counts_hist.size());
+
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    counts_sum += i*counts_hist[i];
+  
+  vector<double> ps_coeffs;
+  for (size_t j = 1; j < max_terms; j++)
+    ps_coeffs.push_back(counts_hist[j]*j*pow(-1, j + 1));
+
+  ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
+  ContinuedFraction new_cf;
+
+  while(old_cf.degree >= MIN_ALLOWED_DEGREE) {    
+    // compute the estimates for the desired set of points
+    vector<double> estimates;
+    old_cf.extrapolate_saturation(counts_hist, counts_sum,
+				  SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    
+    // return the continued fraction if it is stable
+    if (check_satur_estimates_stability(estimates))
       return old_cf;
 
     // if not cf not acceptable, decrease degree

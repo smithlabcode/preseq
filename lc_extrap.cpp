@@ -386,7 +386,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
     
     const ContinuedFraction 
-      lower_cf(lower_cfa.optimal_continued_fraction(hist));
+      lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
     
     vector<double> yield_estimates;
     if (lower_cf.is_valid())
@@ -444,7 +444,7 @@ single_estimates(bool VERBOSE, const vector<double> &hist,
     lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
     
   const ContinuedFraction 
-    lower_cf(lower_cfa.optimal_continued_fraction(hist));
+    lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
     
   if (lower_cf.is_valid())
     lower_cf.extrapolate_distinct(hist, max_val, 
