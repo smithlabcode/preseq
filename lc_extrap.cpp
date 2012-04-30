@@ -168,6 +168,7 @@ resample_values(const vector<double> &full_values,
 }
 */
 
+/*
 //sample histogram
 void
 resample_hist(const vector<double> &values,
@@ -227,6 +228,70 @@ resample_hist(const vector<double> &values,
   }
   assert(sample_hist_sum == total_sampled_reads);
 }
+*/
+
+void
+resample_hist(const vector<double> &vals_hist,
+	      const gsl_rng *rng,
+	      const double total_sampled_reads,
+	      double expected_sample_size,
+	      vector<double> &sample_hist){
+  sample_hist.resize(vals_hist.size());
+  double remaining = total_sampled_reads;
+  const double vals_mean = total_sampled_reads/expected_sample_size;
+ 
+  expected_sample_size /= 2.0;
+  vector<unsigned int> tmp(vals_hist.size());
+  gsl_ran_multinomial(rng, vals_hist.size(), expected_sample_size,
+		      &vals_hist.front(), &tmp.front());
+  double inc = 0.0;
+  for (size_t i = 0; i < tmp.size(); ++i)
+    inc += i*tmp[i];
+
+  vector<double> double_tmp(tmp.size());
+  for(size_t i = 0; i < tmp.size(); i++)
+    double_tmp[i] = static_cast<double>(tmp[i]);
+   // add the new stuff
+  transform(double_tmp.begin(), double_tmp.end(), sample_hist.begin(), 
+	    sample_hist.begin(), std::plus<double>());
+   // update the amount we still need to get
+  remaining -= inc;
+
+  while (remaining > 0 && inc > 0) {
+
+   // get a new sample
+    expected_sample_size = remaining/vals_mean;
+    expected_sample_size /= 2.0;
+    tmp.clear();
+    tmp.resize(vals_hist.size());
+    gsl_ran_multinomial(rng, vals_hist.size(), expected_sample_size,
+			&vals_hist.front(), &tmp.front());
+   // see how much we got
+    inc = 0.0;
+    for (size_t i = 0; i < tmp.size(); ++i)
+      inc += i*tmp[i];
+
+    // only add to histogram if sampled reads < remaining reads
+    if(inc <= remaining){
+      double_tmp.clear();
+      double_tmp.resize(tmp.size());
+      for(size_t i = 0; i < tmp.size(); i++)
+	double_tmp[i] = static_cast<double>(tmp[i]);
+   // add the new stuff
+      transform(double_tmp.begin(), double_tmp.end(), sample_hist.begin(),
+		sample_hist.begin(), std::plus<double>());
+   // update the amount we still need to get
+      remaining -= inc;
+    }
+
+  }
+
+  // just right
+  assert(remaining >= 0);
+  sample_hist[static_cast<size_t>(remaining)]++;
+
+}
+
 
 
 static bool
@@ -297,8 +362,9 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     //   ++hist[static_cast<size_t>(boot_values[i])];
 
     vector<double> hist;
-    resample_hist(orig_values, orig_hist, rng, vals_sum, 
-		  orig_values.size(), hist);
+
+    resample_hist(orig_hist, rng, vals_sum,
+		  static_cast<double>(orig_values.size()), hist);
     
     //resize boot_hist to remove excess zeros
     while(hist.back() == 0)
