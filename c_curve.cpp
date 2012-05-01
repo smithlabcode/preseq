@@ -1,9 +1,9 @@
-/*    complexity_plot: 
+/*    c_curve: 
  *
- *    Copyright (C) 2010 University of Southern California and
- *                       Andrew D. Smith and Timothy Dailey
+ *    Copyright (C) 2012 University of Southern California and
+ *                       Andrew D. Smith and Timothy Daley
  *
- *    Authors: Andrew D. Smith and Timothy Dailey
+ *    Authors: Andrew D. Smith and Timothy Daley
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -39,48 +39,91 @@ using std::sort;
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
 #include "api/BamAlignment.h"
+
 using BamTools::BamAlignment;
 using BamTools::SamHeader;
 using BamTools::RefVector;
 using BamTools::BamReader;
 using BamTools::RefData;
 
-static SimpleGenomicRegion
-BamAlignmentToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-				  const BamAlignment &ba) {
-  const unordered_map<size_t, string>::const_iterator 
-    the_chrom(chrom_lookup.find(ba.RefID));
-  if (the_chrom == chrom_lookup.end())
-    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-  
-  const string chrom = the_chrom->second;
-  const size_t start = ba.Position;
-  const size_t end = start + ba.Length;
-  return SimpleGenomicRegion(chrom, start, end);
+
+static GenomicRegion
+BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
+                  const BamAlignment &ba) {
+ const unordered_map<size_t, string>::const_iterator
+   the_chrom(chrom_lookup.find(ba.RefID));
+ if (the_chrom == chrom_lookup.end())
+   throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+
+ const string chrom = the_chrom->second;
+ const size_t start = ba.Position;
+ const size_t end = start + ba.Length;
+ return GenomicRegion(chrom, start, end, "X", 0, ba.strand);
 }
 
 
 static void
-ReadBAMFormatInput(const string &infile, vector<SimpleGenomicRegion> &read_locations) {
-  
-  BamReader reader;
-  reader.Open(infile);
-  
-  // Get header and reference
-  string header = reader.GetHeaderText();
-  RefVector refs = reader.GetReferenceData();
-  
-  unordered_map<size_t, string> chrom_lookup;
-  for (size_t i = 0; i < refs.size(); ++i)
-    chrom_lookup[i] = refs[i].RefName;
-  
-  BamAlignment bam;
-  while (reader.GetNextAlignment(bam))
-    read_locations.push_back(BamAlignmentToSimpleGenomicRegion(chrom_lookup, bam));
-  reader.Close();
+load_values_BAM(const string &infile, vector<double> &values) {
+
+ BamReader reader;
+ reader.Open(infile);
+
+ // Get header and reference
+ string header = reader.GetHeaderText();
+ RefVector refs = reader.GetReferenceData();
+
+ unordered_map<size_t, string> chrom_lookup;
+ for (size_t i = 0; i < refs.size(); ++i)
+   chrom_lookup[i] = refs[i].RefName;
+
+ size_t n_reads = 1;
+ values.push_back(1.0);
+
+ BamAlignment bam;
+ while (reader.GetNextAlignment(bam)) {
+   const GenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+   if (r < prev)
+     throw SMITHLABException("locations unsorted in: " + input_file_name);
+   if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
+       r.get_strand() != prev.get_strand())
+     values.push_back(1.0);
+   else values.back()++;
+   ++n_reads;
+   prev.swap(r);
+ }
+ reader.Close();
+ return n_reads;
 }
 #endif
 
+
+static size_t
+load_values(const string input_file_name, vector<double> &values) {
+
+ std::ifstream in(input_file_name.c_str());
+ if (!in)
+   throw "problem opening file: " + input_file_name;
+
+ GenomicRegion r, prev;
+ if (!(in >> prev))
+   throw "problem reading from: " + input_file_name;
+
+ size_t n_reads = 1;
+ values.push_back(1.0);
+ while (in >> r) {
+   if (r < prev)
+     throw SMITHLABException("locations unsorted in: " + input_file_name);
+   if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
+       r.get_strand() != prev.get_strand())
+     values.push_back(1.0);
+   else values.back()++;
+   ++n_reads;
+   prev.swap(r);
+ }
+ return n_reads;
+}
+
+/*
 static size_t
 sample_and_unique(const gsl_rng *rng,
 		  const size_t sample_size, 
@@ -96,6 +139,23 @@ sample_and_unique(const gsl_rng *rng,
     count += (regions[idx] != regions[prev_idx]);
     prev_idx = idx;
   }
+  return count;
+}
+*/
+
+static double
+sample_count_distinct(const gsl_rng *rng,
+		      const vector<size_t> &full_umis,
+		      const size_t sample_size){
+  vector<size_t> sample_umis(sample_size);
+  gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
+		 (size_t *)&full_umis.front(), full_umis.size(), 
+		 sizeof(size_t));
+  double count = 1.0;
+  for(size_t i = 1; i < sample_umis.size(); i++)
+    if(sample_umis[i] != sample_umis[i-1])
+      count++;
+
   return count;
 }
 
@@ -160,6 +220,8 @@ int main(int argc, const char **argv) {
     
     if (VERBOSE)
       cerr << "loading mapped locations" << endl;
+
+    /*
     vector<SimpleGenomicRegion> regions;
 #ifdef HAVE_BAMTOOLS
     if (BAM_FORMAT_INPUT)
@@ -170,13 +232,25 @@ int main(int argc, const char **argv) {
     ReadBEDFile(input_file_name, regions);
     if (!check_sorted(regions))
       throw SMITHLABException("regions not sorted");
-    
-    vector<size_t> orig(regions.size());
-    for (size_t i = 0; i < orig.size(); ++i)
-      orig[i] = i;
+    */
+
+
+    vector<double> values;
+
+#ifdef HAVE_BAMTOOLS
+    if (BAM_FORMAT_INPUT)
+      load_values_BAM(input_file_name, values);
+    else
+#endif
+
+    load_values(input_file_name, values);
+    vector<size_t> full_umis;
+    for(size_t i = 0; i < values.size(); i++)
+      for(size_t j = 0; j < values[i]; j++)
+	full_umis.push_back(i+1);
 
     if (upper_limit == 0)
-      upper_limit = orig.size();
+      upper_limit = full_umis.size();
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
@@ -186,7 +260,7 @@ int main(int argc, const char **argv) {
     for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;
-      out << i << "\t" << sample_and_unique(rng, i, orig, regions) << endl;
+      out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl;
     }
     
   }
