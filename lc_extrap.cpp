@@ -254,7 +254,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     vector<double> hist;
     resample_hist(rng, orig_hist, vals_sum,
 		  static_cast<double>(orig_values.size()), hist);
-    
+
     //resize boot_hist to remove excess zeros
     while (hist.back() == 0)
       hist.pop_back();
