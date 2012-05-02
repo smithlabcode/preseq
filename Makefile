@@ -29,7 +29,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  lc_extrap c_curve saturation_extrap
+PROGS =  lc_extrap c_curve 
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
@@ -60,8 +60,6 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
 lc_extrap: pade_approximant.o continued_fraction.o library_size_estimates.o
-
-saturation_extrap: continued_fraction.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
