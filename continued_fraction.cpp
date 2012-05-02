@@ -795,12 +795,9 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   size_t n_terms = local_max_terms - 1;
   
   ContinuedFraction old_cf(ps_coeffs, -2, n_terms);
-  cerr << "begin" << endl;
   while (n_terms > MIN_ALLOWED_DEGREE) {
-    cerr << n_terms << "\t";
     const double candidate = 
       local_max(old_cf, distinct_reads) + distinct_reads;
-    cerr << "local max\t";
     if (candidate < lower_bound) {
       lower_bound = candidate;
       optimal_cf = old_cf;
@@ -809,7 +806,6 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
     // decrease the degree of the continued fraction
     old_cf = old_cf.decrease_degree(old_cf, 2);
     n_terms = old_cf.degree;
-    cerr << "decrease degree" << endl;
   }
   
   return (lower_bound < upper_bound) ? 
