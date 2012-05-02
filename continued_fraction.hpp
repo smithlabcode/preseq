@@ -27,24 +27,30 @@
 #include <complex>
 #include <cassert>
 
-struct ContinuedFraction{
+struct ContinuedFraction {
   ContinuedFraction() {}
   ContinuedFraction(const std::vector<double> &ps_cf, 
 		    const int di, const size_t dg);
   double operator()(const double val) const;
-  void extrapolate_distinct(const std::vector<double> &counts_hist,
-			    const double max_value, const double step_size,
-			    std::vector<double> &estimates) const;
-  void extrapolate_saturation(const std::vector<double> &counts_hist,
-			      const double vals_sum,
-			      const double max_value, 
-			      const double step_size,
-			      std::vector<double> &saturation) const;
-  void extrapolate_yield_deriv(const std::vector<double> &counts_hist,
-			       const double vals_sum,
-			       const double max_value, 
-			       const double step_size,
-			       std::vector<double> &saturation) const;
+
+  void 
+  extrapolate_distinct(const std::vector<double> &counts_hist,
+		       const double max_value, const double step_size,
+		       std::vector<double> &estimates) const;
+  
+  void 
+  extrapolate_saturation(const std::vector<double> &counts_hist,
+			 const double vals_sum,
+			 const double max_value, 
+			 const double step_size,
+			 std::vector<double> &saturation) const;
+
+  void 
+  extrapolate_yield_deriv(const std::vector<double> &counts_hist,
+			  const double vals_sum,
+			  const double max_value, 
+			  const double step_size,
+			  std::vector<double> &saturation) const;
 
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
@@ -73,6 +79,7 @@ public:
   //find best cont frac approx
   ContinuedFraction
   optimal_cont_frac_yield(const std::vector<double> &counts_hist) const;
+
   ContinuedFraction
   optimal_cont_frac_satur(const std::vector<double> &counts_hist) const;
   
@@ -80,12 +87,14 @@ public:
   local_max(const ContinuedFraction &cf,
 	    const double deriv_upper_bound) const;
   double 
-  lowerbound_librarysize(const bool VERBOSE,
-			 const std::vector<double> &counts_hist,
+  lowerbound_librarysize(const std::vector<double> &counts_hist,
 			 const double upper_bound) const;
-  
+  double
+  lowerbound_librarysize(const std::vector<double> &counts_hist,
+			 const double upper_bound,
+			 ContinuedFraction &optimal_cf) const;
 private:
-
+  
   int diagonal_idx; // the diagonal to work with for estimates
   size_t max_terms; // the maximum number of terms to try for a CF
   double step_size; // the step size to use when training
@@ -94,10 +103,13 @@ private:
   double locate_zero_cf_deriv(const ContinuedFraction &cf, 
 			      const double val, const double prev_val) const;
   static const size_t MIN_ALLOWED_DEGREE = 6;
-  static const double SEARCH_MAX_VAL = 500; //largest value to search for lowerbound and stability
-  static const double SEARCH_STEP_SIZE = 0.02; //step size for search of lowerbound and stability
+  
+  // largest value to search for lowerbound and stability
+  static const double SEARCH_MAX_VAL = 500; 
+  
+  //step size for search of lowerbound and stability
+  static const double SEARCH_STEP_SIZE = 0.02; 
 
 };
-
 
 #endif

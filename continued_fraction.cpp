@@ -64,20 +64,20 @@ get_rescale_value(const complex<double> numerator, const complex<double> denomin
 // to bootstrap histogram
 static void
 resample_histogram(const vector<double> &hist_in,
-                  vector<double> &hist_out) {
+vector<double> &hist_out) {
 
- Runif rng;
- const double n_samples = std::accumulate(hist_in.begin(), hist_in.end(), 0.0);
+Runif rng;
+const double n_samples = std::accumulate(hist_in.begin(), hist_in.end(), 0.0);
 
- vector<double> cumulants(1, 0.0);
- for (size_t i = 0; i < hist_in.size(); ++i)
-   cumulants.push_back(cumulants.back() + hist_in[i]);
+vector<double> cumulants(1, 0.0);
+for (size_t i = 0; i < hist_in.size(); ++i)
+cumulants.push_back(cumulants.back() + hist_in[i]);
 
- hist_out.resize(hist_in.size(), 0.0);
- for (size_t i = 0; i < n_samples; ++i) {
-   const size_t idx = std::lower_bound(cumulants.begin(), cumulants.end(), rng.runif(0.0, n_samples)) - cumulants.begin();
-   hist_out[idx-1]++;
- }
+hist_out.resize(hist_in.size(), 0.0);
+for (size_t i = 0; i < n_samples; ++i) {
+const size_t idx = std::lower_bound(cumulants.begin(), cumulants.end(), rng.runif(0.0, n_samples)) - cumulants.begin();
+hist_out[idx-1]++;
+}
 }
 */
 
@@ -169,14 +169,14 @@ quotdiff_below_diagonal(const vector<double> &coeffs, const size_t offset,
 // and coeffs equal to the old, but decreased in degree
 ContinuedFraction
 ContinuedFraction::decrease_degree(const ContinuedFraction &CF,
-				   const size_t decrement){
+				   const size_t decrement) {
   // create return ContinuedFraction
   ContinuedFraction decreasedCF;
   // properties of orig CF to decrement
   vector<double> decreased_ps_coeffs(CF.ps_coeffs);
   vector<double> decreased_cf_coeffs(CF.cf_coeffs);
   // decrease order
-  for(size_t i = 0; i < decrement; i++){
+  for(size_t i = 0; i < decrement; i++) {
     decreased_ps_coeffs.pop_back();
     decreased_cf_coeffs.pop_back();
   }
@@ -703,14 +703,12 @@ check_yield_estimates_stability(const vector<double> &estimates) {
 	(i >= 2 && (estimates[i] - estimates[i - 1] >
 		    estimates[i - 1] - estimates[i - 2])))
       return false;
-  
 
   // fake check
   /*  for(size_t i = 1; i < estimates.size(); ++i)
-    if(estimates[i] < 0.0 || estimates[i] > 1e9)
+      if(estimates[i] < 0.0 || estimates[i] > 1e9)
       return false;
   */
-
   return true;
 }
 
@@ -725,9 +723,9 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
 
-  if(!(max_terms < counts_hist.size()))
-     cerr << "max_terms \t" << max_terms 
-	  << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+  if (!(max_terms < counts_hist.size()))
+    cerr << "max_terms \t" << max_terms 
+	 << "\tcounts_hist.size \t" << counts_hist.size() << endl;
   assert(max_terms < counts_hist.size());
 
   // counts_sum = number of total captures
@@ -742,7 +740,7 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
   ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
   ContinuedFraction new_cf;
 
-  while(old_cf.degree >= MIN_ALLOWED_DEGREE) {    
+  while (old_cf.degree >= MIN_ALLOWED_DEGREE) {    
     // compute the estimates for the desired set of points
     vector<double> estimates;
     old_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
@@ -779,7 +777,7 @@ check_satur_estimates_stability(const vector<double> &estimates) {
 
   // fake check
   /*  for(size_t i = 1; i < estimates.size(); ++i)
-    if(estimates[i] < 0.0 || estimates[i] > 1e9)
+      if(estimates[i] < 0.0 || estimates[i] > 1e9)
       return false;
   */
 
@@ -793,9 +791,9 @@ check_satur_estimates_stability(const vector<double> &estimates) {
 ContinuedFraction
 ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &counts_hist) const { 
 
-  if(!(max_terms < counts_hist.size()))
-     cerr << "max_terms \t" << max_terms 
-	  << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+  if (!(max_terms < counts_hist.size()))
+    cerr << "max_terms \t" << max_terms 
+	 << "\tcounts_hist.size \t" << counts_hist.size() << endl;
   assert(max_terms < counts_hist.size());
 
   // counts_sum = number of total captures
@@ -810,7 +808,7 @@ ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &co
   ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
   ContinuedFraction new_cf;
 
-  while(old_cf.degree >= MIN_ALLOWED_DEGREE) {    
+  while (old_cf.degree >= MIN_ALLOWED_DEGREE) {    
     // compute the estimates for the desired set of points
     vector<double> estimates;
     old_cf.extrapolate_saturation(counts_hist, counts_sum,
@@ -832,6 +830,8 @@ ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &co
 }
 
 
+  
+  
 /* library_yield = xp(x)/q(x), so if degree(q) > degree(p)+1, then
  * library_yield acts like 1/x^n for some n > 0 in the limit and
  * therefore goes to zero since it approximates the library yield in
@@ -839,9 +839,9 @@ ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &co
  * conservative approx, this is a lower bound on library_size
  */
 double
-ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
-						       const vector<double> &counts_hist,
-						       const double upper_bound) const {
+ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
+						       const double upper_bound,
+						       ContinuedFraction &optimal_cf) const {
   
   // the derivative must always be less than the number of distinct
   // reads in the initial sample
@@ -858,41 +858,40 @@ ContinuedFractionApproximation::lowerbound_librarysize(const bool VERBOSE,
   for (size_t j = 1; j < local_max_terms; j++)
     ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
   
-  // iterate over max_terms to find largest local max as lower bound
+  // Iterate over max_terms to find largest local max as lower bound
   // theortically larger max_terms will be better approximations ==>
   // larger lower bounds
-  double candidate_lower_bound = std::numeric_limits<double>::max();
+
+  double lower_bound = std::numeric_limits<double>::max();
   size_t n_terms = local_max_terms - 1;
+  
   ContinuedFraction old_cf(ps_coeffs, -2, n_terms);
   ContinuedFraction new_cf;
-  ContinuedFraction optimal_cf;
-
-  while(n_terms > MIN_ALLOWED_DEGREE) {
-    const double new_lower_bound = local_max(old_cf, distinct_reads) + distinct_reads;
-    if(new_lower_bound < candidate_lower_bound){
-      candidate_lower_bound = new_lower_bound;
-
+  
+  while (n_terms > MIN_ALLOWED_DEGREE) {
+    
+    const double candidate = 
+      local_max(old_cf, distinct_reads) + distinct_reads;
+    
+    if (candidate < lower_bound) {
+      lower_bound = candidate;
       optimal_cf = old_cf;
     }
-    // lower degree of ContinuedFraction
-    new_cf = old_cf.decrease_degree(old_cf, 2);
+    
+    // decrease the degree of the continued fraction
+    old_cf = old_cf.decrease_degree(old_cf, 2);
     n_terms = new_cf.degree;
-    old_cf = new_cf;
   }
+  
+  return (lower_bound < upper_bound) ? 
+    lower_bound : -std::numeric_limits<double>::max();
+}
 
-  if(VERBOSE){
-    cerr << "LOWER_BOUND_CONTINUED_FRACTION_OFFSET_COEFFS" << endl;
-    vector<double> off_coeffs(optimal_cf.offset_coeffs);
-    for(size_t j = 0; j < off_coeffs.size(); j++)
-      cerr << off_coeffs[j] << endl;
-    cerr << "LOWER_BOUND_CONTINUED_FRACTION_COEFF" << endl;
-    vector<double> cf_coefs(optimal_cf.cf_coeffs);
-    for(size_t j = 0; j < cf_coefs.size(); j++)
-      cerr << cf_coefs[j] << endl;
-  }
-
-  if(candidate_lower_bound < upper_bound)
-    return candidate_lower_bound;
-  else
-    return -std::numeric_limits<double>::max();
+double
+ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
+						       const double upper_bound) const {
+  ContinuedFraction optimal_cf;
+  const double r = lowerbound_librarysize(counts_hist, upper_bound, optimal_cf);  
+  
+  return r;
 }
