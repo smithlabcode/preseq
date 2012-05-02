@@ -662,13 +662,14 @@ ContinuedFractionApproximation::locate_zero_cf_deriv(const ContinuedFraction &cf
     val_mid = (val_low + val_high)/2.0;
     deriv_mid = cf.complex_deriv(val_mid);
     
-    if ((deriv_mid > 0 && deriv_low < 0) || (deriv_mid < 0 && deriv_low > 0))
+    if ((deriv_mid > 0 && deriv_low < 0) || (deriv_mid < 0 && deriv_low > 0)) {
       val_high = val_mid;
-    else val_low = val_mid;
-    
-    deriv_low = cf.complex_deriv(val_low);
-    deriv_high = cf.complex_deriv(val_high);
-    
+      deriv_high = deriv_mid;
+    }
+    else {
+      val_low = val_mid;
+      deriv_low = deriv_mid;
+    }
     diff = fabs((prev_deriv - deriv_mid)/prev_deriv);
     prev_deriv = deriv_mid;
   }
