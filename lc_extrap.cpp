@@ -350,8 +350,8 @@ single_estimates(bool VERBOSE, const vector<double> &hist,
 		 vector<double> &yield_estimates) {
 
   saturation_estimates.clear();
-  saturation_estimates.clear();
-
+  yield_estimates.clear();
+  
   // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
   size_t counts_before_first_zero = 1;
   while (counts_before_first_zero < hist.size() &&
