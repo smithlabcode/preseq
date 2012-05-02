@@ -126,8 +126,11 @@ load_values(const string input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
   while (in >> r) {
-    if (r < prev)
+    if (r < prev){
+      cerr << "current \t" << r << endl;
+      cerr << "prev \t" << prev << endl;
       throw SMITHLABException("locations unsorted in: " + input_file_name);
+    }
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
 	r.get_strand() != prev.get_strand())
       values.push_back(1.0);
