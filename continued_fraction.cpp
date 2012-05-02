@@ -802,7 +802,6 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
       lower_bound = candidate;
       optimal_cf = old_cf;
     }
-    cerr << lower_bound << "\t";
     // decrease the degree of the continued fraction
     old_cf = old_cf.decrease_degree(old_cf, 2);
     n_terms = old_cf.degree;

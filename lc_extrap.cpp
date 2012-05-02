@@ -419,6 +419,15 @@ compute_var(const vector<double> &estimates) {
   return variance; 
 }
 
+static double
+compute_var(const vector<double> &estimates,
+	    const double mean) {
+  double variance = 0.0;
+  for(size_t i = 0; i < estimates.size(); i++)
+    variance += (estimates[i] - mean)*(estimates[i] - mean)/estimates.size();
+  return variance; 
+}
+
 
 static inline double
 alpha_log_confint_multiplier(const double estimate,
@@ -460,6 +469,35 @@ return_median_and_ci(const vector<vector<double> > &estimates,
 			initial_distinct)/confint_multiplier);
   }
 }
+
+static void
+return_mean_and_logci(const vector<vector<double> > &estimates,
+		      const double alpha, vector<double> &mean_estimates,
+		      vector<double> &lower_ci, vector<double> &upper_ci) {
+  
+  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
+
+  for(size_t i = 0; i < estimates[0].size(); i++) {
+    // estimates is in wrong order, work locally on const val
+    vector<double> log_estimates_row(estimates.size(), 0.0);
+
+    for(size_t k = 0; k < log_estimates_row.size(); ++k)
+      log_estimates_row[k] = log(estimates[k][i]);
+
+    mean_estimates.push_back(exp(accumulate(log_estimates_row.begin(),
+					    log_estimates_row.end(), 0.0)/
+				 log_estimates_row.size()));
+    const double variance = compute_var(log_estimates_row,
+					log(mean_estimates.back()));
+
+    // log confidence intervals
+    upper_ci.push_back(exp(log(mean_estimates.back())
+			   + inv_norm_alpha*sqrt(variance)));
+    lower_ci.push_back(exp(log(mean_estimates.back())
+			   - inv_norm_alpha*sqrt(variance)));
+  }
+}
+
 
 
 static void
@@ -549,6 +587,8 @@ write_predicted_curve(const string outfile, const double values_sum,
 	<< yield_lower_ci[i] << '\t' 
 	<< yield_upper_ci[i] << endl;
 }
+
+
 
 int
 main(const int argc, const char **argv) {
@@ -700,11 +740,12 @@ main(const int argc, const char **argv) {
 			   initial_distinct, median_yield_estimates, 
 			   yield_lower_ci, yield_upper_ci);
       
-      vector<double> median_sat_estimates;
+      vector<double> mean_sat_estimates;
       vector<double> sat_upper_ci, sat_lower_ci;
-      return_median_and_ci(sat_estimates, 1.0 - c_level, 
-			   initial_distinct, median_sat_estimates, 
-			   sat_lower_ci, sat_upper_ci);
+      return_mean_and_logci(sat_estimates, 1.0 - c_level, 
+			    mean_sat_estimates, sat_lower_ci, 
+			    sat_upper_ci);
+
       
       if (VERBOSE) 
 	cerr << "[WRITING OUTPUT]" << endl;
@@ -726,10 +767,9 @@ main(const int argc, const char **argv) {
 		<< "LOWER_" << 100*c_level << "%CI" << "\t"
 		<< "UPPER_" << 100*c_level << "%CI" << endl;
 	double val = 0.0;
-	for (size_t i = 0; i < median_sat_estimates.size(); ++i, val += val_step)
-	  sat_out << fixed << setprecision(1) 
-		  << (val + 1.0)*values_sum << '\t' 
-		  << median_sat_estimates[i] << '\t'
+	for (size_t i = 0; i < mean_sat_estimates.size(); ++i, val += val_step)
+	  sat_out << (val + 1.0)*values_sum << '\t' 
+		  << mean_sat_estimates[i] << '\t'
 		  << sat_lower_ci[i] << '\t' << sat_upper_ci[i] << endl;
       }
     }
