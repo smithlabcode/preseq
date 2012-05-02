@@ -286,10 +286,10 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 				       val_step, sat_vector);
     }
     // SANITY CHECK
-    const bool ACCEPT_ESTIMATES = 
-      check_yield_estimates(yield_vector) && 
+    const bool ACCEPT_YIELD_ESTIMATES = check_yield_estimates(yield_vector);
+    const bool ACCEPT_SATURATION_ESTIMATES = 
       check_saturation_estimates(sat_vector);
-    if (ACCEPT_ESTIMATES) {
+    if (ACCEPT_YIELD_ESTIMATES && ACCEPT_SATURATION_ESTIMATES) {
       const double distinct = accumulate(hist.begin(), hist.end(), 0.0);
       const double upper_bound =
 	upperbound_librarysize(false, hist, lower_cf.return_degree()) + distinct;
@@ -304,9 +304,19 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	lower_bound_size.push_back(lower_bound);
 	if (VERBOSE) cerr << '.';
       }
-      else if (VERBOSE) cerr << '_';
+      else if (VERBOSE) {
+	cerr << '_';
+	if(!finite(lower_bound) || lower_bound <= 0)
+	  cerr << "lower_bound" << "\t" << lower_bound << endl;
+	else
+	  cerr << "upper_bound" << endl;
+      }
     }
-    else if (VERBOSE) cerr << '_';
+    else if (VERBOSE){
+      cerr << '_';
+      if(!ACCEPT_YIELD_ESTIMATES) cerr << "YIELD" << endl;
+      else if(!ACCEPT_SATURATION_ESTIMATES) cerr << "SATURATION" << endl;
+    }
     if (iter == 2*bootstraps - 1)
       throw SMITHLABException("too many iterations, poor sample");
   }
