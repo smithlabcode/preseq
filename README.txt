@@ -32,8 +32,9 @@ to make the programs.
 INPUT FILE FORMAT:
 ========================================================================
 Input files can be either in bed or bam file format.  The file should
-be sorted by chromosome, start position, end position, and strand.  
-Be sure the sorting is done with LANG="C" to ensure proper sorting.
+be sorted by chromosome, end position, start position, and finally 
+strand. Be sure the sorting is done with LANG="C" to ensure proper 
+sorting.
 
 USAGE EXAMPLES:
 ========================================================================
