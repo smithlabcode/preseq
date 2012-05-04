@@ -29,6 +29,12 @@ desired input is in .bam format, bamtools is required and is located
 at '/bamtools_loc/.  Type 'make all BAMTOOLS_ROOT=/bamtools_loc/'
 to make the programs.
 
+INPUT FILE FORMAT:
+========================================================================
+Input files can be either in bed or bam file format.  The file should
+be sorted by chromosome, start position, end position, and strand.  
+Be sure the sorting is done with LANG="C" to ensure proper sorting.
+
 USAGE EXAMPLES:
 ========================================================================
 Each program included in this software package will print a list of
