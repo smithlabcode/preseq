@@ -126,11 +126,8 @@ load_values(const string input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
   while (in >> r) {
-    if (r < prev){
-      cerr << "current \t" << r << endl;
-      cerr << "prev \t" << prev << endl;
+    if (r < prev)
       throw SMITHLABException("locations unsorted in: " + input_file_name);
-    }
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
 	r.get_strand() != prev.get_strand())
       values.push_back(1.0);
@@ -247,10 +244,9 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
   vector<double> orig_hist(max_observed_count + 1, 0.0);
   for (size_t i = 0; i < orig_values.size(); ++i)
     ++orig_hist[static_cast<size_t>(orig_values[i])];
-
-
+  
   const double vals_sum = accumulate(orig_values.begin(), orig_values.end(), 0.0);
-
+  
   for (size_t iter = 0; 
        iter < 2*bootstraps && yield_estimates.size() < bootstraps; ++iter) {
     
@@ -285,7 +281,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     if (lower_cf.is_valid()) {
       lower_cf.extrapolate_distinct(hist, max_val, 
 				    val_step, yield_vector);
-      lower_cf.extrapolate_yield_deriv(hist, vals_sum, max_val,
+      lower_cf.extrapolate_yield_deriv(hist, vals_sum, max_val, 
 				       val_step, sat_vector);
     }
     // SANITY CHECK
@@ -315,10 +311,12 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	  cerr << "upper_bound" << endl;
       }
     }
-    else if (VERBOSE){
-      cerr << '_';
-      if(!ACCEPT_YIELD_ESTIMATES) cerr << "YIELD" << endl;
-      else if(!ACCEPT_SATURATION_ESTIMATES) cerr << "SATURATION" << endl;
+    else if (VERBOSE) {
+      if (!ACCEPT_YIELD_ESTIMATES) 
+	cerr << 'Y';
+      else if(!ACCEPT_SATURATION_ESTIMATES) 
+	cerr << 'S';
+      else cerr << 'S';
     }
     if (iter == 2*bootstraps - 1)
       throw SMITHLABException("too many iterations, poor sample");

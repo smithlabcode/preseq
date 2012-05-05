@@ -60,28 +60,6 @@ get_rescale_value(const complex<double> numerator, const complex<double> denomin
   return 1.0;
 }
 
-/*
-// to bootstrap histogram
-static void
-resample_histogram(const vector<double> &hist_in,
-vector<double> &hist_out) {
-
-Runif rng;
-const double n_samples = std::accumulate(hist_in.begin(), hist_in.end(), 0.0);
-
-vector<double> cumulants(1, 0.0);
-for (size_t i = 0; i < hist_in.size(); ++i)
-cumulants.push_back(cumulants.back() + hist_in[i]);
-
-hist_out.resize(hist_in.size(), 0.0);
-for (size_t i = 0; i < n_samples; ++i) {
-const size_t idx = std::lower_bound(cumulants.begin(), cumulants.end(), rng.runif(0.0, n_samples)) - cumulants.begin();
-hist_out[idx-1]++;
-}
-}
-*/
-
-
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////
@@ -722,12 +700,9 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
   //do this outside
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
-
-  if (!(max_terms < counts_hist.size()))
-    cerr << "max_terms \t" << max_terms 
-	 << "\tcounts_hist.size \t" << counts_hist.size() << endl;
+  
   assert(max_terms < counts_hist.size());
-
+  
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
@@ -737,21 +712,19 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
   for (size_t j = 1; j < max_terms; j++)
     ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
 
-  ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
-  ContinuedFraction new_cf;
-
-  while (old_cf.degree >= MIN_ALLOWED_DEGREE) {    
+  ContinuedFraction curr_cf(ps_coeffs, diagonal_idx, max_terms - 1);
+  
+  while (curr_cf.degree >= MIN_ALLOWED_DEGREE) {    
     // compute the estimates for the desired set of points
     vector<double> estimates;
-    old_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    curr_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
     
     // return the continued fraction if it is stable
     if (check_yield_estimates_stability(estimates))
-      return old_cf;
-
+      return curr_cf;
+    
     // if not cf not acceptable, decrease degree
-    new_cf = old_cf.decrease_degree(old_cf, 2);
-    old_cf = new_cf;
+    curr_cf = ContinuedFraction::decrease_degree(curr_cf, 2);
   }
   
   //  throw SMITHLABException("unable to fit continued fraction");
@@ -759,7 +732,7 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
   // no stable continued fraction: return null
   return ContinuedFraction();  
 }
-  
+
   
 /* library_yield = xp(x)/q(x), so if degree(q) > degree(p)+1, then
  * library_yield acts like 1/x^n for some n > 0 in the limit and
@@ -790,21 +763,21 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   // Iterate over max_terms to find largest local max as lower bound
   // theortically larger max_terms will be better approximations ==>
   // larger lower bounds
-
+  
   double lower_bound = std::numeric_limits<double>::max();
   size_t n_terms = local_max_terms - 1;
   
-  ContinuedFraction old_cf(ps_coeffs, -2, n_terms);
+  ContinuedFraction curr_cf(ps_coeffs, -2, n_terms);
   while (n_terms > MIN_ALLOWED_DEGREE) {
     const double candidate = 
-      local_max(old_cf, distinct_reads) + distinct_reads;
+      local_max(curr_cf, distinct_reads) + distinct_reads;
     if (candidate < lower_bound) {
       lower_bound = candidate;
-      optimal_cf = old_cf;
+      optimal_cf = curr_cf;
     }
     // decrease the degree of the continued fraction
-    old_cf = old_cf.decrease_degree(old_cf, 2);
-    n_terms = old_cf.degree;
+    curr_cf = ContinuedFraction::decrease_degree(curr_cf, 2);
+    n_terms = curr_cf.degree;
   }
   
   return (lower_bound < upper_bound) ? 
