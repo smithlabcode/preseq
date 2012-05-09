@@ -43,21 +43,28 @@ options if executed without any command line arguments. Many of the
 programs use similar options (for example, output files are specified
 with '-o'). To predict the yield of a future experiment, use lc_extrap.
 For the most basic usage of lc_extrap to bound the number
-of distinct reads and compute the expected yield, use the command:
+of distinct reads, compute the expected yield, and compute the 
+expected saturation, use the command:
 
-  lc_extrap -o yield_estimates.txt -L size_estimates.txt input.bed
+  lc_extrap -o yield_estimates.txt -L size_estimates.txt 
+    -S saturation_estimates input.bed
 
 If the input file is in .bam format, use the command:
 
-  lc_extrap -B -o yield_estimates.txt -L size_estimates.txt input.bed
+  lc_extrap -B -o yield_estimates.txt -L size_estimates.txt 
+    -S saturation_estimates.txt input.bed
 
 The yield estimates will appear in yield_estimates.txt, and will be a 
-column of future experiment sizes in total_reads, a column of the 
-corresponding expected distinct reads in average_distinct, followed by 
-two columns giving the corresponding confidence intervals.  The bounds 
+column of future experiment sizes in TOTAL_READS, a column of the 
+corresponding expected distinct reads in EXPECTED_DISTINCT, followed by 
+two columns giving the corresponding confidence intervals.  Similarly
+the saturation estimates will appear in saturation_estimates.txt.  
+This will be a column of future experiment sizes in TOTAL_READS, a
+column of the saturation estimates in SATURATION, followed by two
+columns giving the corresponding confidence intervals. The bounds 
 on the number of distinct reads will appear as size_estimates.txt, and 
 will give a column giving the upper and lower bounds, and corresponding 
-confidence intervals.
+confidence intervals. 
 
 To investigate the past yield of an experiment, use c_curve.  For the
 most basic usage, use the command:

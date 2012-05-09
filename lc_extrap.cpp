@@ -576,7 +576,7 @@ write_predicted_curve(const string outfile, const double values_sum,
   if (!outfile.empty()) of.open(outfile.c_str());
   ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
   
-  out << "#TOTAL_READS\tEXPECTED_DISTINCT\t"
+  out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
       << "LOWER_" << 100*c_level << "%CI\t"
       << "UPPER_" << 100*c_level << "%CI" << endl;
   
@@ -810,7 +810,7 @@ main(const int argc, const char **argv) {
       
       if (!saturation_outfile.empty()) {
 	ofstream sat_out(saturation_outfile.c_str());
-	sat_out << "#TOTAL_REANDS" << "\t"
+	sat_out << "TOTAL_REANDS" << "\t"
 		<< "SATURATION" << endl;
 	val = 0.0;
 	for (size_t i = 0; i < sat_estimates.size(); ++i, val += val_step)
