@@ -1,4 +1,5 @@
-/*    c_curve: 
+/*    c_curve: plot a complexity curve by subsamping sequenced reads
+ *    and counting UMIs
  *
  *    Copyright (C) 2012 University of Southern California and
  *                       Andrew D. Smith and Timothy Daley
@@ -19,22 +20,21 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iomanip>
+#include <numeric>
 #include <fstream>
+
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "GenomicRegion.hpp"
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <iomanip>
-#include <numeric>
 
 using std::string;
 using std::vector;
-using std::ostream;
 using std::endl;
 using std::cerr;
-using std::sort;
 
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
@@ -111,7 +111,7 @@ load_values(const string input_file_name, vector<double> &values) {
  size_t n_reads = 1;
  values.push_back(1.0);
  while (in >> r) {
-    if (r < prev){
+    if (r < prev) {
       cerr << "current " << r << endl;
       cerr << "prev " << prev << endl;
       throw SMITHLABException("locations unsorted in: " + input_file_name);
@@ -126,36 +126,17 @@ load_values(const string input_file_name, vector<double> &values) {
  return n_reads;
 }
 
-/*
-static size_t
-sample_and_unique(const gsl_rng *rng,
-		  const size_t sample_size, 
-		  const vector<size_t> &orig,
-		  const vector<SimpleGenomicRegion> &regions) {
-  vector<size_t> sample(sample_size);
-  gsl_ran_choose(rng, (size_t *)&sample.front(), sample_size, 
-		 (size_t *)&orig.front(), orig.size(), sizeof(size_t));
-  size_t count = 1;
-  size_t prev_idx = sample.front();
-  for (size_t i = 1; i < sample.size(); ++i) {
-    const size_t idx = sample[i];
-    count += (regions[idx] != regions[prev_idx]);
-    prev_idx = idx;
-  }
-  return count;
-}
-*/
 
 static double
 sample_count_distinct(const gsl_rng *rng,
 		      const vector<size_t> &full_umis,
-		      const size_t sample_size){
+		      const size_t sample_size) {
   vector<size_t> sample_umis(sample_size);
   gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
 		 (size_t *)&full_umis.front(), full_umis.size(), 
 		 sizeof(size_t));
   double count = 1.0;
-  for(size_t i = 1; i < sample_umis.size(); i++)
+  for (size_t i = 1; i < sample_umis.size(); i++)
     if(sample_umis[i] != sample_umis[i-1])
       count++;
 
@@ -176,8 +157,9 @@ int main(int argc, const char **argv) {
 
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse("c_curve", "",
-			   "<sorted-bed-file> or <sorted-bam-file>");
+    OptionParser opt_parse("c_curve", "plot a complexity curve by subsamping "
+			   "sequenced reads and counting UMIs",
+			   "<bed-file|bam-file>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
     //    opt_parse.add_opt("lower", 'l', "lower limit for samples", 
@@ -192,7 +174,6 @@ int main(int argc, const char **argv) {
     opt_parse.add_opt("bam", 'b', "input is in BAM format", 
 		      false , BAM_FORMAT_INPUT);
 #endif
-
 
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -224,41 +205,26 @@ int main(int argc, const char **argv) {
     if (VERBOSE)
       cerr << "loading mapped locations" << endl;
 
-    /*
-    vector<SimpleGenomicRegion> regions;
-#ifdef HAVE_BAMTOOLS
-    if (BAM_FORMAT_INPUT)
-      ReadBAMFormatInput(input_file_name, regions);
-    else 
-#endif
-
-    ReadBEDFile(input_file_name, regions);
-    if (!check_sorted(regions))
-      throw SMITHLABException("regions not sorted");
-    */
-
-
     vector<double> values;
-
 #ifdef HAVE_BAMTOOLS
     if (BAM_FORMAT_INPUT)
       load_values_BAM(input_file_name, values);
     else
 #endif
-
+      
     load_values(input_file_name, values);
     vector<size_t> full_umis;
-    for(size_t i = 0; i < values.size(); i++)
-      for(size_t j = 0; j < values[i]; j++)
+    for (size_t i = 0; i < values.size(); i++)
+      for (size_t j = 0; j < values[i]; j++)
 	full_umis.push_back(i+1);
-
+    
     if (upper_limit == 0)
       upper_limit = full_umis.size();
-
+    
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
-    ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-
+    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+    
     out << "total_reads" << "\t" << "distinct_reads" << endl;
     for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
       if (VERBOSE)
