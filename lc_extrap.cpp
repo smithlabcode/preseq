@@ -1,7 +1,7 @@
 /*    lc_extrap:
  *
  *    Copyright (C) 2012 University of Southern California and
- *                       Andrew D. Smith and Timothy Daley
+ *			 Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
  *
@@ -16,35 +16,31 @@
  *    GNU General Public License for more details.
  *
  *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *    along with this program.	If not, see <http://www.gnu.org/licenses/>.
  */
-
-#include "pade_approximant.hpp"
-#include "continued_fraction.hpp"
-#include "library_size_estimates.hpp"
-
-#include <OptionParser.hpp>
-#include <smithlab_utils.hpp>
-#include <GenomicRegion.hpp>
-#include <RNG.hpp>
-
-#include <smithlab_os.hpp>
-
-#include <gsl/gsl_cdf.h>
-#include <gsl/gsl_randist.h>
 
 #include <fstream>
 #include <numeric>
 #include <vector>
 
+#include <gsl/gsl_cdf.h>
+#include <gsl/gsl_randist.h>
+
+#include <OptionParser.hpp>
+#include <smithlab_utils.hpp>
+#include <GenomicRegion.hpp>
+#include <RNG.hpp>
+#include <smithlab_os.hpp>
+
+#include "pade_approximant.hpp"
+#include "continued_fraction.hpp"
+#include "library_size_estimates.hpp"
+
 using std::string;
 using std::vector;
-using std::count_if;
 using std::endl;
 using std::cerr;
 using std::max;
-using std::ostream;
-using std::ofstream;
 
 using std::setw;
 using std::fixed;
@@ -60,7 +56,6 @@ using BamTools::SamHeader;
 using BamTools::RefVector;
 using BamTools::BamReader;
 using BamTools::RefData;
-
 
 static GenomicRegion
 BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
@@ -114,15 +109,15 @@ load_values_BAM(const string &infile, vector<double> &values) {
 
 static size_t
 load_values(const string input_file_name, vector<double> &values) {
-
+  
   std::ifstream in(input_file_name.c_str());
   if (!in)
-    throw "problem opening file: " + input_file_name;
-
+    throw SMITHLABException("problem opening file: " + input_file_name);
+  
   GenomicRegion r, prev;
   if (!(in >> prev))
-    throw "problem reading from: " + input_file_name;
-
+    throw SMITHLABException("problem reading from: " + input_file_name);
+  
   size_t n_reads = 1;
   values.push_back(1.0);
   while (in >> r) {
@@ -508,10 +503,10 @@ write_bootstrap_size_info(const string size_outfile,
 			  const vector<double> &lower_libsize,
 			  const vector<double> &upper_libsize) {
   
-  ofstream st_of;
+  std::ofstream st_of;
   if (!size_outfile.empty()) 
     st_of.open(size_outfile.c_str());
-  ostream size_out(size_outfile.empty() ? cerr.rdbuf() : st_of.rdbuf());
+  std::ostream size_out(size_outfile.empty() ? cerr.rdbuf() : st_of.rdbuf());
       
   const double cf_upper_size_var = compute_var(upper_libsize);
   const double cf_upper_size_mean = 
@@ -572,9 +567,9 @@ write_predicted_curve(const string outfile, const double values_sum,
 		      const vector<double> &median_yield_estimates,
 		      const vector<double> &yield_lower_ci,
 		      const vector<double> &yield_upper_ci) {
-  ofstream of;
+  std::ofstream of;
   if (!outfile.empty()) of.open(outfile.c_str());
-  ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+  std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
   
   out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
       << "LOWER_" << 100*c_level << "%CI\t"
@@ -612,7 +607,7 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    //  bool SMOOTH_HISTOGRAM = false;  
+    //	bool SMOOTH_HISTOGRAM = false;	
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -624,14 +619,13 @@ main(const int argc, const char **argv) {
 			   "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
-    opt_parse.add_opt("LIBRARY_SIZE", 'L', "library size output file", 
+    opt_parse.add_opt("libsize", 'L', "library size output file", 
 		      false , size_outfile);
-    opt_parse.add_opt("SATURATION", 'S', "saturation output file",
+    opt_parse.add_opt("satfile", 'S', "saturation output file",
 		      false, saturation_outfile);
-    opt_parse.add_opt("extrapolation_length",'e',
-		      "maximum extrapolation length "
+    opt_parse.add_opt("extrap",'e',"maximum extrapolation "
 		      "(default: " + toa(max_extrapolation) + ")",
-                      false, max_extrapolation);
+		      false, max_extrapolation);
     opt_parse.add_opt("step",'s',"step size in extrapolations "
 		      "(default: " + toa(step_size) + ")", 
 		      false, step_size);
@@ -639,9 +633,9 @@ main(const int argc, const char **argv) {
 		      "(default: " + toa(bootstraps) + "), "
 		      "set to 0 or 1 for single estimate",
 		      false, bootstraps);
-    opt_parse.add_opt("c_level", 'c', "level for confidence intervals "
+    opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
-    //  opt_parse.add_opt("terms",'t',"maximum number of terms", false, 
+    //	opt_parse.add_opt("terms",'t',"maximum number of terms", false, 
     //	     orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
@@ -701,8 +695,8 @@ main(const int argc, const char **argv) {
       ++counts_hist[static_cast<size_t>(values[i])];
     
     const size_t distinct_counts = 
-      static_cast<size_t>(count_if(counts_hist.begin(), counts_hist.end(),
-				   bind2nd(std::greater<double>(), 0.0)));
+      static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
+					bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
       cerr << "TOTAL READS     = " << values_sum << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
@@ -762,7 +756,7 @@ main(const int argc, const char **argv) {
 				  lower_libsize, upper_libsize);
       
       if (!saturation_outfile.empty()) {
-	ofstream sat_out(saturation_outfile.c_str());
+	std::ofstream sat_out(saturation_outfile.c_str());
 	sat_out << "#TOTAL_REANDS" << "\t"
 		<< "SATURATION" << "\t"
 		<< "LOWER_" << 100*c_level << "%CI" << "\t"
@@ -775,7 +769,7 @@ main(const int argc, const char **argv) {
       }
     }
     // if there are not enough bootstraps, do single estimate
-    else{
+    else {
       
       if (VERBOSE)
 	cerr << "[ESTIMATING]" << endl;
@@ -789,9 +783,9 @@ main(const int argc, const char **argv) {
       if (VERBOSE) 
 	cerr << "[WRITING OUTPUT]" << endl;
       
-      ofstream of;
+      std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
-      ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out << "#TOTAL_READS\tEXPECTED_DISTINCT" <<  endl;
       double val = 0.0;
@@ -800,16 +794,17 @@ main(const int argc, const char **argv) {
 	    << yield_estimates[i] << endl;
       
       if (VERBOSE || !size_outfile.empty()) {
-	ofstream st_of;
+	std::ofstream st_of;
 	if (!size_outfile.empty()) 
 	  st_of.open(size_outfile.c_str());
-	ostream size_out(size_outfile.empty() ? cerr.rdbuf() : st_of.rdbuf());
+	std::ostream size_out(size_outfile.empty() ? 
+			      cerr.rdbuf() : st_of.rdbuf());
 	size_out << "UPPER_BOUND\t" << upper_bound << endl
 		 << "LOWER_BOUND\t" << lower_bound << endl;
       }
       
       if (!saturation_outfile.empty()) {
-	ofstream sat_out(saturation_outfile.c_str());
+	std::ofstream sat_out(saturation_outfile.c_str());
 	sat_out << "TOTAL_REANDS" << "\t"
 		<< "SATURATION" << endl;
 	val = 0.0;
