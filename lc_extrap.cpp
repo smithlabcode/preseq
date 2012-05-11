@@ -301,13 +301,14 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	if (VERBOSE) cerr << '.';
       }
       else if (VERBOSE)
-	cerr << (!finite(lower_bound) || lower_bound <= 0) ? 'L' : 'U';
+	cerr << ((!finite(lower_bound) || lower_bound <= 0) ? 'L' : 'U');
     }
     else if (VERBOSE) {
       if (!ACCEPT_YIELD_ESTIMATES) 
 	cerr << 'Y';
       else if(!ACCEPT_SATURATION_ESTIMATES) 
 	cerr << 'S';
+      else cerr << '_';
     }
   }
   if (VERBOSE)
