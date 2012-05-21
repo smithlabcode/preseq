@@ -662,6 +662,7 @@ main(const int argc, const char **argv) {
 					bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
       cerr << "TOTAL READS     = " << values_sum << endl
+	   << "DISTINCT READS  = " << values.size() << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
 	   << "COUNTS OF 1     = " << counts_hist[1] << endl
