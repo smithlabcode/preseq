@@ -236,8 +236,8 @@ evaluate_above_diagonal(const vector<double> &cf_coeffs,
   for (size_t i = 0; i < offset_coeffs.size(); i++)
     offset_part += offset_coeffs[i]*pow(val, i);
   
-  return val*(offset_part + pow(val, min(depth, offset_coeffs.size()))*
-	      current_num/current_denom);
+  return offset_part + pow(val, min(depth, offset_coeffs.size()))*
+    current_num/current_denom;
 } 
 
 
@@ -286,7 +286,7 @@ evaluate_below_diagonal(const vector<double> &cf_coeffs,
     offset_terms += offset_coeffs[i]*pow(val, i);
   
   // recall that if lower_offset > 0, we are working with 1/f, invert approx
-  return val/(offset_terms + pow(val, min(offset_coeffs.size(),depth))*
+  return 1.0/(offset_terms + pow(val, min(offset_coeffs.size(),depth))*
 	      current_num/current_denom);
 }
 
@@ -328,7 +328,7 @@ evaluate_on_diagonal(const vector<double> &cf_coeffs,
     prev_denom1 = prev_denom1*rescale_val;
     prev_denom2 = prev_denom2*rescale_val;
   }
-  return val*current_num/current_denom;
+  return current_num/current_denom;
 }
 
 
@@ -392,7 +392,7 @@ evaluate_complex_on_diagonal(const vector<double> &cf_coeffs,
       prev_denom1 = prev_denom1*rescale_val;
       prev_denom2 = prev_denom2*rescale_val;
     }
-    approx = perturbed_val*current_num/current_denom;
+    approx = current_num/current_denom;
   }
 }
 
@@ -445,7 +445,7 @@ evaluate_complex_above_diagonal(const vector<double> &cf_coeffs,
     for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
       offset_terms += offset_coeffs[i]*pow(perturbed_val, i);
     
-    approx = perturbed_val*
+    approx = 
       (offset_terms + pow(perturbed_val, min(offset_coeffs.size(), depth))*
        current_num/current_denom);
   }
@@ -499,7 +499,7 @@ evaluate_complex_below_diagonal(const vector<double> &cf_coeffs,
     for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
       offset_terms += offset_coeffs[i]*pow(perturbed_val, i);
 
-    approx = perturbed_val/
+    approx = 1.0/
       (offset_terms + pow(perturbed_val, min(offset_coeffs.size(), depth))*
        current_num/current_denom);
   }
@@ -561,7 +561,7 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
   estimates.clear();
   estimates.push_back(hist_sum);
   for (double t = step_size; t <= max_value; t += step_size)
-    estimates.push_back(hist_sum + operator()(t));
+    estimates.push_back(hist_sum + t*operator()(t));
 }
 
 void
@@ -572,7 +572,7 @@ ContinuedFraction::extrapolate_saturation(const vector<double> &counts_hist,
 					  vector<double> &saturation_estimates) const {
   saturation_estimates.clear();
   for(double t = step_size; t <= max_value; t += step_size)
-    saturation_estimates.push_back(operator()(t)/(t*vals_sum));
+    saturation_estimates.push_back(operator()(t)/vals_sum);
 }
 
 
@@ -583,8 +583,10 @@ ContinuedFraction::extrapolate_yield_deriv(const vector<double> &counts_hist,
 					   const double step_size,
 					   vector<double> &saturation_estimates) const {
   saturation_estimates.clear();
-  for(double t = 0.0; t <= max_value; t += step_size)
-    saturation_estimates.push_back(complex_deriv(t)/vals_sum);
+  saturation_estimates.push_back(counts_hist[1]/vals_sum);
+  for(double t = step_size; t <= max_value; t += step_size)
+    saturation_estimates.push_back((operator()(t) 
+				    + t*complex_deriv(t)/vals_sum);
 }
 
 
@@ -618,6 +620,7 @@ movement(const double a, const double b) {
 /* locate zero deriv by bisection to find local max within (prev_val,
    val)
 */ 
+// need to modify to account for change in evaluating
 double
 ContinuedFractionApproximation::locate_zero_cf_deriv(const ContinuedFraction &cf, 
 						     const double val, 
