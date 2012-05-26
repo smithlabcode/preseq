@@ -33,9 +33,7 @@
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
-#include "pade_approximant.hpp"
 #include "continued_fraction.hpp"
-#include "library_size_estimates.hpp"
 
 using std::string;
 using std::vector;
@@ -217,15 +215,9 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, 
 		    const double max_val, const double val_step, 
-		    vector<double> &lower_bound_size,
-		    vector<double> &upper_bound_size,
-		    vector< vector<double> > &sat_estimates,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
-  upper_bound_size.clear();
-  lower_bound_size.clear();
   yield_estimates.clear();
-  sat_estimates.clear();
   
   //setup rng
   srand(time(0) + getpid());
@@ -273,43 +265,20 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     
     vector<double> yield_vector;
     vector<double> sat_vector;
-    if (lower_cf.is_valid()) {
+    if (lower_cf.is_valid()) 
       lower_cf.extrapolate_distinct(hist, max_val, 
 				    val_step, yield_vector);
-      lower_cf.extrapolate_yield_deriv(hist, vals_sum, max_val, 
-				       val_step, sat_vector);
-    }
+
     
-    // SANITY CHECK
-    const bool ACCEPT_YIELD_ESTIMATES = check_yield_estimates(yield_vector);
-    const bool ACCEPT_SATURATION_ESTIMATES = 
-      check_saturation_estimates(sat_vector);
     
-    if (ACCEPT_YIELD_ESTIMATES && ACCEPT_SATURATION_ESTIMATES) {
-      
-      const double distinct = accumulate(hist.begin(), hist.end(), 0.0);
-      const double upper_bound =
-	upperbound_librarysize(false, hist, lower_cf.return_degree()) + distinct;
-      const double lower_bound = 
-	lower_cfa.lowerbound_librarysize(hist, upper_bound);
-      
-      if (finite(lower_bound) && lower_bound > 0 && finite(upper_bound)) {
-	yield_estimates.push_back(yield_vector);
-	sat_estimates.push_back(sat_vector);
-	upper_bound_size.push_back(upper_bound);
-	lower_bound_size.push_back(lower_bound);
+    // SANITY CHECK    
+    if (check_yield_estimates(yield_vector)) {
+      yield_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
-      }
-      else if (VERBOSE)
-	cerr << ((!finite(lower_bound) || lower_bound <= 0) ? 'L' : 'U');
     }
-    else if (VERBOSE) {
-      if (!ACCEPT_YIELD_ESTIMATES) 
-	cerr << 'Y';
-      else if(!ACCEPT_SATURATION_ESTIMATES) 
-	cerr << 'S';
-      else cerr << '_';
-    }
+    else if (VERBOSE) 
+      cerr << '_';
+    
   }
   if (VERBOSE)
     cerr << endl;
@@ -322,11 +291,8 @@ single_estimates(const bool VERBOSE, const vector<double> &hist,
 		 size_t max_terms, const int diagonal, const double vals_sum,
 		 const double step_size, const double max_extrapolation, 
 		 const double max_val, const double val_step,
-		 double &upper_bound, double &lower_bound,
-		 vector<double> &sat_estimates,
 		 vector<double> &yield_estimates) {
 
-  sat_estimates.clear();
   yield_estimates.clear();
   
   // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
@@ -349,12 +315,10 @@ single_estimates(const bool VERBOSE, const vector<double> &hist,
   const ContinuedFraction 
     lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
     
-  if (lower_cf.is_valid()) {
+  if (lower_cf.is_valid()) 
     lower_cf.extrapolate_distinct(hist, max_val, 
 				  val_step, yield_estimates);
-    lower_cf.extrapolate_yield_deriv(hist, vals_sum, max_val,
-				     val_step, sat_estimates);
-  }
+
 
   if (VERBOSE) {
     cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
@@ -367,32 +331,9 @@ single_estimates(const bool VERBOSE, const vector<double> &hist,
   }
   
   // SANITY CHECK
-  if (check_yield_estimates(yield_estimates) && 
-      check_saturation_estimates(sat_estimates)) {
-      
-    const double distinct = accumulate(hist.begin(), hist.end(), 0.0);
-    upper_bound = upperbound_librarysize(VERBOSE, hist, 
-					 lower_cf.return_degree()) + distinct;
-    ContinuedFraction lb_opt;
-    lower_bound = lower_cfa.lowerbound_librarysize(hist, upper_bound, lb_opt);
-    
-    if (VERBOSE) {
-      cerr << "CF_LB_OFFSET_COEFFS" << endl;
-      copy(lb_opt.offset_coeffs.begin(), lb_opt.offset_coeffs.end(),
-	   std::ostream_iterator<double>(cerr, "\n"));
-      
-      cerr << "CF_LB_COEFFS" << endl;
-      copy(lb_opt.cf_coeffs.begin(), lb_opt.cf_coeffs.end(),
-	   std::ostream_iterator<double>(cerr, "\n"));
-    }
-    
-    // error if bounds are unacceptable
-    if (!finite(upper_bound))
-      cerr << "UPPER_BOUND INFINITE" << endl;
-    if (!finite(lower_bound) || lower_bound <= 0.0)
-      cerr << "LOWER_BOUND UNACCEPTABLE" << endl;
-  }
-  else cerr << "ESTIMATES UNSTABLE, MORE DATA REQUIRED" << endl;
+  if (!check_yield_estimates(yield_estimates)) 
+    cerr << "ESTIMATES UNSTABLE, MORE DATA REQUIRED" << endl;
+
 }
 
 
@@ -441,89 +382,6 @@ return_median_and_ci(const vector<vector<double> > &estimates,
 
 
 static void
-return_mean_and_logci(const vector<vector<double> > &estimates,
-		      const double alpha, vector<double> &mean_estimates,
-		      vector<double> &lower_ci, vector<double> &upper_ci) {
-  
-  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
-  
-  const size_t n_est = estimates.size();
-  vector<double> log_estimates_row(n_est, 0.0);
-  for (size_t i = 0; i < estimates[0].size(); i++) {
-    
-    // estimates is in wrong order, work locally on const val
-    for (size_t k = 0; k < n_est; ++k)
-      log_estimates_row[k] = log(estimates[k][i]);
-    
-    const double log_mean = gsl_stats_mean(&log_estimates_row[0], 1, n_est);
-    const double sd = gsl_stats_sd_m(&log_estimates_row[0], 1, n_est, log_mean);
-    
-    // log confidence intervals
-    upper_ci.push_back(exp(log_mean + inv_norm_alpha*sd));
-    lower_ci.push_back(exp(log_mean - inv_norm_alpha*sd));
-    
-    mean_estimates.push_back(std::exp(log_mean));
-  }
-}
-
-
-static void
-write_bootstrap_size_info(const string size_outfile, const double c_level,
-			  const double initial_distinct,
-			  const vector<double> &lower_libsize,
-			  const vector<double> &upper_libsize) {
-  
-  // COMPUTE ALL THE VALUES FOR THE UPPER BOUND
-  const double cf_ub_size_mean = 
-    gsl_stats_mean(&upper_libsize[0], 1, upper_libsize.size());
-  const double cf_ub_size_var = 
-    gsl_stats_variance_m(&upper_libsize[0], 1, upper_libsize.size(),
-			 cf_ub_size_mean);
-  
-  const double cf_ub_size_alpha_mltr = 
-    alpha_log_confint_multiplier(cf_ub_size_mean, initial_distinct, 
-				 cf_ub_size_var, 1.0 - c_level);
-  const double lib_size_ub_lower = initial_distinct + 
-    (cf_ub_size_mean - initial_distinct)/cf_ub_size_alpha_mltr;
-  const double lib_size_ub_upper = initial_distinct + 
-    (cf_ub_size_mean - initial_distinct)*cf_ub_size_alpha_mltr;
-  
-  // COMPUTE ALL THE VALUES FOR THE LOWER BOUND
-  const double cf_lb_size_mean = 
-    gsl_stats_mean(&lower_libsize[0], 1, lower_libsize.size());
-  const double cf_lb_size_var = 
-    gsl_stats_variance_m(&lower_libsize[0], 1, lower_libsize.size(), 
-			 cf_lb_size_mean);
-  
-  const double cf_lb_size_alpha_mltr = 
-    alpha_log_confint_multiplier(cf_lb_size_mean, initial_distinct, 
-				 cf_lb_size_var, 1.0 - c_level);
-  const double lib_size_lb_lower = initial_distinct + 
-    (cf_lb_size_mean - initial_distinct)/cf_lb_size_alpha_mltr;
-  const double lib_size_lb_upper = initial_distinct + 
-    (cf_lb_size_mean - initial_distinct)*cf_lb_size_alpha_mltr;
-  
-  // NOW OUTPUT EVERYTHING
-  std::ofstream st_of;
-  if (!size_outfile.empty()) 
-    st_of.open(size_outfile.c_str());
-  std::ostream size_out(size_outfile.empty() ? cerr.rdbuf() : st_of.rdbuf());
-  
-  size_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-  size_out.precision(0);
-  
-  size_out << "LIB_SIZE_BOUNDS: MEAN (" << 100*c_level << "%CI)" << endl
-	   << "UPPER:\t" << cf_ub_size_mean << "\t("
-	   << lib_size_ub_lower << ", " 
-	   << lib_size_ub_upper << ")" << endl
-	   << "LOWER\t" << cf_lb_size_mean << "\t("
-	   << lib_size_lb_lower << ", " 
-	   << lib_size_lb_upper << ")" << endl;
-}
-
-
-
-static void
 write_predicted_curve(const string outfile, const double values_sum,
 		      const double c_level, const double val_step,
 		      const vector<double> &median_yield_estimates,
@@ -558,10 +416,8 @@ main(const int argc, const char **argv) {
 
     /* FILES */
     string outfile;
-    string size_outfile;
-    string saturation_outfile;
     
-    size_t orig_max_terms = 200;
+    size_t orig_max_terms = 1000;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
     size_t bootstraps = 100;
@@ -582,10 +438,6 @@ main(const int argc, const char **argv) {
 			   "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
-    opt_parse.add_opt("libsize", 'L', "library size output file", 
-		      false , size_outfile);
-    opt_parse.add_opt("satfile", 'S', "saturation output file",
-		      false, saturation_outfile);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation "
 		      "(default: " + toa(max_extrapolation) + ")",
 		      false, max_extrapolation);
@@ -689,8 +541,7 @@ main(const int argc, const char **argv) {
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
 			diagonal, step_size, max_extrapolation, 
-			max_val, val_step, lower_libsize, upper_libsize,
-			sat_estimates, yield_estimates);
+			max_val, val_step, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -703,11 +554,6 @@ main(const int argc, const char **argv) {
     vector<double> yield_upper_ci, yield_lower_ci;
     return_median_and_ci(yield_estimates, 1.0 - c_level, initial_distinct, 
 			 median_yield_estimates, yield_lower_ci, yield_upper_ci);
-    
-    vector<double> mean_sat_estimates;
-    vector<double> sat_upper_ci, sat_lower_ci;
-    return_mean_and_logci(sat_estimates, 1.0 - c_level, mean_sat_estimates, 
-			  sat_lower_ci, sat_upper_ci);
 
     
     /////////////////////////////////////////////////////////////////////
@@ -722,23 +568,7 @@ main(const int argc, const char **argv) {
       
     // IF VERBOSE OUTPUT IS REQUESTED, OR IF STATS ARE REQUESTED IN A
     // FILE, PRINT THEM!!
-    if (VERBOSE || !size_outfile.empty())
-      write_bootstrap_size_info(size_outfile, c_level, initial_distinct,
-				lower_libsize, upper_libsize);
-    
-    if (!saturation_outfile.empty()) {
-      std::ofstream sat_out(saturation_outfile.c_str());
-      sat_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      sat_out << "#TOTAL_READS" << "\t"
-	      << "SATURATION" << "\t"
-	      << "LOWER_" << 100*c_level << "%CI" << "\t"
-	      << "UPPER_" << 100*c_level << "%CI" << endl;
-      double val = 0.0;
-      for (size_t i = 0; i < mean_sat_estimates.size(); ++i, val += val_step)
-	sat_out << static_cast<size_t>((val + 1.0)*values_sum) << '\t' 
-		<< mean_sat_estimates[i] << '\t'
-		<< sat_lower_ci[i] << '\t' << sat_upper_ci[i] << endl;
-    }
+
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;

@@ -59,7 +59,7 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
-lc_extrap: pade_approximant.o continued_fraction.o library_size_estimates.o
+lc_extrap: continued_fraction.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
