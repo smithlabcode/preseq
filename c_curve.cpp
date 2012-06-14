@@ -35,6 +35,8 @@ using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
+using std::tr1::unordered_map;
+
 
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
@@ -46,53 +48,52 @@ using BamTools::RefVector;
 using BamTools::BamReader;
 using BamTools::RefData;
 
-
 static GenomicRegion
 BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-                  const BamAlignment &ba) {
- const unordered_map<size_t, string>::const_iterator
-   the_chrom(chrom_lookup.find(ba.RefID));
- if (the_chrom == chrom_lookup.end())
-   throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+		   const BamAlignment &ba) {
+  const unordered_map<size_t, string>::const_iterator
+    the_chrom(chrom_lookup.find(ba.RefID));
+  if (the_chrom == chrom_lookup.end())
+    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
 
- const string chrom = the_chrom->second;
- const size_t start = ba.Position;
- const size_t end = start + ba.Length;
- return GenomicRegion(chrom, start, end, "X", 0, ba.strand);
+  const string chrom = the_chrom->second;
+  const size_t start = ba.Position;
+  const size_t end = start + ba.Length;
+  return GenomicRegion(chrom, start, end, "X", 0, ba.IsReverseStrand());
 }
 
+static size_t
+load_values_BAM(const string &input_file_name, vector<double> &values) {
 
-static void
-load_values_BAM(const string &infile, vector<double> &values) {
+  BamReader reader;
+  reader.Open(input_file_name);
 
- BamReader reader;
- reader.Open(infile);
+  // Get header and reference
+  string header = reader.GetHeaderText();
+  RefVector refs = reader.GetReferenceData();
 
- // Get header and reference
- string header = reader.GetHeaderText();
- RefVector refs = reader.GetReferenceData();
+  unordered_map<size_t, string> chrom_lookup;
+  for (size_t i = 0; i < refs.size(); ++i)
+    chrom_lookup[i] = refs[i].RefName;
 
- unordered_map<size_t, string> chrom_lookup;
- for (size_t i = 0; i < refs.size(); ++i)
-   chrom_lookup[i] = refs[i].RefName;
+  size_t n_reads = 1;
+  values.push_back(1.0);
 
- size_t n_reads = 1;
- values.push_back(1.0);
-
- BamAlignment bam;
- while (reader.GetNextAlignment(bam)) {
-   const GenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-   if (r < prev)
-     throw SMITHLABException("locations unsorted in: " + input_file_name);
-   if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
-       r.get_strand() != prev.get_strand())
-     values.push_back(1.0);
-   else values.back()++;
-   ++n_reads;
-   prev.swap(r);
- }
- reader.Close();
- return n_reads;
+  GenomicRegion prev;
+  BamAlignment bam;
+  while (reader.GetNextAlignment(bam)) {
+    GenomicRegion r(BamToGenomicRegion(chrom_lookup, bam));
+    if (r < prev)
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
+	r.get_strand() != prev.get_strand())
+      values.push_back(1.0);
+    else values.back()++;
+    ++n_reads;
+    prev.swap(r);
+  }
+  reader.Close();
+  return n_reads;
 }
 #endif
 
@@ -154,6 +155,10 @@ int main(int argc, const char **argv) {
     size_t step_size = 1000000;
 
     bool VERBOSE = false;
+
+#ifdef HAVE_BAMTOOLS
+    bool BAM_FORMAT_INPUT = false;
+#endif
 
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
