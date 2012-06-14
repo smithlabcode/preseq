@@ -67,15 +67,15 @@ BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
   const size_t end = start + ba.Length;
-  return GenomicRegion(chrom, start, end, "X", 0, ba.strand);
+  return GenomicRegion(chrom, start, end, "X", 0, ba.IsReverseStrand());
 }
 
 
-static void
-load_values_BAM(const string &infile, vector<double> &values) {
+static size_t
+load_values_BAM(const string &input_file_name, vector<double> &values) {
 
   BamReader reader;
-  reader.Open(infile);
+  reader.Open(input_file_name);
 
   // Get header and reference
   string header = reader.GetHeaderText();
@@ -88,9 +88,10 @@ load_values_BAM(const string &infile, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
 
+  GenomicRegion prev;
   BamAlignment bam;
   while (reader.GetNextAlignment(bam)) {
-    const GenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+    GenomicRegion r(BamToGenomicRegion(chrom_lookup, bam));
     if (r < prev)
       throw SMITHLABException("locations unsorted in: " + input_file_name);
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
