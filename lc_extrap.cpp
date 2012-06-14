@@ -67,7 +67,7 @@ BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
   const size_t end = start + ba.Length;
-  return GenomicRegion(chrom, start, end, "X", 0, ba.IsReverseStrand());
+  return GenomicRegion(chrom, start, end, "X", 0, !(ba.IsReverseStrand()));
 }
 
 
