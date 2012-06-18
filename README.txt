@@ -24,14 +24,11 @@ INSTALLATION:
 This should be easy: unpack the archive and change into the archive
 directory. Then type 'make all'. The programs will be in the archive
 directory. These can be moved around, and also do not depend on any
-dynamic libraries, so they should simply work when executed. If the 
-desired input is in .bam format, bamtools is required and is located
-at '/bamtools_loc/.  Type 'make all BAMTOOLS_ROOT=/bamtools_loc/'
-to make the programs.
+dynamic libraries, so they should simply work when executed. 
 
 INPUT FILE FORMAT:
 ========================================================================
-Input files can be either in bed or bam file format.  The file should
+Input files should be in bed file format.  The file should
 be sorted by chromosome, end position, start position, and finally 
 strand. Be sure the sorting is done with LANG="C" to ensure proper 
 sorting.
@@ -47,10 +44,6 @@ use the command:
 
   lc_extrap -o yield_estimates.txt input.bed
 
-If the input file is in .bam format, use the command:
-
-  lc_extrap -B -o yield_estimates.txt input.bed
-
 The yield estimates will appear in yield_estimates.txt, and will be a 
 column of future experiment sizes in TOTAL_READS, a column of the 
 corresponding expected distinct reads in EXPECTED_DISTINCT, followed by 
@@ -60,10 +53,6 @@ To investigate the past yield of an experiment, use c_curve.  For the
 most basic usage, use the command:
 
   c_curve -o estimates.txt input.bed
-
-If the input file is in .bam format, use the command:
-
-  c_curve -B -o estimates.txt input.bed
 
 The estimates will appear in estimates.txt with two columns.  The
 first column gives the total number of reads in a theoretically
