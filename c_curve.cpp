@@ -48,8 +48,8 @@ using BamTools::RefVector;
 using BamTools::BamReader;
 using BamTools::RefData;
 
-static GenomicRegion
-BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
+static SimpleGenomicRegion
+BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
 		   const BamAlignment &ba) {
   const unordered_map<size_t, string>::const_iterator
     the_chrom(chrom_lookup.find(ba.RefID));
@@ -59,8 +59,10 @@ BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
   const size_t end = start + ba.Length;
-  return GenomicRegion(chrom, start, end, "X", 0, !(ba.IsReverseStrand()));
+
+  return SimpleGenomicRegion(chrom, start, end);
 }
+
 
 static size_t
 load_values_BAM(const string &input_file_name, vector<double> &values) {
@@ -79,14 +81,14 @@ load_values_BAM(const string &input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
 
-  GenomicRegion prev;
+  SimpleGenomicRegion prev;
   BamAlignment bam;
   while (reader.GetNextAlignment(bam)) {
-    GenomicRegion r(BamToGenomicRegion(chrom_lookup, bam));
+    SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
     if (r < prev)
       throw SMITHLABException("locations unsorted in: " + input_file_name);
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
-	r.get_strand() != prev.get_strand())
+    
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
       values.push_back(1.0);
     else values.back()++;
     ++n_reads;
@@ -176,7 +178,7 @@ int main(int argc, const char **argv) {
     opt_parse.add_opt("verbose", 'v', "print more run information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS
-    opt_parse.add_opt("bam", 'b', "input is in BAM format", 
+    opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false , BAM_FORMAT_INPUT);
 #endif
 
