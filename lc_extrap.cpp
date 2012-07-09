@@ -152,7 +152,8 @@ resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
     
     // get a new sample
     expected_sample_size = max(1.0, (remaining/vals_mean)/2.0);
-    gsl_ran_multinomial(rng, hist_size, expected_sample_size,
+    gsl_ran_multinomial(rng, hist_size, 
+			static_cast<unsigned int>(expected_sample_size),
 			&vals_hist.front(), &curr_sample.front());
     
     // see how much we got
@@ -288,6 +289,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     throw SMITHLABException("too many iterations, poor sample");
 }
 
+/*
 static void
 single_estimates(const bool VERBOSE, const vector<double> &hist,
 		 size_t max_terms, const int diagonal, const double vals_sum,
@@ -337,6 +339,7 @@ single_estimates(const bool VERBOSE, const vector<double> &hist,
     cerr << "ESTIMATES UNSTABLE, MORE DATA REQUIRED" << endl;
 
 }
+*/
 
 
 static inline double
@@ -447,8 +450,7 @@ main(const int argc, const char **argv) {
 		      "(default: " + toa(step_size) + ")", 
 		      false, step_size);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps "
-		      "(default: " + toa(bootstraps) + "), "
-		      "set to 0 or 1 for single estimate",
+		      "(default: " + toa(bootstraps) + "), ",
 		      false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
@@ -494,7 +496,7 @@ main(const int argc, const char **argv) {
     
     // JUST A SANITY CHECK
     const size_t values_sum = 
-      static_cast<double>(accumulate(values.begin(), values.end(), 0.0));
+      static_cast<size_t>(accumulate(values.begin(), values.end(), 0.0));
     
     const double max_val = max_extrapolation/static_cast<double>(values_sum);
     const double val_step = step_size/static_cast<double>(values_sum);
