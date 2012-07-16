@@ -289,59 +289,6 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     throw SMITHLABException("too many iterations, poor sample");
 }
 
-/*
-static void
-single_estimates(const bool VERBOSE, const vector<double> &hist,
-		 size_t max_terms, const int diagonal, const double vals_sum,
-		 const double step_size, const double max_extrapolation, 
-		 const double max_val, const double val_step,
-		 vector<double> &yield_estimates) {
-
-  yield_estimates.clear();
-  
-  // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-  size_t counts_before_first_zero = 1;
-  while (counts_before_first_zero < hist.size() && 
-	 hist[counts_before_first_zero] > 0)
-    ++counts_before_first_zero;
-  
-  // Ensure we are not using a zero term
-  max_terms = std::min(max_terms, counts_before_first_zero - 1);
-  
-  // refit curve for lower bound (degree of approx is 1 less than
-  // max_terms)
-  max_terms = max_terms - (max_terms % 2 == 0);
-  
-  //refit curve for lower bound
-  const ContinuedFractionApproximation 
-    lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
-    
-  const ContinuedFraction 
-    lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
-    
-  if (lower_cf.is_valid()) 
-    lower_cf.extrapolate_distinct(hist, max_val, 
-				  val_step, yield_estimates);
-
-
-  if (VERBOSE) {
-    cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
-    copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
-	 std::ostream_iterator<double>(cerr, "\n"));
-    
-    cerr << "CF_COEFF_ESTIMATES" << endl;
-    copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
-	 std::ostream_iterator<double>(cerr, "\n"));
-  }
-  
-  // SANITY CHECK
-  if (!check_yield_estimates(yield_estimates)) 
-    cerr << "ESTIMATES UNSTABLE, MORE DATA REQUIRED" << endl;
-
-}
-*/
-
-
 static inline double
 alpha_log_confint_multiplier(const double estimate,
 			     const double initial_distinct,
@@ -537,6 +484,10 @@ main(const int argc, const char **argv) {
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     // BOOTSTRAPS
+
+    if(bootstraps < 10)
+      throw SMITHLABException("too few bootstraps, must be at least 10");
+
     if (VERBOSE) 
       cerr << "[BOOTSTRAP ESTIMATES]" << endl;
       
@@ -556,8 +507,9 @@ main(const int argc, const char **argv) {
       
     vector<double> median_yield_estimates;
     vector<double> yield_upper_ci, yield_lower_ci;
-    return_median_and_ci(yield_estimates, 1.0 - c_level, initial_distinct, 
-			 median_yield_estimates, yield_lower_ci, yield_upper_ci);
+    return_median_and_ci(yield_estimates, 1.0 - c_level, 
+			 initial_distinct, median_yield_estimates, 
+			 yield_lower_ci, yield_upper_ci);
 
     
     /////////////////////////////////////////////////////////////////////
