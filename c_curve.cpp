@@ -85,7 +85,7 @@ load_values_BAM(const string &input_file_name, vector<double> &values) {
   BamAlignment bam;
   while (reader.GetNextAlignment(bam)) {
     SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-    if (r < prev)
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
       throw SMITHLABException("locations unsorted in: " + input_file_name);
     
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
