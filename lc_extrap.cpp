@@ -115,7 +115,7 @@ load_values(const string input_file_name, vector<double> &values) {
   if (!in)
     throw SMITHLABException("problem opening file: " + input_file_name);
   
-  GenomicRegion r, prev;
+  SimplieGenomicRegion r, prev;
   if (!(in >> prev))
     throw SMITHLABException("problem reading from: " + input_file_name);
   
@@ -124,8 +124,7 @@ load_values(const string input_file_name, vector<double> &values) {
   while (in >> r) {
     if (r < prev)
       throw SMITHLABException("locations unsorted in: " + input_file_name);
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() ||
-	r.get_strand() != prev.get_strand())
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
       values.push_back(1.0);
     else values.back()++;
     ++n_reads;
