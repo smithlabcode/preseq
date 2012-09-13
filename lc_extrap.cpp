@@ -115,7 +115,7 @@ load_values(const string input_file_name, vector<double> &values) {
   if (!in)
     throw SMITHLABException("problem opening file: " + input_file_name);
   
-  SimplieGenomicRegion r, prev;
+  SimpleGenomicRegion r, prev;
   if (!(in >> prev))
     throw SMITHLABException("problem reading from: " + input_file_name);
   
