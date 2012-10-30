@@ -46,6 +46,9 @@ using std::fixed;
 using std::setprecision;
 using std::tr1::unordered_map;
 
+/*
+ * This code is used to deal with read data in BAM format.
+ */
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
 #include "api/BamAlignment.h"
@@ -58,23 +61,23 @@ using BamTools::RefData;
 
 static SimpleGenomicRegion
 BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-		   const BamAlignment &ba) {
+			 const BamAlignment &ba) {
   const unordered_map<size_t, string>::const_iterator
     the_chrom(chrom_lookup.find(ba.RefID));
   if (the_chrom == chrom_lookup.end())
     throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-
+  
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
   const size_t end = start + ba.Length;
-
+  
   return SimpleGenomicRegion(chrom, start, end);
 }
 
 
 static size_t
 load_values_BAM(const string &input_file_name, vector<double> &values) {
-
+  
   BamReader reader;
   reader.Open(input_file_name);
 
@@ -237,12 +240,13 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
   
   const double vals_sum = accumulate(orig_values.begin(), orig_values.end(), 0.0);
   
-  for (size_t iter = 0; iter < 2*bootstraps && yield_estimates.size() < bootstraps; ++iter) {
+  for (size_t iter = 0; 
+       (iter < 2*bootstraps && yield_estimates.size() < bootstraps); ++iter) {
     
     vector<double> hist;
     resample_hist(rng, orig_hist, vals_sum,
 		  static_cast<double>(orig_values.size()), hist);
-
+    
     //resize boot_hist to remove excess zeros
     while (hist.back() == 0)
       hist.pop_back();
@@ -268,15 +272,12 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     vector<double> yield_vector;
     vector<double> sat_vector;
     if (lower_cf.is_valid()) 
-      lower_cf.extrapolate_distinct(hist, max_val, 
-				    val_step, yield_vector);
-
-    
+      lower_cf.extrapolate_distinct(hist, max_val, val_step, yield_vector);
     
     // SANITY CHECK    
     if (check_yield_estimates(yield_vector)) {
       yield_estimates.push_back(yield_vector);
-	if (VERBOSE) cerr << '.';
+      if (VERBOSE) cerr << '.';
     }
     else if (VERBOSE) 
       cerr << '_';
@@ -362,7 +363,7 @@ int
 main(const int argc, const char **argv) {
 
   try {
-
+    
     const size_t MIN_REQUIRED_COUNTS = 8;
 
     /* FILES */
@@ -377,7 +378,7 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    //	bool SMOOTH_HISTOGRAM = false;	
+    // bool SMOOTH_HISTOGRAM = false;	
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -385,8 +386,7 @@ main(const int argc, const char **argv) {
     
     /**************** GET COMMAND LINE ARGUMENTS ***********************/
     OptionParser opt_parse(strip_path(argv[0]), 
-			   "",
-			   "<sorted-bed-file>");
+			   "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation "
@@ -521,9 +521,6 @@ main(const int argc, const char **argv) {
 			  val_step, median_yield_estimates,
 			  yield_lower_ci, yield_upper_ci);
       
-    // IF VERBOSE OUTPUT IS REQUESTED, OR IF STATS ARE REQUESTED IN A
-    // FILE, PRINT THEM!!
-
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
