@@ -532,23 +532,23 @@ ContinuedFraction::complex_deriv(const double val) const {
 }
 
 
-std::ostream& 
+std::ostream&
 operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
-  using std::setw;
-  using std::fixed;
-  using std::setprecision;
+  std::ios_base::fmtflags orig_flags = the_stream.flags();
+  the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
+  the_stream.precision(2);
   the_stream << "OFFSET_COEFFS" << '\n';
-  for (size_t i = 0; i < cf.offset_coeffs.size(); ++i)
-    the_stream << setw(12) << fixed << setprecision(2) << cf.offset_coeffs[i] << '\t'
-	       << setw(12) << fixed << setprecision(2) << cf.ps_coeffs[i] << '\n';
-  the_stream << "CF_COEFFS" << '\n';
   const size_t offset = cf.offset_coeffs.size();
+  for (size_t i = 0; i < offset; ++i)
+    the_stream << std::setw(12) << cf.offset_coeffs[i] << '\t'
+               << std::setw(12) << cf.ps_coeffs[i] << '\n';
+  the_stream << "CF_COEFFS" << '\n';
   for (size_t i = 0; i < cf.cf_coeffs.size(); ++i)
-    the_stream << setw(12) << fixed << setprecision(2) << cf.cf_coeffs[i] << '\t'
-	       << setw(12) << fixed << setprecision(2) << cf.ps_coeffs[i + offset] << '\n';
+    the_stream << std::setw(12) << cf.cf_coeffs[i] << '\t'
+               << std::setw(12) << cf.ps_coeffs[i + offset] << '\n';
+  the_stream.flags(orig_flags);
   return the_stream;
 }
-
 
 // Extrapolates the curve, for given values (step & max) and numbers
 // of terms
