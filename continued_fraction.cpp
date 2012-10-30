@@ -537,7 +537,7 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
   std::ios_base::fmtflags orig_flags = the_stream.flags();
   the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
   the_stream.precision(2);
-  the_stream << "OFFSET_COEFFS" << '\n';
+  the_stream << "OFFSET_COEFFS" << '\t' << "PS_COEFFS" << '\n';
   const size_t offset = cf.offset_coeffs.size();
   for (size_t i = 0; i < offset; ++i)
     the_stream << std::setw(12) << cf.offset_coeffs[i] << '\t'
