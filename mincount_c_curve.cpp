@@ -144,7 +144,7 @@ sample_count_mincount_reads(const gsl_rng *rng,
   double values_above_mincount = 0;
   double count = 1.0;
   for (size_t i = 1; i < sample_umis.size(); i++){
-    if(sample_umis[i] != sample_umis[i-1])
+    if(sample_umis[i] == sample_umis[i-1])
       count++;
     else{
       values.push_back(count);
