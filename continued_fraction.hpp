@@ -78,14 +78,13 @@ public:
   
   //find best cont frac approx
   ContinuedFraction
-  optimal_cont_frac_yield(const std::vector<double> &counts_hist) const;
+  optimal_cont_frac(const std::vector<double> &counts_hist,
+		    const size_t min_count) const;
 
-  ContinuedFraction
-  optimal_cont_frac_satur(const std::vector<double> &counts_hist) const;
-  
   double
   local_max(const ContinuedFraction &cf,
 	    const double deriv_upper_bound) const;
+  /*
   double 
   lowerbound_librarysize(const std::vector<double> &counts_hist,
 			 const double upper_bound) const;
@@ -93,6 +92,7 @@ public:
   lowerbound_librarysize(const std::vector<double> &counts_hist,
 			 const double upper_bound,
 			 ContinuedFraction &optimal_cf) const;
+  */
 private:
   
   int diagonal_idx; // the diagonal to work with for estimates

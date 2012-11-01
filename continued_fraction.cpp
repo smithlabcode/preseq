@@ -20,6 +20,7 @@
 #include "continued_fraction.hpp"
 #include <smithlab_utils.hpp>
 #include <RNG.hpp>
+#include <gsl/gsl_sf_gamma.h>
 
 #include <vector>
 #include <cmath>
@@ -693,13 +694,34 @@ check_yield_estimates_stability(const vector<double> &estimates) {
   return true;
 }
 
+void
+construct_ps_coeffs(const vector<double> &counts_hist,
+		    const size_t min_count,
+		    const size_t max_terms,
+		    vector<double> &ps_coeffs){
+  ps_coeffs.resize(max_terms - 1, 0.0);
+
+  for(size_t j = 1; j < max_terms; j++){
+    for(size_t l = 0; l < min_count; l++){
+      const size_t indx= j - 1 +  l;
+      if(indx < max_terms - 1){
+	double binom_coeff = 
+	  exp(gsl_sf_lnfact(indx) - gsl_sf_lnfact(l) - gsl_sf_lnfact(indx - l));
+	ps_coeffs[indx] += 
+	  pow(-1, j + 1)*binom_coeff*counts_hist[indx + 1];
+      }
+    }
+  }
+}
+
 
 /* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
  * continued fraction by checking for stability of estimates at
  * specific points for yield.
  */
 ContinuedFraction
-ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &counts_hist) const {
+ContinuedFractionApproximation::optimal_cont_frac(const vector<double> &counts_hist, 
+						  const size_t min_count) const {
   //do this outside
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
@@ -712,8 +734,8 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
     counts_sum += i*counts_hist[i];
   
   vector<double> ps_coeffs;
-  for (size_t j = 1; j < max_terms; j++)
-    ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
+
+  construct_ps_coeffs(counts_hist, min_count, max_terms, ps_coeffs);
 
   ContinuedFraction curr_cf(ps_coeffs, diagonal_idx, max_terms - 1);
   
@@ -743,6 +765,7 @@ ContinuedFractionApproximation::optimal_cont_frac_yield(const vector<double> &co
  * the neighborhood of zero there is global max, so if we choose a
  * conservative approx, this is a lower bound on library_size
  */
+/*
 double
 ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
 						       const double upper_bound,
@@ -795,3 +818,4 @@ ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &cou
   
   return r;
 }
+*/

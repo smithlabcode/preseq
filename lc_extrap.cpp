@@ -219,7 +219,8 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, 
-		    const double max_val, const double val_step, 
+		    const double max_val, const double val_step,
+		    const size_t min_count, 
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -267,7 +268,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
     
     const ContinuedFraction 
-      lower_cf(lower_cfa.optimal_cont_frac_yield(hist));
+      lower_cf(lower_cfa.optimal_cont_frac(hist, min_count));
     
     vector<double> yield_vector;
     vector<double> sat_vector;
@@ -369,12 +370,13 @@ main(const int argc, const char **argv) {
     /* FILES */
     string outfile;
     
-    size_t orig_max_terms = 1000;
+    size_t orig_max_terms = 100;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
     size_t bootstraps = 100;
     int diagonal = -1;
     double c_level = 0.95;
+    size_t min_count = 1;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -389,6 +391,10 @@ main(const int argc, const char **argv) {
 			   "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
+    opt_parse.add_opt("min_count",'m', 
+		      "minimum count for complexity "
+		      "(default:1, counts distinct reads)",
+		      false, min_count);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation "
 		      "(default: " + toa(max_extrapolation) + ")",
 		      false, max_extrapolation);
@@ -495,7 +501,7 @@ main(const int argc, const char **argv) {
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
 			diagonal, step_size, max_extrapolation, 
-			max_val, val_step, yield_estimates);
+			max_val, val_step, min_count, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
