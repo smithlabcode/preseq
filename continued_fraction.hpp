@@ -37,6 +37,13 @@ struct ContinuedFraction {
   extrapolate_distinct(const std::vector<double> &counts_hist,
 		       const double max_value, const double step_size,
 		       std::vector<double> &estimates) const;
+
+  void
+  extrapolate_count(const std::vector<double> &counts_hist,
+		    const double max_value,
+		    const double step_size,
+		    const size_t count,
+		    std::vector<double> &estimates) const;
   
   void 
   extrapolate_saturation(const std::vector<double> &counts_hist,
@@ -76,23 +83,19 @@ public:
   ContinuedFractionApproximation(const int di, const size_t mt, 
 				 const double ss, const double mv);
   
-  //find best cont frac approx
+  //find best cont frac approx for estimating distinct
   ContinuedFraction
-  optimal_cont_frac(const std::vector<double> &counts_hist,
-		    const size_t min_count) const;
+  optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
+
+  // find best cont frac approx for estimating count
+  ContinuedFraction
+  optimal_cont_frac_count(const std::vector<double> &counts_hist,
+			  const size_t count) const;
 
   double
   local_max(const ContinuedFraction &cf,
 	    const double deriv_upper_bound) const;
-  /*
-  double 
-  lowerbound_librarysize(const std::vector<double> &counts_hist,
-			 const double upper_bound) const;
-  double
-  lowerbound_librarysize(const std::vector<double> &counts_hist,
-			 const double upper_bound,
-			 ContinuedFraction &optimal_cf) const;
-  */
+
 private:
   
   int diagonal_idx; // the diagonal to work with for estimates

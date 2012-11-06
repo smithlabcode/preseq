@@ -566,6 +566,19 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
 }
 
 void
+ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
+				     const double max_value,
+				     const double step_size,
+				     const size_t count,
+				     vector<double> &estimates) const {
+  const double current_count = counts_hist[count];
+  estimates.clear();
+  estimates.push_back(current_count);
+  for (double t = step_size; t <= max_value; t += step_size)
+    estimates.push_back(pow(t + 1.0, count)*operator()(t));
+}
+
+void
 ContinuedFraction::extrapolate_saturation(const vector<double> &counts_hist,
 					  const double vals_sum,
 					  const double max_value,
@@ -694,34 +707,13 @@ check_yield_estimates_stability(const vector<double> &estimates) {
   return true;
 }
 
-void
-construct_ps_coeffs(const vector<double> &counts_hist,
-		    const size_t min_count,
-		    const size_t max_terms,
-		    vector<double> &ps_coeffs){
-  ps_coeffs.resize(max_terms - 1, 0.0);
-
-  for(size_t j = 1; j < max_terms; j++){
-    for(size_t l = 0; l < min_count; l++){
-      const size_t indx= j - 1 +  l;
-      if(indx < max_terms - 1){
-	double binom_coeff = 
-	  exp(gsl_sf_lnfact(indx) - gsl_sf_lnfact(l) - gsl_sf_lnfact(indx - l));
-	ps_coeffs[indx] += 
-	  pow(-1, j + 1)*binom_coeff*counts_hist[indx + 1];
-      }
-    }
-  }
-}
-
 
 /* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
  * continued fraction by checking for stability of estimates at
  * specific points for yield.
  */
 ContinuedFraction
-ContinuedFractionApproximation::optimal_cont_frac(const vector<double> &counts_hist, 
-						  const size_t min_count) const {
+ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double> &counts_hist) const {
   //do this outside
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
@@ -735,9 +727,10 @@ ContinuedFractionApproximation::optimal_cont_frac(const vector<double> &counts_h
   
   vector<double> ps_coeffs;
 
-  construct_ps_coeffs(counts_hist, min_count, max_terms, ps_coeffs);
+  for (size_t j = 1; j < max_terms; j++)
+    ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));  
 
-  ContinuedFraction curr_cf(ps_coeffs, diagonal_idx, max_terms - 1);
+  ContinuedFraction curr_cf(ps_coeffs, -1, max_terms - 1);
   
   while (curr_cf.degree >= MIN_ALLOWED_DEGREE) {    
     // compute the estimates for the desired set of points
@@ -758,64 +751,74 @@ ContinuedFractionApproximation::optimal_cont_frac(const vector<double> &counts_h
   return ContinuedFraction();  
 }
 
-  
-/* library_yield = xp(x)/q(x), so if degree(q) > degree(p)+1, then
- * library_yield acts like 1/x^n for some n > 0 in the limit and
- * therefore goes to zero since it approximates the library yield in
- * the neighborhood of zero there is global max, so if we choose a
- * conservative approx, this is a lower bound on library_size
+/* Checks if count estimates do not go out of bounds 
+ * and are unimodal
  */
-/*
-double
-ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
-						       const double upper_bound,
-						       ContinuedFraction &optimal_cf) const {
-  
-  // the derivative must always be less than the number of distinct
-  // reads in the initial sample
-  const double distinct_reads = 
-    accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
-  
-  // make sure we are using appropriate order estimate,
-  // degree of approx is 1 less than local_max_terms
-  const size_t local_max_terms = max_terms - (max_terms % 2 == 1);
+static bool
+check_count_estimates_stability(const vector<double> &estimates,
+				const size_t count) {
+  size_t number_modes = 0;
+  for(size_t i = 1; i < estimates.size(); ++i){
+    // make sure estimates are in bounds
+    if(estimates[i] < 0.0 || estimates[i] > 3.2e9/count || !finite(estimates[i]))
+      return false;
+    // count modes by detecting change in sign of derivative
+    if(i < estimates.size() - 1 &&
+       ((estimates[i] - estimates[i - 1])
+	*(estimates[i + 1] - estimates[i]) < 0))
+      number_modes++;
+  }
+  // check unimodality
+  if(number_modes > 1)
+    return false;
+ 
+  return true;
+}
 
-  assert(local_max_terms < counts_hist.size());
+
+
+ContinuedFraction
+ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &counts_hist,
+							const size_t count) const {
+  //do this outside
+  // ensure that we will use an underestimate
+  //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
+  
+  assert(max_terms < counts_hist.size() + count);
+  
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    counts_sum += i*counts_hist[i];
   
   vector<double> ps_coeffs;
-  for (size_t j = 1; j < local_max_terms; j++)
-    ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
+
+  for (size_t j = 0; j < max_terms; j++){
+    const double binom_coeff =
+      exp(gsl_sf_lnfact(j + count) - gsl_sf_lnfact(j) - gsl_sf_lnfact(count));
+    ps_coeffs.push_back(pow(-1.0, j)*binom_coeff*counts_hist[j + count]);  
+  }
+
+  ContinuedFraction curr_cf(ps_coeffs, -count, max_terms);
   
-  // Iterate over max_terms to find largest local max as lower bound
-  // theortically larger max_terms will be better approximations ==>
-  // larger lower bounds
-  
-  double lower_bound = std::numeric_limits<double>::max();
-  size_t n_terms = local_max_terms - 1;
-  
-  ContinuedFraction curr_cf(ps_coeffs, -2, n_terms);
-  while (n_terms > MIN_ALLOWED_DEGREE) {
-    const double candidate = 
-      local_max(curr_cf, distinct_reads) + distinct_reads;
-    if (candidate < lower_bound) {
-      lower_bound = candidate;
-      optimal_cf = curr_cf;
-    }
-    // decrease the degree of the continued fraction
+  while (curr_cf.degree >= MIN_ALLOWED_DEGREE + count + 1) {    
+    // compute the estimates for the desired set of points
+    vector<double> estimates;
+    curr_cf.extrapolate_count(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
+			      count, estimates);
+    
+    // return the continued fraction if it is stable
+    if (check_count_estimates_stability(estimates, count))
+      return curr_cf;
+
+    
+    // if not cf not acceptable, decrease degree
     curr_cf = ContinuedFraction::decrease_degree(curr_cf, 2);
-    n_terms = curr_cf.degree;
   }
   
-  return (lower_bound < upper_bound) ? 
-    lower_bound : -std::numeric_limits<double>::max();
+  //  throw SMITHLABException("unable to fit continued fraction");
+  
+  // no stable continued fraction: return null
+  return ContinuedFraction();  
 }
 
-double
-ContinuedFractionApproximation::lowerbound_librarysize(const vector<double> &counts_hist,
-						       const double upper_bound) const {
-  ContinuedFraction optimal_cf;
-  const double r = lowerbound_librarysize(counts_hist, upper_bound, optimal_cf);  
-  
-  return r;
-}
-*/
