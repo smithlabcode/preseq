@@ -173,6 +173,22 @@ resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
   }
 }
 
+static double
+sample_count_distinct(const gsl_rng *rng,
+		      const vector<size_t> &full_umis,
+		      const size_t sample_size) {
+  vector<size_t> sample_umis(sample_size);
+  gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
+		 (size_t *)&full_umis.front(), full_umis.size(), 
+		 sizeof(size_t));
+  double count = 1.0;
+  for (size_t i = 1; i < sample_umis.size(); i++)
+    if(sample_umis[i] != sample_umis[i-1])
+      count++;
+
+  return count;
+}
+
 
 static bool
 check_yield_estimates(const vector<double> &estimates) {
@@ -219,7 +235,6 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, 
-		    const double max_val, const double val_step,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -243,14 +258,38 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
   for (size_t iter = 0; 
        (iter < 2*bootstraps && yield_estimates.size() < bootstraps); ++iter) {
     
+    vector<double> yield_vector;
     vector<double> hist;
     resample_hist(rng, orig_hist, vals_sum,
 		  static_cast<double>(orig_values.size()), hist);
+
+    const double initial_distinct = accumulate(hist.begin(), hist.end(), 0.0);
     
     //resize boot_hist to remove excess zeros
     while (hist.back() == 0)
       hist.pop_back();
-    
+
+    //construct umi vector to sample from
+    vector<size_t> umis;
+    size_t umi = 1;
+    for(size_t i = 1; i < hist.size(); i++){
+      for(size_t j = 0; j < hist[i]; j++){
+	for(size_t k = 0; k < i; k++)
+	  umis.push_back(umi);
+	umi++;
+      }
+    }
+    assert(umis.size() == static_cast<size_t>(vals_sum));
+
+    // compute complexity curve by random sampling w/out replacement
+    size_t upper_limit = static_cast<size_t>(vals_sum);
+    size_t step = static_cast<size_t>(step_size);
+    size_t sample = step;
+    while(sample < upper_limit){
+      yield_vector.push_back(sample_count_distinct(rng, umis, sample));
+      sample += step;
+    }
+
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t counts_before_first_zero = 1;
     while (counts_before_first_zero < hist.size() &&
@@ -269,18 +308,25 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     const ContinuedFraction 
       lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
     
-    vector<double> yield_vector;
-    vector<double> sat_vector;
-    if (lower_cf.is_valid()) 
-      lower_cf.extrapolate_distinct(hist, max_val, val_step, yield_vector);
+    //extrapolate the curve start
+    if (lower_cf.is_valid()){
+      double sample_size = static_cast<double>(sample);
+      while(sample_size < max_extrapolation){
+	double t = (sample_size - vals_sum)/vals_sum;
+	assert(t >= 0.0);
+	yield_vector.push_back(initial_distinct + t*lower_cf(t));
+	sample_size += step_size;
+      }
+    }
     
     // SANITY CHECK    
     if (check_yield_estimates(yield_vector)) {
       yield_estimates.push_back(yield_vector);
       if (VERBOSE) cerr << '.';
     }
-    else if (VERBOSE) 
-      cerr << '_';
+    else if (VERBOSE){
+      cerr << '_' << endl;
+    }
     
   }
   if (VERBOSE)
@@ -302,6 +348,7 @@ alpha_log_confint_multiplier(const double estimate,
 static void
 return_median_and_ci(const vector<vector<double> > &estimates,
 		     const double alpha, const double initial_distinct,
+		     const double vals_sum, const double step_size, 
 		     vector<double> &median_estimates,
 		     vector<double> &lower_ci, vector<double> &upper_ci) {
   
@@ -309,10 +356,7 @@ return_median_and_ci(const vector<vector<double> > &estimates,
   
   const size_t n_est = estimates.size();
   vector<double> estimates_row(estimates.size(), 0.0);
-  median_estimates.push_back(initial_distinct);
-  upper_ci.push_back(initial_distinct);
-  lower_ci.push_back(initial_distinct);
-  for (size_t i = 1; i < estimates[0].size(); i++) {
+  for (size_t i = 0; i < estimates[0].size(); i++) {
     
     // estimates is in wrong order, work locally on const val
     for (size_t k = 0; k < n_est; ++k)
@@ -328,17 +372,25 @@ return_median_and_ci(const vector<vector<double> > &estimates,
     const double confint_mltr = 
       alpha_log_confint_multiplier(curr_median, initial_distinct, 
 				   variance, alpha);
-    upper_ci.push_back(initial_distinct + 
-		       (curr_median - initial_distinct)*confint_mltr);
-    lower_ci.push_back(initial_distinct + 
-		       (curr_median - initial_distinct)/confint_mltr);
+    if(curr_median > initial_distinct){
+      upper_ci.push_back(initial_distinct + 
+			 (curr_median - initial_distinct)*confint_mltr);
+      lower_ci.push_back(initial_distinct + 
+			 (curr_median - initial_distinct)/confint_mltr);
+    }
+    else{
+      lower_ci.push_back(initial_distinct + 
+			 (curr_median - initial_distinct)*confint_mltr);
+      upper_ci.push_back(initial_distinct + 
+			 (curr_median - initial_distinct)/confint_mltr);
+    }
   }
 }
 
 
 static void
 write_predicted_curve(const string outfile, const double values_sum,
-		      const double c_level, const double val_step,
+		      const double c_level, const double step_size,
 		      const vector<double> &median_yield_estimates,
 		      const vector<double> &yield_lower_ci,
 		      const vector<double> &yield_upper_ci) {
@@ -353,9 +405,9 @@ write_predicted_curve(const string outfile, const double values_sum,
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
   
-  double val = 0.0;
-  for (size_t i = 0; i < median_yield_estimates.size(); ++i, val += val_step)
-    out << (val + 1.0)*values_sum << '\t' 
+  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
+  for (size_t i = 0; i < median_yield_estimates.size(); ++i)
+    out << (i + 1)*step_size << '\t' 
 	<< median_yield_estimates[i] << '\t'
 	<< yield_lower_ci[i] << '\t' << yield_upper_ci[i] << endl;
 }
@@ -444,12 +496,8 @@ main(const int argc, const char **argv) {
     const double initial_distinct = static_cast<double>(values.size());
     
     // JUST A SANITY CHECK
-    const size_t values_sum = 
-      static_cast<size_t>(accumulate(values.begin(), values.end(), 0.0));
-    
-    const double max_val = max_extrapolation/static_cast<double>(values_sum);
-    const double val_step = step_size/static_cast<double>(values_sum);
-    
+    const double values_sum = accumulate(values.begin(), values.end(), 0.0);
+        
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
 
@@ -497,8 +545,7 @@ main(const int argc, const char **argv) {
     vector< vector<double> > sat_estimates;
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, 
-			max_val, val_step, yield_estimates);
+			diagonal, step_size, max_extrapolation, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -510,7 +557,8 @@ main(const int argc, const char **argv) {
     vector<double> median_yield_estimates;
     vector<double> yield_upper_ci, yield_lower_ci;
     return_median_and_ci(yield_estimates, 1.0 - c_level, 
-			 initial_distinct, median_yield_estimates, 
+			 initial_distinct, values_sum, step_size,
+			 median_yield_estimates, 
 			 yield_lower_ci, yield_upper_ci);
 
     
@@ -520,8 +568,8 @@ main(const int argc, const char **argv) {
     if (VERBOSE) 
       cerr << "[WRITING OUTPUT]" << endl;
     
-    write_predicted_curve(outfile, values_sum, c_level,
-			  val_step, median_yield_estimates,
+    write_predicted_curve(outfile, values_sum, c_level, step_size,
+			  median_yield_estimates,
 			  yield_lower_ci, yield_upper_ci);
       
   }

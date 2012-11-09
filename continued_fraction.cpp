@@ -575,7 +575,7 @@ ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
   estimates.clear();
   estimates.push_back(current_count);
   for (double t = step_size; t <= max_value; t += step_size)
-    estimates.push_back(pow(t + 1.0, count)*operator()(t));
+    estimates.push_back(operator()(t));
 }
 
 void
@@ -775,16 +775,30 @@ check_count_estimates_stability(const vector<double> &estimates,
   return true;
 }
 
-
+static void
+construct_count_ps_coeffs(const vector<double> &counts_hist,
+			  const size_t max_terms, const size_t count,
+			  vector<double> &ps_coeffs) {
+  ps_coeffs.clear();
+  for(size_t i = 0; i < max_terms; i++){
+    double curr_coeff = 0.0;
+    for(size_t l = 0; l <= i; l++){
+      const double first_binom_coeff =
+	exp(gsl_sf_lnfact(l + count) - gsl_sf_lnfact(l) - gsl_sf_lnfact(count));
+      const double second_binom_coeff = 
+	exp(gsl_sf_lnfact(count) - gsl_sf_lnfact(i - l) - gsl_sf_lnfact(count - i + l));
+      curr_coeff += 
+	pow(-1.0, l)*first_binom_coeff*counts_hist[count + l]*second_binom_coeff;
+    }
+    ps_coeffs.push_back(curr_coeff);
+  }
+}
 
 ContinuedFraction
 ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &counts_hist,
 							const size_t count) const {
-  //do this outside
-  // ensure that we will use an underestimate
-  //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
   
-  assert(max_terms < counts_hist.size() + count);
+
   
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
@@ -792,20 +806,28 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
     counts_sum += i*counts_hist[i];
   
   vector<double> ps_coeffs;
+  construct_count_ps_coeffs(counts_hist, max_terms, count, ps_coeffs);
 
+  /*
   for (size_t j = 0; j < max_terms; j++){
     const double binom_coeff =
       exp(gsl_sf_lnfact(j + count) - gsl_sf_lnfact(j) - gsl_sf_lnfact(count));
     ps_coeffs.push_back(pow(-1.0, j)*binom_coeff*counts_hist[j + count]);  
   }
+  */
+  int order = 4;
 
-  ContinuedFraction curr_cf(ps_coeffs, -count, max_terms);
+  if(max_terms < MIN_ALLOWED_DEGREE + abs(order)){
+    cerr << "max_terms too small" << endl;
+    return ContinuedFraction();
+  }
+
+  ContinuedFraction curr_cf(ps_coeffs, order, max_terms);
   
-  while (curr_cf.degree >= MIN_ALLOWED_DEGREE + count + 1) {    
+  while (curr_cf.degree >= MIN_ALLOWED_DEGREE + abs(order)) {    
     // compute the estimates for the desired set of points
     vector<double> estimates;
-    curr_cf.extrapolate_count(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
-			      count, estimates);
+    curr_cf.extrapolate_count(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, count, estimates);
     
     // return the continued fraction if it is stable
     if (check_count_estimates_stability(estimates, count))

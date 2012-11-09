@@ -243,7 +243,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	   hist[counts_before_first_zero] > 0)
       ++counts_before_first_zero;
     
-    size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - count - 1);
+    size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - count);
     // refit curve for lower bound (degree of approx is 1 less than
     // max_terms)
     max_terms = max_terms - (max_terms % 2 == 0);
@@ -362,7 +362,25 @@ write_predicted_curve(const string outfile, const double values_sum,
 	<< count_lower_ci[i] << '\t' << count_upper_ci[i] << endl;
 }
 
+/*
+static void
+write_estimates_outfile(const string outfile,
+			const vector< vector<double> > &estimates,
+			const double val_step, const double values_sum){
 
+  std::ofstream of;
+  if (!outfile.empty()) of.open(outfile.c_str());
+  std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+
+  double val = 0.0;
+  for(size_t i = 0; i < estimates[0].size(); i++, val += val_step){
+    out << (val + 1.0)*values_sum << '\t';
+    for(size_t j = 0; j < estimates.size(); j++)
+      out << estimates[j][i] << "\t";
+    out << endl;
+  }
+}
+*/
 
 int
 main(const int argc, const char **argv) {
@@ -413,6 +431,7 @@ main(const int argc, const char **argv) {
     //	     orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
+
 #ifdef HAVE_BAMTOOLS
     opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false, BAM_FORMAT_INPUT);
