@@ -325,7 +325,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       if (VERBOSE) cerr << '.';
     }
     else if (VERBOSE){
-      cerr << '_' << endl;
+      cerr << '_';
     }
     
   }
@@ -335,6 +335,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     throw SMITHLABException("too many iterations, poor sample");
 }
 
+/*
 static inline double
 alpha_log_confint_multiplier(const double estimate,
 			     const double initial_distinct,
@@ -386,7 +387,36 @@ return_median_and_ci(const vector<vector<double> > &estimates,
     }
   }
 }
+*/
 
+static void
+return_median_and_ci(const vector<vector<double> > &estimates,
+		     const double alpha, const double initial_distinct,
+		     const double vals_sum, const double step_size, 
+		     vector<double> &median_estimates,
+		     vector<double> &lower_ci, vector<double> &upper_ci) {
+  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
+  assert(!estimates.empty());
+  
+  const size_t n_est = estimates.size();
+  vector<double> estimates_row(estimates.size(), 0.0);
+  for (size_t i = 0; i < estimates[0].size(); i++) {
+    
+    // estimates is in wrong order, work locally on const val
+    for (size_t k = 0; k < n_est; ++k)
+      estimates_row[k] = estimates[k][i];
+    
+    // sort to get confidence interval
+    sort(estimates_row.begin(), estimates_row.end());
+    const double curr_median = 
+      gsl_stats_median_from_sorted_data(&estimates_row[0], 1, n_est);
+    
+    median_estimates.push_back(curr_median);
+    const double std_dev = sqrt(gsl_stats_variance(&estimates_row[0], 1, n_est));
+    upper_ci.push_back(curr_median + inv_norm_alpha*std_dev);
+    lower_ci.push_back(curr_median - inv_norm_alpha*std_dev);
+  }
+}
 
 static void
 write_predicted_curve(const string outfile, const double values_sum,

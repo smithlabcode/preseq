@@ -579,6 +579,20 @@ ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
 }
 
 void
+ContinuedFraction::extrapolate_mincount(const vector<double> &counts_hist,
+					const double max_value,
+					const double step_size,
+					const size_t mincount,
+					vector<double> &estimates) const {
+  const double current_observed = 
+    accumulate(counts_hist.begin() + mincount, counts_hist.end(), 0.0);
+  estimates.clear();
+  estimates.push_back(current_observed);
+  for (double t = step_size; t <= max_value; t += step_size)
+    estimates.push_back(current_observed + t*operator()(t));
+}
+
+void
 ContinuedFraction::extrapolate_saturation(const vector<double> &counts_hist,
 					  const double vals_sum,
 					  const double max_value,
@@ -693,11 +707,18 @@ static bool
 check_yield_estimates_stability(const vector<double> &estimates) {
   // make sure that the estimate is increasing in the time_step and
   // is below the initial distinct per step_size
-  for (size_t i = 1; i < estimates.size(); ++i)
-    if (estimates[i] < estimates[i - 1] ||
-	(i >= 2 && (estimates[i] - estimates[i - 1] >
-		    estimates[i - 1] - estimates[i - 2])))
+  for (size_t i = 1; i < estimates.size(); ++i){
+    if (estimates[i] < estimates[i - 1] ){
+      cerr << "estimates decreasing" << endl;
       return false;
+    }
+    if(i >= 2 && (estimates[i] - estimates[i - 1] >
+		  estimates[i - 1] - estimates[i - 2])){
+      cerr << "estimates not concave" << endl;
+      return false;
+    }
+  }
+    
 
   // fake check
   /*  for(size_t i = 1; i < estimates.size(); ++i)
@@ -815,7 +836,7 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
     ps_coeffs.push_back(pow(-1.0, j)*binom_coeff*counts_hist[j + count]);  
   }
   */
-  int order = 4;
+  int order = 0;
 
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order)){
     cerr << "max_terms too small" << endl;
@@ -844,3 +865,92 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
   return ContinuedFraction();  
 }
 
+static void
+construct_mincount_ps_coeffs(const vector<double> &counts_hist,
+			     const size_t max_terms, const size_t mincount,
+			     vector<double> &ps_coeffs) {
+  ps_coeffs.clear();
+  for(size_t i = 1; i < max_terms; i++){
+    double curr_coeff = 0.0;
+    for(size_t r = 0; r < mincount; r++){
+      for(size_t l = 0; l <= i; l++){
+	const double first_binom_coeff =
+	  exp(gsl_sf_lnfact(l + r) - gsl_sf_lnfact(l) - gsl_sf_lnfact(r));
+	const double second_binom_coeff = 
+	  exp(gsl_sf_lnfact(r) - gsl_sf_lnfact(i - l) - gsl_sf_lnfact(r - i + l));
+	curr_coeff += 
+	  pow(-1.0, l + 1)*first_binom_coeff*counts_hist[r + l]*second_binom_coeff;
+      }
+    }
+    ps_coeffs.push_back(curr_coeff);
+  }
+}
+
+static bool
+check_mincount_estimates_stability(const vector<double> &estimates,
+				   const double max_change_per_time_step) {
+  // make sure that the estimate is increasing in the time_step and
+  // is below the initial distinct per step_size
+  for (size_t i = 1; i < estimates.size(); ++i){
+    if(!finite(estimates[i])){
+      return false;
+    }
+    if ((estimates[i] < estimates[i - 1]) ||
+	(estimates[i] - estimates[i - 1] > max_change_per_time_step)){
+      return false;
+    }
+  }
+    
+
+  // fake check
+  /*  for(size_t i = 1; i < estimates.size(); ++i)
+      if(estimates[i] < 0.0 || estimates[i] > 1e9)
+      return false;
+  */
+  return true;
+}
+
+
+ContinuedFraction
+ContinuedFractionApproximation::optimal_cont_frac_mincount(const vector<double> &counts_hist,
+							   const size_t mincount) const {
+  
+
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    counts_sum += i*counts_hist[i];
+  
+  vector<double> ps_coeffs;
+  construct_mincount_ps_coeffs(counts_hist, max_terms, mincount, ps_coeffs);
+
+  int order = 0;
+
+  // if max_terms is too small, unacceptable extrapolation
+  if(max_terms < MIN_ALLOWED_DEGREE + abs(order))
+    return ContinuedFraction();
+  
+
+  ContinuedFraction curr_cf(ps_coeffs, order, max_terms);
+
+  while (curr_cf.degree >= MIN_ALLOWED_DEGREE + abs(order)) {    
+    // compute the estimates for the desired set of points
+    vector<double> estimates;
+
+    curr_cf.extrapolate_mincount(counts_hist, SEARCH_MAX_VAL, 
+				 SEARCH_STEP_SIZE, mincount, estimates);
+    const double max_reads_per_step = counts_sum*SEARCH_STEP_SIZE;
+    // return the continued fraction if it is stable
+    if (check_mincount_estimates_stability(estimates, max_reads_per_step))
+      return curr_cf;
+
+    
+    // if not cf not acceptable, decrease degree
+    curr_cf = ContinuedFraction::decrease_degree(curr_cf, 2);
+  }
+  
+  //  throw SMITHLABException("unable to fit continued fraction");
+  
+  // no stable continued fraction: return null
+  return ContinuedFraction();  
+}

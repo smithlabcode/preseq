@@ -44,6 +44,13 @@ struct ContinuedFraction {
 		    const double step_size,
 		    const size_t count,
 		    std::vector<double> &estimates) const;
+
+  void
+  extrapolate_mincount(const std::vector<double> &counts_hist,
+		       const double max_value,
+		       const double step_size,
+		       const size_t mincount,
+		       std::vector<double> &estimates) const;
   
   void 
   extrapolate_saturation(const std::vector<double> &counts_hist,
@@ -91,6 +98,11 @@ public:
   ContinuedFraction
   optimal_cont_frac_count(const std::vector<double> &counts_hist,
 			  const size_t count) const;
+
+  // find best cont frac approx for estimating # reads w/ mincount
+  ContinuedFraction
+  optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
+			     const size_t mincount) const;
 
   double
   local_max(const ContinuedFraction &cf,
