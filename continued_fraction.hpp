@@ -30,48 +30,48 @@
 struct ContinuedFraction {
   ContinuedFraction() {}
   ContinuedFraction(const std::vector<double> &ps_cf, 
-		    const int di, const size_t dg);
+                    const int di, const size_t dg);
   double operator()(const double val) const;
 
   void 
   extrapolate_distinct(const std::vector<double> &counts_hist,
-		       const double max_value, const double step_size,
-		       std::vector<double> &estimates) const;
+                       const double max_value, const double step_size,
+                       std::vector<double> &estimates) const;
 
   void
   extrapolate_count(const std::vector<double> &counts_hist,
-		    const double max_value,
-		    const double step_size,
-		    const size_t count,
-		    std::vector<double> &estimates) const;
+                    const double max_value,
+                    const double step_size,
+                    const size_t count,
+                    std::vector<double> &estimates) const;
 
   void
   extrapolate_mincount(const std::vector<double> &counts_hist,
-		       const double max_value,
-		       const double step_size,
-		       const size_t mincount,
-		       std::vector<double> &estimates) const;
+                       const double max_value,
+                       const double step_size,
+                       const size_t mincount,
+                       std::vector<double> &estimates) const;
   
   void 
   extrapolate_saturation(const std::vector<double> &counts_hist,
-			 const double vals_sum,
-			 const double max_value, 
-			 const double step_size,
-			 std::vector<double> &saturation) const;
+                         const double vals_sum,
+                         const double max_value, 
+                         const double step_size,
+                         std::vector<double> &saturation) const;
 
   void 
   extrapolate_yield_deriv(const std::vector<double> &counts_hist,
-			  const double vals_sum,
-			  const double max_value, 
-			  const double step_size,
-			  std::vector<double> &saturation) const;
+                          const double vals_sum,
+                          const double max_value, 
+                          const double step_size,
+                          std::vector<double> &saturation) const;
 
   double complex_deriv(const double val) const;
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
 
   static ContinuedFraction decrease_degree(const ContinuedFraction &CF,
-					   const size_t decrement);
+                                           const size_t decrement);
   
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -88,7 +88,7 @@ class ContinuedFractionApproximation {
 public:
   // Constructor
   ContinuedFractionApproximation(const int di, const size_t mt, 
-				 const double ss, const double mv);
+                                 const double ss, const double mv);
   
   //find best cont frac approx for estimating distinct
   ContinuedFraction
@@ -97,16 +97,16 @@ public:
   // find best cont frac approx for estimating count
   ContinuedFraction
   optimal_cont_frac_count(const std::vector<double> &counts_hist,
-			  const size_t count) const;
+                          const size_t count) const;
 
   // find best cont frac approx for estimating # reads w/ mincount
   ContinuedFraction
   optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
-			     const size_t mincount) const;
+                             const size_t mincount) const;
 
   double
   local_max(const ContinuedFraction &cf,
-	    const double deriv_upper_bound) const;
+            const double deriv_upper_bound) const;
 
 private:
   
@@ -116,7 +116,7 @@ private:
   double max_value; // the largest value to check when training
 
   double locate_zero_cf_deriv(const ContinuedFraction &cf, 
-			      const double val, const double prev_val) const;
+                              const double val, const double prev_val) const;
   static const size_t MIN_ALLOWED_DEGREE = 5;
   
   // largest value to search for lowerbound and stability
@@ -128,3 +128,4 @@ private:
 };
 
 #endif
+ 
