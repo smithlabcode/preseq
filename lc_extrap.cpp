@@ -335,14 +335,13 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     throw SMITHLABException("too many iterations, poor sample");
 }
 
-/*
+
 static inline double
 alpha_log_confint_multiplier(const double estimate,
-			     const double initial_distinct,
 			     const double variance, const double alpha) {
   const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
   return exp(inv_norm_alpha*
-	     sqrt(log(1.0 + variance/pow(estimate - initial_distinct, 2))));
+	     sqrt(log(1.0 + variance/pow(estimate, 2))));
 }
 
 
@@ -351,7 +350,10 @@ return_median_and_ci(const vector<vector<double> > &estimates,
 		     const double alpha, const double initial_distinct,
 		     const double vals_sum, const double step_size, 
 		     vector<double> &median_estimates,
-		     vector<double> &lower_ci, vector<double> &upper_ci) {
+		     vector<double> &lower_ci_lognormal, 
+		     vector<double> &upper_ci_lognormal,
+		     vector<double> &lower_ci_quantile,
+		     vector<double> &upper_ci_quantile) {
   
   assert(!estimates.empty());
   
@@ -371,50 +373,11 @@ return_median_and_ci(const vector<vector<double> > &estimates,
     median_estimates.push_back(curr_median);
     const double variance = gsl_stats_variance(&estimates_row[0], 1, n_est);
     const double confint_mltr = 
-      alpha_log_confint_multiplier(curr_median, initial_distinct, 
-				   variance, alpha);
-    if(curr_median > initial_distinct){
-      upper_ci.push_back(initial_distinct + 
-			 (curr_median - initial_distinct)*confint_mltr);
-      lower_ci.push_back(initial_distinct + 
-			 (curr_median - initial_distinct)/confint_mltr);
-    }
-    else{
-      lower_ci.push_back(initial_distinct + 
-			 (curr_median - initial_distinct)*confint_mltr);
-      upper_ci.push_back(initial_distinct + 
-			 (curr_median - initial_distinct)/confint_mltr);
-    }
-  }
-}
-*/
-
-static void
-return_median_and_ci(const vector<vector<double> > &estimates,
-		     const double alpha, const double initial_distinct,
-		     const double vals_sum, const double step_size, 
-		     vector<double> &median_estimates,
-		     vector<double> &lower_ci, vector<double> &upper_ci) {
-  const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv(alpha/2.0);
-  assert(!estimates.empty());
-  
-  const size_t n_est = estimates.size();
-  vector<double> estimates_row(estimates.size(), 0.0);
-  for (size_t i = 0; i < estimates[0].size(); i++) {
-    
-    // estimates is in wrong order, work locally on const val
-    for (size_t k = 0; k < n_est; ++k)
-      estimates_row[k] = estimates[k][i];
-    
-    // sort to get confidence interval
-    sort(estimates_row.begin(), estimates_row.end());
-    const double curr_median = 
-      gsl_stats_median_from_sorted_data(&estimates_row[0], 1, n_est);
-    
-    median_estimates.push_back(curr_median);
-    const double std_dev = sqrt(gsl_stats_variance(&estimates_row[0], 1, n_est));
-    upper_ci.push_back(curr_median + inv_norm_alpha*std_dev);
-    lower_ci.push_back(curr_median - inv_norm_alpha*std_dev);
+      alpha_log_confint_multiplier(curr_median, variance, alpha);
+    lower_ci_lognormal.push_back(curr_median*confint_mltr);
+    upper_ci_lognormal.push_back(curr_median/confint_mltr);
+    upper_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 0.95));
+    lower_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 0.05));
   }
 }
 
@@ -422,24 +385,29 @@ static void
 write_predicted_curve(const string outfile, const double values_sum,
 		      const double c_level, const double step_size,
 		      const vector<double> &median_yield_estimates,
-		      const vector<double> &yield_lower_ci,
-		      const vector<double> &yield_upper_ci) {
+		      const vector<double> &yield_lower_ci_lognormal,
+		      const vector<double> &yield_upper_ci_lognormal,
+		      const vector<double> &yield_lower_ci_quantile,
+		      const vector<double> &yield_upper_ci_quantile) {
   std::ofstream of;
   if (!outfile.empty()) of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
   
   out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
-      << "LOWER_" << 100*c_level << "%CI\t"
-      << "UPPER_" << 100*c_level << "%CI" << endl;
+      << "LOGNORMAL_LOWER_" << 100*c_level << "%CI\t"
+      << "LOGNORMAL_UPPER_" << 100*c_level << "%CI\t" 
+      << "QUANTILE_LOWER_" << 100*c_level << "%CI\t" 
+      << "QUANTILE_UPPER_" << 100*c_level << "%CI" << endl;
   
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
   
-  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
+  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
   for (size_t i = 0; i < median_yield_estimates.size(); ++i)
     out << (i + 1)*step_size << '\t' 
 	<< median_yield_estimates[i] << '\t'
-	<< yield_lower_ci[i] << '\t' << yield_upper_ci[i] << endl;
+	<< yield_lower_ci_lognormal[i] << '\t' << yield_upper_ci_lognormal[i] << '\t'
+	<< yield_lower_ci_quantile[i] << '\t' << yield_upper_ci_quantile[i] << endl;
 }
 
 
@@ -585,11 +553,13 @@ main(const int argc, const char **argv) {
       cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       
     vector<double> median_yield_estimates;
-    vector<double> yield_upper_ci, yield_lower_ci;
+    vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal,
+      yield_upper_ci_quantile, yield_lower_ci_quantile;
     return_median_and_ci(yield_estimates, 1.0 - c_level, 
 			 initial_distinct, values_sum, step_size,
 			 median_yield_estimates, 
-			 yield_lower_ci, yield_upper_ci);
+			 yield_lower_ci_lognormal, yield_upper_ci_lognormal,
+			 yield_lower_ci_quantile, yield_upper_ci_quantile);
 
     
     /////////////////////////////////////////////////////////////////////
@@ -600,7 +570,8 @@ main(const int argc, const char **argv) {
     
     write_predicted_curve(outfile, values_sum, c_level, step_size,
 			  median_yield_estimates,
-			  yield_lower_ci, yield_upper_ci);
+			  yield_lower_ci_lognormal, yield_upper_ci_lognormal,
+			  yield_lower_ci_quantile, yield_upper_ci_quantile);
       
   }
   catch (SMITHLABException &e) {

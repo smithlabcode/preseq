@@ -710,12 +710,10 @@ check_yield_estimates_stability(const vector<double> &estimates) {
   // is below the initial distinct per step_size
   for (size_t i = 1; i < estimates.size(); ++i){
     if (estimates[i] < estimates[i - 1] ){
-      cerr << "estimates decreasing" << endl;
       return false;
     }
     if(i >= 2 && (estimates[i] - estimates[i - 1] >
                   estimates[i - 1] - estimates[i - 2])){
-      cerr << "estimates not concave" << endl;
       return false;
     }
   }
