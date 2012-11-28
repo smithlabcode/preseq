@@ -23,8 +23,6 @@
 #include <vector>
 #include <numeric>
 
-#include "continued_fraction.hpp"
-#include "pade_approximant.hpp"
 #include "newtons_method.hpp"
 
 double
@@ -33,11 +31,13 @@ chao87_lowerbound_librarysize(const std::vector<double> &counts_hist);
 double 
 cl92_estimate_librarysize(const std::vector<double> &counts_hist);
 
+/*
 double
 harris_lowerbound_librarysize(const std::vector<double> &counts_hist,
 			      const double tolerance,
 			      const size_t max_iter,
 			      const size_t depth);
+*/
 
 double
 my_harris(const bool VERBOSE,

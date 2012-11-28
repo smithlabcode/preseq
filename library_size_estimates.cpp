@@ -33,8 +33,6 @@
 #include "smithlab_utils.hpp"
 
 #include "library_size_estimates.hpp"
-#include "pade_approximant.hpp"
-#include "continued_fraction.hpp"
 #include "newtons_method.hpp"
 
 using std::string;
@@ -137,13 +135,15 @@ cl92_estimate_librarysize(const vector<double> &counts_hist) {
 
 //////////////////////////////////////////////////
 // Harris (1959) lower bound
-
+/*
 struct pars{
+  // observed moments
   vector<double> moments;
+  // number of captures, i.e. mapped reads
   double N;
 };
 
-void
+static void
 set_lambdas(const gsl_vector *lambdas_xs,
 	    const size_t dim,
 	    vector<double> &lambdas){
@@ -154,7 +154,7 @@ set_lambdas(const gsl_vector *lambdas_xs,
   lambdas.push_back(gsl_vector_get(lambdas_xs, dim));
 }
 
-void
+static void
 set_xs(const gsl_vector *lambdas_xs,
        const size_t dim,
        vector<double> &xs){
@@ -171,7 +171,7 @@ set_xs(const gsl_vector *lambdas_xs,
 // sum_i lambda_i x_i^2 = mu_2
 // ....
 // sum_i lambda_i x_i^k = mu_k
-int
+static int
 set_system_eqns(const gsl_vector *lambdas_xs, 
 		void *param,
 		gsl_vector *f){
@@ -201,7 +201,9 @@ set_system_eqns(const gsl_vector *lambdas_xs,
   return GSL_SUCCESS;
 }
 
-int
+
+// compute and set the jacobian
+static int
 set_system_jacobian(const gsl_vector *lambdas_xs,
 		    void *param,
 		    gsl_matrix *Jacob){
@@ -235,7 +237,9 @@ set_system_jacobian(const gsl_vector *lambdas_xs,
   return GSL_SUCCESS;
 }
 
-int
+
+// set function value and jacobian
+static int
 set_fdf(const gsl_vector *lambdas_xs,
 	void *param,
 	gsl_vector *f,
@@ -265,6 +269,7 @@ print_state(const size_t iter,
 
 //Harris (AnnalsMathStat 1959) lower bound, 
 // Chao's(1987) bound is a simple approx
+// uses gsl's newton's method
 double 
 harris_lowerbound_librarysize(const vector<double> &counts_hist,
 			      const double tolerance,
@@ -284,6 +289,7 @@ harris_lowerbound_librarysize(const vector<double> &counts_hist,
 
 
   // need to use an even number of coefficients
+  // odd number gives upper bound ( = infty)
   if(depth % 2 == 1)
     measure_moments.pop_back();
 
@@ -364,7 +370,10 @@ harris_lowerbound_librarysize(const vector<double> &counts_hist,
 
   return lower_bound;
 }
+*/
 
+
+// generate random initial starting position
 static void
 generate_rand_initial(const size_t dim, const double values_sum,
 		      vector<double> &initial_lambdas,
@@ -408,6 +417,7 @@ my_harris(const bool VERBOSE,
 
 
   // need to use an even number of coefficients
+  // odd # gives upper bound
   if(depth % 2 == 1)
     measure_moments.pop_back();
 
@@ -420,7 +430,9 @@ my_harris(const bool VERBOSE,
   size_t iterations = 0;
   bool CONTINUE = true;
   do{
-    cerr << "iteration # " << iterations << "\t" << CONVERGENCE << endl;
+    if(VERBOSE)
+      cerr << "iteration # " << iterations << "\t" << CONVERGENCE << endl;
+
     generate_rand_initial(dim, values_sum, initial_lambdas, initial_xs);
 
     if(VERBOSE){
@@ -434,11 +446,14 @@ my_harris(const bool VERBOSE,
       cerr << endl;
     }
 
-    CONVERGENCE = newtons_method(VERBOSE, initial_lambdas, 
-				 initial_xs, measure_moments,
-				 values_sum, tolerance, max_iter, 
-				 root_lambdas, root_xs);
+    // one full iteration of my modified newtons method
+    CONVERGENCE = 
+      modified_newtons_method(VERBOSE, initial_lambdas, initial_xs, 
+			      measure_moments, values_sum, tolerance, 
+			      max_iter, root_lambdas, root_xs);
     iterations++;
+    // if newtons method did not converge, 
+    // start over from random starting position
     CONTINUE = (iterations < max_iter) && !CONVERGENCE;
   }while(CONTINUE);
 
@@ -462,7 +477,8 @@ my_harris(const bool VERBOSE,
     lower_bound += exp(log(counts_hist[1]) 
 		       + log(root_lambdas.back()) 
 		       -log(values_sum));
-    lower_bound += counts_hist[1];
+    lower_bound += 
+      accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   }
   else
     cerr << "did not converge" << endl;

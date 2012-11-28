@@ -26,14 +26,14 @@
 
 // unrestricted newtons method
 bool
-newtons_method(const bool VERBOSE,
-	       const std::vector<double> &initial_lambdas,
-	       const std::vector<double> &initial_xs,
-	       const std::vector<double> &moments,
-	       const double values_sum,
-	       const double tolerance, const size_t max_iter,
-	       std::vector<double> &root_lambdas,
-	       std::vector<double> &root_xs);
+modified_newtons_method(const bool VERBOSE,
+			const std::vector<double> &initial_lambdas,
+			const std::vector<double> &initial_xs,
+			const std::vector<double> &moments,
+			const double values_sum,
+			const double tolerance, const size_t max_iter,
+			std::vector<double> &root_lambdas,
+			std::vector<double> &root_xs);
 
 
 // newton's method so that all elements are strictly positive

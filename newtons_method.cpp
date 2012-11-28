@@ -128,6 +128,8 @@ check_convergence(const vector<double> &current_values,
   return false;
 }
 
+// check the x's to make sure all are strictly positive,
+// as guaranteed by Harris
 static inline bool
 check_positive(const vector<double> &x){
   bool POS_X = true;
@@ -136,6 +138,7 @@ check_positive(const vector<double> &x){
 
   return POS_X;
 }
+
 
 static inline bool
 check_finite(const vector<double> &x){
@@ -147,6 +150,21 @@ check_finite(const vector<double> &x){
 }
 
 static inline bool
+check_xs(const vector<double> &xs,
+	 const double N){
+  // Check if they are increasing and less than N
+  if(xs[0] > N)
+    return false;
+  if(xs.size() > 1){
+    for(size_t i = 1; i < xs.size(); i++)
+      if(xs[i] < xs[i - 1] || xs[i] > N)
+	return false;
+  }
+
+  return true;
+}
+
+static inline bool
 smaller_abs(const double a, const double b){
   return fabs(a) < fabs(b);
 }
@@ -154,58 +172,70 @@ smaller_abs(const double a, const double b){
 // we want the iteration to move in the same direction,
 // but we want no variable to be negative.
 static inline void
-calculate_nonneg_delta(const vector<double> &current_lambdas,
+calculate_nonneg_delta(const parameters &params,
+		       const vector<double> &current_lambdas,
 		       const vector<double> &current_xs,
 		       vector<double> &proposed_delta){
 
-  cerr << "proposed delta : ";
-  for(size_t i = 0; i < proposed_delta.size(); i++)
-    cerr << proposed_delta[i] << ", ";
-  cerr << endl;
+  const double upper_bound = params.vals_sum;
 
   // use L_infinity norm
   vector<double> full_vec(current_lambdas);
   full_vec.insert(full_vec.end(), current_xs.begin(), current_xs.end());
   assert(full_vec.size() == proposed_delta.size());
 
+  /*
   cerr << "full_vec = ";
   for(size_t i = 0; i < full_vec.size(); i++)
     cerr << full_vec[i] << ", ";
   cerr << endl;
+  */
 
   // multiplier = smallest y s.t. x_i + y*delta_x_i = 0
-  double multiplier = 
+  double lower_multiplier = 
     ( (full_vec[0] + proposed_delta[0] <= 0.0) ? 
       -full_vec[0]/proposed_delta[0] : numeric_limits<double>::max() );
   for(size_t i = 1; i < full_vec.size(); i++){
     if(full_vec[i] + proposed_delta[i] <= 0.0){
-      cerr << "indx " << i << " has neg new pos" << endl;
-      multiplier = std::min(multiplier, -full_vec[i]/proposed_delta[i]);
+      //    cerr << "indx " << i << " has neg new pos" << endl;
+      lower_multiplier = std::min(lower_multiplier, -full_vec[i]/proposed_delta[i]);
     }
   }
-  multiplier = multiplier/2.0;
+  //go only half the distance to origin
+  lower_multiplier = lower_multiplier/2.0;
 
-  cerr << "multiplier = " << multiplier << endl;
+  double upper_multiplier = 
+    ( (full_vec[0] + proposed_delta[0] >= upper_bound) ? 
+      (upper_bound - full_vec[0])/proposed_delta[0] : numeric_limits<double>::max() );
 
+  for(size_t i = 1; i < full_vec.size(); i++){
+    if(full_vec[i] + proposed_delta[i] >= upper_bound){
+      //    cerr << "indx " << i << " has neg new pos" << endl;
+      upper_multiplier = std::min(upper_multiplier, 
+				  (upper_bound - full_vec[i])/proposed_delta[i]);
+    }
+  }
+  //go only half the distance to upper boundary
+  upper_multiplier = upper_multiplier/2.0;
 
   // some new val is negative, 
   // set new delta in same direction as proposed,
   // make sure all new variables are positive
   // set new delta so that the largest neg new val
   // is halved
-      if(multiplier < 1.0){
-
+  if(lower_multiplier < 1.0 || upper_multiplier < 1.0){
+    double multiplier = std::min(lower_multiplier, upper_multiplier);
     for(size_t i = 0; i < proposed_delta.size(); i++)
       proposed_delta[i] = proposed_delta[i]*multiplier;
 
+    /*
     cerr << "new_delta : ";
     for(size_t i = 0; i < proposed_delta.size(); i++)
       cerr << proposed_delta[i] << ", ";
     cerr << endl;
+    */
 
   }
-  else
-    cerr << "multiplier is finite, accept proposed delta" << endl;
   // else the proposed_delta is acceptable, no new
   // vals are neg, do nothing
 }
@@ -239,9 +269,9 @@ iterate_newton(const vector<double> &current_values,
 
   gsl_linalg_LU_decomp(J, P, &signum_P);
 
-  double det = gsl_linalg_LU_det(J, signum_P);
+  double log_det = gsl_linalg_LU_lndet(J);
 
-  if(det != 0.0){
+  if(finite(fabs(log_det))){
 
     gsl_linalg_LU_solve(J, P, neg_f_vals, direction);
 
@@ -250,22 +280,34 @@ iterate_newton(const vector<double> &current_values,
     for(size_t i = 0; i < delta_x.size(); i++)
       delta_x[i] = gsl_vector_get(direction, i);
 
-    calculate_nonneg_delta(current_lambdas, current_xs,
-			   delta_x);
+    calculate_nonneg_delta(params, current_lambdas, 
+			   current_xs, delta_x);
 
 
 
     vector<double> new_lambdas = current_lambdas;
     for(size_t i = 0; i < current_lambdas.size(); i++)
       new_lambdas[i] += delta_x[i];
-    // should we normalize lambdas?  having success w/out normalization
+
+    // should we normalize lambdas?
+    const double lambdas_sum = accumulate(new_lambdas.begin(), new_lambdas.end(), 0.0);
+    for(size_t i = 0; i < new_lambdas.size(); i++)
+      new_lambdas[i] = new_lambdas[i]/lambdas_sum;
     params.lambdas = new_lambdas;
 
     vector<double> new_xs = current_xs;
     for(size_t i = 0; i < current_xs.size(); i++)
       new_xs[i] += delta_x[current_lambdas.size() + i];
+    
+    // check new points, exit with failure if they don't check
+    //  if(!check_xs(new_xs, params.vals_sum))
+    //    return false;
+
     params.xs = new_xs;
 
+    vector<double> new_values;
+    system_eqns(params, new_values);
+    /*
     cerr << "new lambdas: ";
     for(size_t i = 0; i < new_lambdas.size(); i++)
       cerr << new_lambdas[i] << ", ";
@@ -274,12 +316,48 @@ iterate_newton(const vector<double> &current_values,
     for(size_t i = 0; i < new_xs.size(); i++)
       cerr << new_xs[i] << ", ";
     cerr << endl;
+    cerr << "new values : ";
+    for(size_t i = 0 ; i < new_values.size(); i++)
+      cerr << new_values[i] << ", ";
+    cerr << endl;
+    */
+    
 
+    gsl_matrix_free(J);
+    gsl_permutation_free(P);
+    gsl_vector_free(neg_f_vals);
+    gsl_vector_free(direction);
     return true;
 
   }
-  else
-    cerr << "determinant too small,  restarting from rand pos" << endl;
+  /*
+  else{
+    cerr << "determinant too small, log det = " << log_det << ", restarting from rand pos" << endl;
+    cerr << "JACOBIAN = " << endl;
+    for(size_t i = 0; i < jacob.size(); i++){
+      for(size_t j = 0; j < jacob[i].size(); j++)
+	cerr << jacob[i][j] << ", ";
+      cerr << endl;
+    }
+    cerr << "CURRENT LAMBDAS = " << endl;
+    for(size_t i = 0 ; i < params.lambdas.size(); i++)
+      cerr << params.lambdas[i] << ", ";
+    cerr << endl;
+    cerr << "CURRENT Xs = " << endl;
+    for(size_t i = 0; i < params.xs.size(); i++)
+      cerr << params.xs[i] << ", ";
+    cerr << endl;
+    cerr << "CURRENT VALUES = " << endl;
+    for(size_t i = 0; i < current_values.size(); i++)
+      cerr << current_values[i] << ", ";
+    cerr << endl;
+    throw SMITHLABException("Fuck");
+  }
+  */
+  gsl_matrix_free(J);
+  gsl_permutation_free(P);
+  gsl_vector_free(neg_f_vals);
+  gsl_vector_free(direction);
 
   // if condition number too large, 
   // exit and flag iteration as unsuccesful
@@ -329,7 +407,7 @@ full_iteration_newton(const bool VERBOSE,
     CONTINUE = ITERATION_SUCCESS && (indx < max_iter) && !CONVERGED;
   }while(CONTINUE);
 
-  cerr << "new starting point" << endl;
+  //  cerr << "new starting point" << endl;
 
   //
   if(CONVERGED && ITERATION_SUCCESS){
@@ -342,14 +420,14 @@ full_iteration_newton(const bool VERBOSE,
 
 
 bool
-newtons_method(const bool VERBOSE,
-	       const vector<double> &initial_lambdas,
-	       const vector<double> &initial_xs,
-	       const vector<double> &in_moments,
-	       const double values_sum,
-	       const double tolerance, const size_t max_iter,
-	       vector<double> &root_lambdas,
-	       vector<double> &root_xs){
+modified_newtons_method(const bool VERBOSE,
+			const vector<double> &initial_lambdas,
+			const vector<double> &initial_xs,
+			const vector<double> &in_moments,
+			const double values_sum,
+			const double tolerance, const size_t max_iter,
+			vector<double> &root_lambdas,
+			vector<double> &root_xs){
 
   const size_t degrees_freedom = initial_lambdas.size() + initial_xs.size();
   // set params
@@ -362,6 +440,7 @@ newtons_method(const bool VERBOSE,
   bool FULL_ITER_SUCCESS = true;
   FULL_ITER_SUCCESS = full_iteration_newton(VERBOSE, tolerance, max_iter,
 					    degrees_freedom, params);
+
   // make sure all values are finite
   FULL_ITER_SUCCESS =
     FULL_ITER_SUCCESS && check_finite(params.lambdas) && check_finite(params.xs);
