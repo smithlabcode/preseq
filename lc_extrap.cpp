@@ -376,8 +376,9 @@ return_median_and_ci(const vector<vector<double> > &estimates,
       alpha_log_confint_multiplier(curr_median, variance, alpha);
     lower_ci_lognormal.push_back(curr_median*confint_mltr);
     upper_ci_lognormal.push_back(curr_median/confint_mltr);
-    upper_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 0.95));
-    lower_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 0.05));
+    upper_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 
+								    1.0 - alpha/2.0));
+    lower_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, alpha/2.0));
   }
 }
 

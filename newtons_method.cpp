@@ -255,10 +255,14 @@ iterate_newton(const vector<double> &current_values,
   for(size_t i = 0; i < current_values.size(); i++)
     gsl_vector_set(neg_f_vals, i, -current_values[i]);
 
-  gsl_matrix *J = gsl_matrix_alloc(jacob.size(), jacob[0].size());
-  for(size_t i = 0; i < jacob.size(); i++)
-    for(size_t k = 0; k < jacob[i].size(); k++)
-      gsl_matrix_set(J, i, k, jacob[i][k]);
+  gsl_matrix *LU = gsl_matrix_alloc(jacob.size(), jacob[0].size());
+  gsl_matrix *QR = gsl_matrix_alloc(jacob.size(), jacob[0].size());
+  for(size_t i = 0; i < jacob.size(); i++){
+    for(size_t k = 0; k < jacob[i].size(); k++){
+      gsl_matrix_set(QR, i, k, jacob[i][k]);
+      gsl_matrix_set(LU, i, k, jacob[i][k]);
+    }
+  }
 
   // delta_x = (x_n+1 - x_n) i.e. change in x at current iteration
   gsl_vector *direction = gsl_vector_calloc(current_lambdas.size() +  
@@ -266,14 +270,17 @@ iterate_newton(const vector<double> &current_values,
 
   gsl_permutation *P = gsl_permutation_alloc(jacob.size());
   int signum_P = 0;
+  gsl_vector *tau = gsl_vector_calloc(jacob.size());
 
-  gsl_linalg_LU_decomp(J, P, &signum_P);
+  gsl_linalg_LU_decomp(LU, P, &signum_P);
+  gsl_linalg_QR_decomp(QR, tau);
 
-  double log_det = gsl_linalg_LU_lndet(J);
+  double log_det = gsl_linalg_LU_lndet(LU);
 
   if(finite(fabs(log_det))){
 
-    gsl_linalg_LU_solve(J, P, neg_f_vals, direction);
+    gsl_linalg_LU_solve(LU, P, neg_f_vals, direction);
+    //gsl_linalg_QR_solve(QR, tau, neg_f_vals, direction);
 
     vector<double> delta_x(current_lambdas.size() 
 			   + current_xs.size(), 0.0);
@@ -323,10 +330,12 @@ iterate_newton(const vector<double> &current_values,
     */
     
 
-    gsl_matrix_free(J);
+    gsl_matrix_free(LU);
+    gsl_matrix_free(QR);
     gsl_permutation_free(P);
     gsl_vector_free(neg_f_vals);
     gsl_vector_free(direction);
+    gsl_vector_free(tau);
     return true;
 
   }
@@ -354,10 +363,12 @@ iterate_newton(const vector<double> &current_values,
     throw SMITHLABException("Fuck");
   }
   */
-  gsl_matrix_free(J);
+  gsl_matrix_free(LU);
+  gsl_matrix_free(QR);
   gsl_permutation_free(P);
   gsl_vector_free(neg_f_vals);
   gsl_vector_free(direction);
+  gsl_vector_free(tau);
 
   // if condition number too large, 
   // exit and flag iteration as unsuccesful

@@ -125,9 +125,9 @@ main(const int argc, const char **argv) {
     /* FILES */
     string outfile;
     
-    size_t orig_max_terms = 200;
+    size_t orig_max_terms = 5;
     double lib_size = 3.0e9;
-    double sampled_reads = 1e6;
+    double sampled_reads = 1e7;
     double alpha = 1.0;
     double tolerance = 1e-8;
     size_t max_iter = 1000;

@@ -565,7 +565,7 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
     estimates.push_back(hist_sum + t*operator()(t));
 }
 
-
+/*
 void
 ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
                                      const double max_value,
@@ -578,6 +578,7 @@ ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
   for (double t = step_size; t <= max_value; t += step_size)
     estimates.push_back(operator()(t));
 }
+*/
 
 void
 ContinuedFraction::extrapolate_mincount(const vector<double> &counts_hist,

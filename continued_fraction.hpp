@@ -28,23 +28,34 @@
 #include <cassert>
 
 struct ContinuedFraction {
+  // Constructors
   ContinuedFraction() {}
   ContinuedFraction(const std::vector<double> &ps_cf, 
                     const int di, const size_t dg);
+
+  // Evaluate the continued fraction
   double operator()(const double val) const;
 
+  // Evaluate the continued fraction estimating distinct
+  // along a curve from 0 to max_value
   void 
   extrapolate_distinct(const std::vector<double> &counts_hist,
                        const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
 
+  /*
+  // Evaluate the continued fraction estimating read count 
+  // along a curve from 0 to max_value
   void
   extrapolate_count(const std::vector<double> &counts_hist,
                     const double max_value,
                     const double step_size,
                     const size_t count,
                     std::vector<double> &estimates) const;
+  */
 
+  // Evaluate the continued fraction estimating # reads with mincount
+  // along curve from 0 to max_value
   void
   extrapolate_mincount(const std::vector<double> &counts_hist,
                        const double max_value,
@@ -52,6 +63,8 @@ struct ContinuedFraction {
                        const size_t mincount,
                        std::vector<double> &estimates) const;
   
+  // Evalute the continued fraction estimating saturation 
+  // along curve from 0 to max_value
   void 
   extrapolate_saturation(const std::vector<double> &counts_hist,
                          const double vals_sum,
@@ -59,6 +72,8 @@ struct ContinuedFraction {
                          const double step_size,
                          std::vector<double> &saturation) const;
 
+  // Evaluate the saturation along a curve from 0 to max_value
+  // by taking numerical derivative of the distinct continued fraction approx
   void 
   extrapolate_yield_deriv(const std::vector<double> &counts_hist,
                           const double vals_sum,
@@ -66,10 +81,13 @@ struct ContinuedFraction {
                           const double step_size,
                           std::vector<double> &saturation) const;
 
+  // Evaluate derivative by complex #s
   double complex_deriv(const double val) const;
+
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
 
+  // Return new ContinuedFraction with degree decrement less than CF
   static ContinuedFraction decrease_degree(const ContinuedFraction &CF,
                                            const size_t decrement);
   
@@ -104,6 +122,7 @@ public:
   optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
                              const size_t mincount) const;
 
+  // find a local maximum located btwn 0 & deriv_upper_bound
   double
   local_max(const ContinuedFraction &cf,
             const double deriv_upper_bound) const;
