@@ -42,8 +42,7 @@ struct ContinuedFraction {
   extrapolate_distinct(const std::vector<double> &counts_hist,
                        const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
-
-  /*
+  
   // Evaluate the continued fraction estimating read count 
   // along a curve from 0 to max_value
   void
@@ -52,7 +51,7 @@ struct ContinuedFraction {
                     const double step_size,
                     const size_t count,
                     std::vector<double> &estimates) const;
-  */
+ 
 
   // Evaluate the continued fraction estimating # reads with mincount
   // along curve from 0 to max_value
@@ -115,7 +114,7 @@ public:
   // find best cont frac approx for estimating count
   ContinuedFraction
   optimal_cont_frac_count(const std::vector<double> &counts_hist,
-                          const size_t count) const;
+			  const size_t count) const;
 
   // find best cont frac approx for estimating # reads w/ mincount
   ContinuedFraction

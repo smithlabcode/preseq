@@ -59,13 +59,36 @@ renormalize_hist(const vector<double> &hist_in,
 */
 
 void
+resample_hist(const gsl_rng *rng, const vector<double> &expected_hist,
+	      const double total_sampled_reads,
+	      vector<double> &sample_hist) {
+  
+  const size_t hist_size = expected_hist.size();
+  
+  sample_hist = vector<double>(hist_size, 0.0);
+  vector<unsigned int> curr_sample(hist_size);  
+    
+    // get a new sample
+  gsl_ran_multinomial(rng, hist_size, 
+		      static_cast<unsigned int>(total_sampled_reads),
+		      &expected_hist.front(), &curr_sample.front());
+
+  double sampled_reads = 0.0;    
+  for (size_t i = 0; i < hist_size; i++){
+    sample_hist[i] += static_cast<double>(curr_sample[i]);
+    sampled_reads += i*sample_hist[i];
+  }
+  
+}
+
+
+void
 randomize_coefficients_compare_bounds(const bool VERBOSE,
 				      const vector<double> &counts_hist, 
 				      const double tolerance,
 				      const size_t max_iter, 
 				      const size_t max_terms,
 				      const size_t bootstraps,
-				      const size_t rand_indx,
 				      vector<double> &chao_bounds,
 				      vector<double> &harris_bounds){
 
@@ -78,13 +101,27 @@ randomize_coefficients_compare_bounds(const bool VERBOSE,
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(rng, rand()); 
 
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    vals_sum += i*counts_hist[i];
+
+  cerr << "vals_sum = " << vals_sum << endl;
+
+  const double vals_size = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+
+  cerr << "vals_size = " << vals_size << endl;
+  size_t indx = 0;
   while(chao_bounds.size() < bootstraps){
+    cerr << indx << endl;
+    vector<double> rand_counts_hist;
 
-    vector<double> rand_counts_hist(counts_hist);
-
-    rand_counts_hist[rand_indx] = gsl_ran_poisson(rng, counts_hist[rand_indx]);
-
-    //    renormalize_hist(counts_hist, rand_counts_hist);
+    resample_hist(rng, counts_hist, vals_sum, rand_counts_hist);
+    if(VERBOSE){
+      cerr << "sampled hist" << endl;
+      for(size_t i = 0; i < rand_counts_hist.size(); i++)
+	if(rand_counts_hist[i] > 0)
+	  cerr << i << "\t" << rand_counts_hist[i] << endl;
+    }
 
     const double harris_lower_bound = my_harris(VERBOSE, rand_counts_hist, tolerance,
 						max_iter, max_terms);
@@ -132,7 +169,6 @@ main(const int argc, const char **argv) {
     double tolerance = 1e-8;
     size_t max_iter = 1000;
     size_t hist_max_terms = 1000;
-    size_t rand_indx = 1;
     size_t bootstraps = 1000;
     double CI = 0.95;
 
@@ -161,8 +197,6 @@ main(const int argc, const char **argv) {
 		      false, tolerance);
     opt_parse.add_opt("max_iter",'i',"maximum # iterations",
 		      false, max_iter);
-    opt_parse.add_opt("rand_indx",'r',"index to randomize",
-		      false, rand_indx);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps to perform",
 		      false, bootstraps);
     opt_parse.add_opt("CI",'c', "Confidence level",
@@ -233,8 +267,7 @@ main(const int argc, const char **argv) {
     vector<double> chao_bounds, harris_bounds;
     randomize_coefficients_compare_bounds(VERBOSE, counts_hist, tolerance,
 					  max_iter, orig_max_terms,
-					  bootstraps, rand_indx,
-					  chao_bounds, harris_bounds);
+					  bootstraps, chao_bounds, harris_bounds);
 
     double median_diff, upper_CI, lower_CI;
     compute_mediandiff_CI(chao_bounds, harris_bounds, 1.0 - CI, median_diff,
@@ -244,11 +277,9 @@ main(const int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-    out << "median_diff" << '\t' << "lower" << CI << "CI" 
-	<< '\t' << "upper" << CI << "CI" << endl;
-
-    out << median_diff << '\t' << lower_CI << '\t'
-	<< upper_CI << endl;
+    out << "chao" << "\t" << "harris" << endl;
+    for(size_t i = 0; i < chao_bounds.size(); i++)
+      out << chao_bounds[i] << "\t" << harris_bounds[i] << endl;
 
 
 

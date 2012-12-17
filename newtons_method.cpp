@@ -396,7 +396,7 @@ full_iteration_newton(const bool VERBOSE,
     ITERATION_SUCCESS = iterate_newton(current_func_vals, J, tolerance, params);
 
     system_eqns(params, current_func_vals);
-
+    /*
     if(VERBOSE){
       cerr << "new lambdas : ";
       for(size_t i = 0; i < params.lambdas.size(); i++)
@@ -407,6 +407,7 @@ full_iteration_newton(const bool VERBOSE,
 	cerr << params.xs[i] << ", ";
       cerr << endl;
     }
+    */
 
     CONVERGED = check_convergence(current_func_vals, tolerance);
     indx++;	

@@ -317,12 +317,15 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	yield_vector.push_back(initial_distinct + t*lower_cf(t));
 	sample_size += step_size;
       }
-    }
     
     // SANITY CHECK    
-    if (check_yield_estimates(yield_vector)) {
-      yield_estimates.push_back(yield_vector);
-      if (VERBOSE) cerr << '.';
+      if (check_yield_estimates(yield_vector)) {
+	yield_estimates.push_back(yield_vector);
+	if (VERBOSE) cerr << '.';
+      }
+      else if (VERBOSE){
+	cerr << '_';
+      }
     }
     else if (VERBOSE){
       cerr << '_';

@@ -565,7 +565,7 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
     estimates.push_back(hist_sum + t*operator()(t));
 }
 
-/*
+
 void
 ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
                                      const double max_value,
@@ -578,7 +578,7 @@ ContinuedFraction::extrapolate_count(const vector<double> &counts_hist,
   for (double t = step_size; t <= max_value; t += step_size)
     estimates.push_back(operator()(t));
 }
-*/
+
 
 void
 ContinuedFraction::extrapolate_mincount(const vector<double> &counts_hist,
@@ -796,6 +796,7 @@ check_count_estimates_stability(const vector<double> &estimates,
   return true;
 }
 
+
 static void
 construct_count_ps_coeffs(const vector<double> &counts_hist,
                           const size_t max_terms, const size_t count,
@@ -829,13 +830,12 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
   vector<double> ps_coeffs;
   construct_count_ps_coeffs(counts_hist, max_terms, count, ps_coeffs);
 
-  /*
-  for (size_t j = 0; j < max_terms; j++){
-    const double binom_coeff =
-      exp(gsl_sf_lnfact(j + count) - gsl_sf_lnfact(j) - gsl_sf_lnfact(count));
-    ps_coeffs.push_back(pow(-1.0, j)*binom_coeff*counts_hist[j + count]);  
-  }
-  */
+  
+ // for (size_t j = 0; j < max_terms; j++){
+ //   const double binom_coeff =
+ //     exp(gsl_sf_lnfact(j + count) - gsl_sf_lnfact(j) - gsl_sf_lnfact(count));
+ //   ps_coeffs.push_back(pow(-1.0, j)*binom_coeff*counts_hist[j + count]);  
+ // }
   int order = 0;
 
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order)){
@@ -864,6 +864,7 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
   // no stable continued fraction: return null
   return ContinuedFraction();  
 }
+  
 
 /*
 static void
