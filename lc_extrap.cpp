@@ -112,7 +112,7 @@ load_values_BAM(const string &input_file_name, vector<double> &values) {
 
 
 static size_t
-load_values(const string input_file_name, vector<double> &values) {
+load_values_BED(const string input_file_name, vector<double> &values) {
   
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -136,6 +136,34 @@ load_values(const string input_file_name, vector<double> &values) {
   return n_reads;
 }
 
+static size_t
+load_values(const string input_file_name, vector<double> &values) {
+
+  std::ifstream in(input_file_name.c_str());
+  if (!in)
+    throw SMITHLABException("problem opening file: " + input_file_name);
+
+  vector<double> full_values;
+  size_t n_reads = 0;
+  static const size_t buffer_size = 10000; // Magic!
+  while(!in.eof()){
+    char buffer[buffer_size];
+    in.getline(buffer, buffer_size);
+    full_values.push_back(atof(buffer));
+    if(full_values.back() <= 0.0){
+      cerr << "INVALID INPUT\t" << buffer << endl;
+      throw SMITHLABException("ERROR IN INPUT");
+    }
+    ++n_reads;
+    in.peek();
+  }
+  in.close();
+  if(full_values.back() == 0)
+    full_values.pop_back();
+
+  values.swap(full_values);
+  return n_reads;
+}
 
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
@@ -435,7 +463,7 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    // bool SMOOTH_HISTOGRAM = false;	
+    bool VALS_INPUT = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -465,6 +493,9 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false, BAM_FORMAT_INPUT);
 #endif
+    opt_parse.add_opt("vals", 'V', 
+		      "input is a text file containing only the observed counts",
+		      false, VALS_INPUT);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -488,12 +519,15 @@ main(const int argc, const char **argv) {
     /******************************************************************/
     
     vector<double> values;
-#ifdef HAVE_BAMTOOLS
-    if (BAM_FORMAT_INPUT)
-      load_values_BAM(input_file_name, values);
-    else
-#endif
+    if(VALS_INPUT)
       load_values(input_file_name, values);
+#ifdef HAVE_BAMTOOLS
+    else if (BAM_FORMAT_INPUT)
+      load_values_BAM(input_file_name, values);
+#endif
+    else
+      load_values_BED(input_file_name, values);
+
 
     const double initial_distinct = static_cast<double>(values.size());
     
