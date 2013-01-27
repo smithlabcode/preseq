@@ -76,8 +76,42 @@ BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
 
 
 static size_t
-load_values_BAM(const string &input_file_name, vector<double> &values) {
+load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   
+  BamReader reader;
+  reader.Open(input_file_name);
+
+  // Get header and reference
+  string header = reader.GetHeaderText();
+  RefVector refs = reader.GetReferenceData();
+
+  unordered_map<size_t, string> chrom_lookup;
+  for (size_t i = 0; i < refs.size(); ++i)
+    chrom_lookup[i] = refs[i].RefName;
+
+  size_t n_reads = 1;
+  values.push_back(1.0);
+
+  SimpleGenomicRegion prev;
+  BamAlignment bam;
+  while (reader.GetNextAlignment(bam)) {
+    SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
+      values.push_back(1.0);
+    else values.back()++;
+    ++n_reads;
+    prev.swap(r);
+  }
+  reader.Close();
+  return n_reads;
+}
+
+static size_t
+load_values_BAM_pe(const string &input_file_name, vector<double> &values) {
+
   BamReader reader;
   reader.Open(input_file_name);
 
@@ -112,7 +146,7 @@ load_values_BAM(const string &input_file_name, vector<double> &values) {
 
 
 static size_t
-load_values_BED(const string input_file_name, vector<double> &values) {
+load_values_BED_se(const string input_file_name, vector<double> &values) {
   
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -125,8 +159,9 @@ load_values_BED(const string input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
   while (in >> r) {
-    if (r < prev)
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
       throw SMITHLABException("locations unsorted in: " + input_file_name);
+
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
       values.push_back(1.0);
     else values.back()++;
@@ -135,6 +170,35 @@ load_values_BED(const string input_file_name, vector<double> &values) {
   }
   return n_reads;
 }
+
+static size_t
+load_values_BED_pe(const string input_file_name, vector<double> &values) {
+
+ std::ifstream in(input_file_name.c_str());
+ if (!in)
+   throw "problem opening file: " + input_file_name;
+
+ GenomicRegion r, prev;
+ if (!(in >> prev))
+   throw "problem reading from: " + input_file_name;
+
+ size_t n_reads = 1;
+ values.push_back(1.0);
+ while (in >> r) {
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start() 
+	&& r.get_end() < prev.get_end())
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() 
+	|| r.get_end() != prev.get_end())
+     values.push_back(1.0);
+   else values.back()++;
+   ++n_reads;
+   prev.swap(r);
+ }
+ return n_reads;
+}
+
 
 static size_t
 load_values(const string input_file_name, vector<double> &values) {
@@ -382,9 +446,7 @@ return_median_and_ci(const vector<vector<double> > &estimates,
 		     const double vals_sum, const double step_size, 
 		     vector<double> &median_estimates,
 		     vector<double> &lower_ci_lognormal, 
-		     vector<double> &upper_ci_lognormal,
-		     vector<double> &lower_ci_quantile,
-		     vector<double> &upper_ci_quantile) {
+		     vector<double> &upper_ci_lognormal) {
   
   assert(!estimates.empty());
   
@@ -407,9 +469,6 @@ return_median_and_ci(const vector<vector<double> > &estimates,
       alpha_log_confint_multiplier(curr_median, variance, alpha);
     lower_ci_lognormal.push_back(curr_median*confint_mltr);
     upper_ci_lognormal.push_back(curr_median/confint_mltr);
-    upper_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, 
-								    1.0 - alpha/2.0));
-    lower_ci_quantile.push_back(gsl_stats_quantile_from_sorted_data(&estimates_row[0], 1, n_est, alpha/2.0));
   }
 }
 
@@ -418,9 +477,7 @@ write_predicted_curve(const string outfile, const double values_sum,
 		      const double c_level, const double step_size,
 		      const vector<double> &median_yield_estimates,
 		      const vector<double> &yield_lower_ci_lognormal,
-		      const vector<double> &yield_upper_ci_lognormal,
-		      const vector<double> &yield_lower_ci_quantile,
-		      const vector<double> &yield_upper_ci_quantile) {
+		      const vector<double> &yield_upper_ci_lognormal) {
   std::ofstream of;
   if (!outfile.empty()) of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
@@ -438,8 +495,7 @@ write_predicted_curve(const string outfile, const double values_sum,
   for (size_t i = 0; i < median_yield_estimates.size(); ++i)
     out << (i + 1)*step_size << '\t' 
 	<< median_yield_estimates[i] << '\t'
-	<< yield_lower_ci_lognormal[i] << '\t' << yield_upper_ci_lognormal[i] << '\t'
-	<< yield_lower_ci_quantile[i] << '\t' << yield_upper_ci_quantile[i] << endl;
+	<< yield_lower_ci_lognormal[i] << '\t' << yield_upper_ci_lognormal[i] << endl;
 }
 
 
@@ -596,8 +652,7 @@ main(const int argc, const char **argv) {
     return_median_and_ci(yield_estimates, 1.0 - c_level, 
 			 initial_distinct, values_sum, step_size,
 			 median_yield_estimates, 
-			 yield_lower_ci_lognormal, yield_upper_ci_lognormal,
-			 yield_lower_ci_quantile, yield_upper_ci_quantile);
+			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
     
     /////////////////////////////////////////////////////////////////////
@@ -608,8 +663,7 @@ main(const int argc, const char **argv) {
     
     write_predicted_curve(outfile, values_sum, c_level, step_size,
 			  median_yield_estimates,
-			  yield_lower_ci_lognormal, yield_upper_ci_lognormal,
-			  yield_lower_ci_quantile, yield_upper_ci_quantile);
+			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
       
   }
   catch (SMITHLABException &e) {

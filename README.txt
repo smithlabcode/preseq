@@ -1,23 +1,24 @@
-This is the README file for the first release of Rational Function 
-Complexity. Rational Function Complexity is a tool for estimating 
-bounds on the number of distinct reads contained in a sequencing 
-library and the yield obtained from a high-throughput sequencing
-experiment.
+This is the README file for the first release of preseq.  The 
+preseq package is aimed at predicting the yield of distinct 
+reads from a genomic library from an initial sequencing 
+experiment. The estimates can then be used to examine the utility 
+of further sequencing, optimize the sequencing depth, or to 
+screen multiple libraries to avoid low complexity samples.
+
 
 CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
 tdaley@usc.edu
-http://smithlab.cmb.usc.edu
+http://smithlab.usc.edu
 
 SYSTEM REQUIREMENTS:
 ========================================================================
-The Rational Function Complexity software will only run on 64-bit
-UNIX-like operating systems and was developed on Linux systems. The 
-Rational Function Complexity software requires a fairly recent C++ 
-compiler (i.e. it must include tr1 headers).  
-Rational Function Complexity has been compiled and tested on Linux 
-and Mac OS X operating systems using GCC v4.1 or greater. 
+The preseq software will only run on 64-bit UNIX-like operating 
+systems and was developed on Linux systems. The preseq software 
+requires a fairly recent C++ compiler (i.e. it must include tr1 
+headers). preseq has been compiled and tested on Linux and Mac 
+OS X operating systems using GCC v4.1 or greater. 
 
 INSTALLATION:
 ========================================================================
@@ -32,10 +33,9 @@ to make the programs.
 INPUT FILE FORMAT:
 ========================================================================
 Input files can be either in bed or bam file format.  The file should
-be sorted by chromosome, end position, start position, and finally 
+be sorted by chromosome, start position, strand position, and finally 
 strand if in bed format. If the file is in bam format, then the file
-should be sorted using bamtools sort.  This will ignore strand, so
-to distinguish reads by strand bed format must be used.
+should be sorted using bamtools or samtools sort.
 
 USAGE EXAMPLES:
 ========================================================================
@@ -73,13 +73,13 @@ distinct reads.
 
 HISTORY
 ========================================================================
-Rational Function Complexity was originally developed by Timothy Daley
-and Andrew Smith at the University of Southern California.
+preseq was originally developed by Timothy Daley and Andrew Smith 
+at the University of Southern California.
 
 
 LICENSE
 ========================================================================
-The Rational Function Complexity software for estimating complexity
+The preseq software for estimating complexity
 Copyright (C) 2012 Timothy Daley and Andrew D Smith and 
 the University of Southern California
 
