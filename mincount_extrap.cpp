@@ -76,8 +76,42 @@ BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
 
 
 static size_t
-load_values_BAM(const string &input_file_name, vector<double> &values) {
+load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   
+  BamReader reader;
+  reader.Open(input_file_name);
+
+  // Get header and reference
+  string header = reader.GetHeaderText();
+  RefVector refs = reader.GetReferenceData();
+
+  unordered_map<size_t, string> chrom_lookup;
+  for (size_t i = 0; i < refs.size(); ++i)
+    chrom_lookup[i] = refs[i].RefName;
+
+  size_t n_reads = 1;
+  values.push_back(1.0);
+
+  SimpleGenomicRegion prev;
+  BamAlignment bam;
+  while (reader.GetNextAlignment(bam)) {
+    SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
+      values.push_back(1.0);
+    else values.back()++;
+    ++n_reads;
+    prev.swap(r);
+  }
+  reader.Close();
+  return n_reads;
+}
+
+static size_t
+load_values_BAM_pe(const string &input_file_name, vector<double> &values) {
+
   BamReader reader;
   reader.Open(input_file_name);
 
@@ -112,7 +146,7 @@ load_values_BAM(const string &input_file_name, vector<double> &values) {
 
 
 static size_t
-load_values(const string input_file_name, vector<double> &values) {
+load_values_BED_se(const string input_file_name, vector<double> &values) {
   
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -125,8 +159,9 @@ load_values(const string input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
   while (in >> r) {
-    if (r < prev)
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
       throw SMITHLABException("locations unsorted in: " + input_file_name);
+
     if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
       values.push_back(1.0);
     else values.back()++;
@@ -136,6 +171,63 @@ load_values(const string input_file_name, vector<double> &values) {
   return n_reads;
 }
 
+static size_t
+load_values_BED_pe(const string input_file_name, vector<double> &values) {
+
+ std::ifstream in(input_file_name.c_str());
+ if (!in)
+   throw "problem opening file: " + input_file_name;
+
+ GenomicRegion r, prev;
+ if (!(in >> prev))
+   throw "problem reading from: " + input_file_name;
+
+ size_t n_reads = 1;
+ values.push_back(1.0);
+ while (in >> r) {
+    if (r.same_chrom(prev) && r.get_start() < prev.get_start() 
+	&& r.get_end() < prev.get_end())
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    
+    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() 
+	|| r.get_end() != prev.get_end())
+     values.push_back(1.0);
+   else values.back()++;
+   ++n_reads;
+   prev.swap(r);
+ }
+ return n_reads;
+}
+
+
+static size_t
+load_values(const string input_file_name, vector<double> &values) {
+
+  std::ifstream in(input_file_name.c_str());
+  if (!in)
+    throw SMITHLABException("problem opening file: " + input_file_name);
+
+  vector<double> full_values;
+  size_t n_reads = 0;
+  static const size_t buffer_size = 10000; // Magic!
+  while(!in.eof()){
+    char buffer[buffer_size];
+    in.getline(buffer, buffer_size);
+    full_values.push_back(atof(buffer));
+    if(full_values.back() <= 0.0){
+      cerr << "INVALID INPUT\t" << buffer << endl;
+      throw SMITHLABException("ERROR IN INPUT");
+    }
+    ++n_reads;
+    in.peek();
+  }
+  in.close();
+  if(full_values.back() == 0)
+    full_values.pop_back();
+
+  values.swap(full_values);
+  return n_reads;
+}
 
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
@@ -393,7 +485,8 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    // bool SMOOTH_HISTOGRAM = false;	
+    bool VALS_INPUT = false;
+    bool PAIRED_END = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -426,6 +519,11 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false, BAM_FORMAT_INPUT);
 #endif
+    opt_parse.add_opt("pe", 'P', "input is paired end read file",
+		      false, PAIRED_END);
+    opt_parse.add_opt("vals", 'V', 
+		      "input is a text file containing only the observed counts",
+		      false, VALS_INPUT);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -449,12 +547,18 @@ main(const int argc, const char **argv) {
     /******************************************************************/
     
     vector<double> values;
-#ifdef HAVE_BAMTOOLS
-    if (BAM_FORMAT_INPUT)
-      load_values_BAM(input_file_name, values);
-    else
-#endif
+    if(VALS_INPUT)
       load_values(input_file_name, values);
+#ifdef HAVE_BAMTOOLS
+    else if (BAM_FORMAT_INPUT && PAIRED_END)
+      load_values_BAM_pe(input_file_name, values);
+    else if(BAM_FORMAT_INPUT)
+      load_values_BAM_se(input_file_name, values);
+#endif
+    else if(PAIRED_END)
+      load_values_BED_pe(input_file_name, values);  
+    else
+      load_values_BED_se(input_file_name, values);
     
     // JUST A SANITY CHECK
     const double values_sum = accumulate(values.begin(), values.end(), 0.0);
