@@ -442,8 +442,7 @@ alpha_log_confint_multiplier(const double estimate,
 
 static void
 return_median_and_ci(const vector<vector<double> > &estimates,
-		     const double alpha, const double initial_distinct,
-		     const double vals_sum, const double step_size, 
+		     const double alpha, 
 		     vector<double> &median_estimates,
 		     vector<double> &lower_ci_lognormal, 
 		     vector<double> &upper_ci_lognormal) {
@@ -484,14 +483,12 @@ write_predicted_curve(const string outfile, const double values_sum,
   
   out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
       << "LOGNORMAL_LOWER_" << 100*c_level << "%CI\t"
-      << "LOGNORMAL_UPPER_" << 100*c_level << "%CI\t" 
-      << "QUANTILE_LOWER_" << 100*c_level << "%CI\t" 
-      << "QUANTILE_UPPER_" << 100*c_level << "%CI" << endl;
+      << "LOGNORMAL_UPPER_" << 100*c_level << "%CI" << endl;
   
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
   
-  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
+  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
   for (size_t i = 0; i < median_yield_estimates.size(); ++i)
     out << (i + 1)*step_size << '\t' 
 	<< median_yield_estimates[i] << '\t'
@@ -520,6 +517,7 @@ main(const int argc, const char **argv) {
     /* FLAGS */
     bool VERBOSE = false;
     bool VALS_INPUT = false;
+    bool PAIRED_END = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -549,6 +547,8 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("bam", 'B', "input is in BAM format", 
 		      false, BAM_FORMAT_INPUT);
 #endif
+    opt_parse.add_opt("pe", 'P', "input is paired end read file",
+		      false, PAIRED_END);
     opt_parse.add_opt("vals", 'V', 
 		      "input is a text file containing only the observed counts",
 		      false, VALS_INPUT);
@@ -578,14 +578,16 @@ main(const int argc, const char **argv) {
     if(VALS_INPUT)
       load_values(input_file_name, values);
 #ifdef HAVE_BAMTOOLS
-    else if (BAM_FORMAT_INPUT)
-      load_values_BAM(input_file_name, values);
+    else if (BAM_FORMAT_INPUT && PAIRED_END)
+      load_values_BAM_pe(input_file_name, values);
+    else if(BAM_FORMAT_INPUT)
+      load_values_BAM_se(input_file_name, values);
 #endif
+    else if(PAIRED_END)
+      load_values_BED_pe(input_file_name, values);  
     else
-      load_values_BED(input_file_name, values);
+      load_values_BED_se(input_file_name, values);
 
-
-    const double initial_distinct = static_cast<double>(values.size());
     
     // JUST A SANITY CHECK
     const double values_sum = accumulate(values.begin(), values.end(), 0.0);
@@ -650,7 +652,6 @@ main(const int argc, const char **argv) {
     vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal,
       yield_upper_ci_quantile, yield_lower_ci_quantile;
     return_median_and_ci(yield_estimates, 1.0 - c_level, 
-			 initial_distinct, values_sum, step_size,
 			 median_yield_estimates, 
 			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 

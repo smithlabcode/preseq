@@ -211,8 +211,7 @@ check_mincount_estimates_stability(const vector<double> &estimates,
 	(estimates[i] - estimates[i - 1] > max_change_per_time_step)){
       return false;
     }
-  }
-    
+  }    
 
   return true;
 }
@@ -349,8 +348,8 @@ return_median_and_ci(const vector<vector<double> > &estimates,
 
 
 static void
-write_predicted_curve(const string outfile, const double values_sum,
-		      const double c_level, const double step_size,
+write_predicted_curve(const string outfile, const double c_level,
+		      const double step_size,
 		      const vector<double> &median_yield_estimates,
 		      const vector<double> &yield_lower_ci,
 		      const vector<double> &yield_upper_ci) {
@@ -456,8 +455,6 @@ main(const int argc, const char **argv) {
     else
 #endif
       load_values(input_file_name, values);
-
-    const double initial_distinct = static_cast<double>(values.size());
     
     // JUST A SANITY CHECK
     const double values_sum = accumulate(values.begin(), values.end(), 0.0);
@@ -473,10 +470,6 @@ main(const int argc, const char **argv) {
     vector<double> counts_hist(max_observed_count + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i)
       ++counts_hist[static_cast<size_t>(values[i])];
-    
-    const size_t distinct_counts = 
-      static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
-					bind2nd(std::greater<double>(), 0.0)));
 
     const double initial_observed =
       accumulate(counts_hist.begin() + mincount, counts_hist.end(), 0.0);
@@ -485,7 +478,6 @@ main(const int argc, const char **argv) {
       cerr << "TOTAL READS      = " << values_sum << endl
 	   << "DISTINCT READS   = " << values.size() << endl
 	   << "INITIAL OBSERVED = " << initial_observed << endl
-	   << "DISTINCT COUNTS  = " << distinct_counts << endl
 	   << "MAX COUNT        = " << max_observed_count << endl
 	   << "COUNTS OF 1      = " << counts_hist[1] << endl
 	   << "MAX TERMS        = " << orig_max_terms << endl;
@@ -527,7 +519,7 @@ main(const int argc, const char **argv) {
     vector<double> median_yield_estimates;
     vector<double> yield_upper_ci, yield_lower_ci;
     return_median_and_ci(yield_estimates, 1.0 - c_level, 
-			 initial_distinct, values_sum, step_size,
+			 initial_observed, values_sum, step_size,
 			 median_yield_estimates, 
 			 yield_lower_ci, yield_upper_ci);
 
@@ -538,7 +530,7 @@ main(const int argc, const char **argv) {
     if (VERBOSE) 
       cerr << "[WRITING OUTPUT]" << endl;
     
-    write_predicted_curve(outfile, values_sum, c_level, step_size,
+    write_predicted_curve(outfile, c_level, step_size,
 			  median_yield_estimates,
 			  yield_lower_ci, yield_upper_ci);
       
