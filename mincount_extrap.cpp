@@ -342,6 +342,12 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     resample_hist(rng, orig_hist, vals_sum,
 		  static_cast<double>(orig_values.size()), hist);
 
+    /*   cerr << "sampled hist:" << endl;
+    for(size_t i = 0; i <= std::min(hist.size(), orig_max_terms); i++)
+      if(hist[i] > 0)
+	cerr << i << "\t" << hist[i] << endl;
+    */
+
     const double initial_observed = accumulate(hist.begin() + mincount, hist.end(), 0.0);
     
     //resize boot_hist to remove excess zeros
@@ -387,6 +393,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 
     //extrapolate the curve start
     if (mincount_cf.is_valid()){
+      //  cerr << "valid" << endl;
       double sample_size = static_cast<double>(sample);
       while(sample_size <= max_extrapolation){
 	double t = (sample_size - vals_sum)/vals_sum;
@@ -400,7 +407,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       }
       else if(VERBOSE) cerr << '_';
     }
-    else if(VERBOSE) cerr << '_';
+  else if(VERBOSE) cerr << '_';
   }
   if (VERBOSE)
     cerr << endl;
@@ -475,11 +482,11 @@ main(const int argc, const char **argv) {
     /* FILES */
     string outfile;
     
-    size_t orig_max_terms = 100;
+    size_t orig_max_terms = 200;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
     size_t bootstraps = 100;
-    int diagonal = -1;
+    int diagonal = -3;
     double c_level = 0.95;
     size_t mincount = 2;
     
@@ -600,8 +607,8 @@ main(const int argc, const char **argv) {
     /////////////////////////////////////////////////////////////////////
     // BOOTSTRAPS
 
-    if(bootstraps < 10)
-      throw SMITHLABException("too few bootstraps, must be at least 10");
+    //    if(bootstraps < 10)
+    //  throw SMITHLABException("too few bootstraps, must be at least 10");
 
     if (VERBOSE) 
       cerr << "[BOOTSTRAP ESTIMATES]" << endl;

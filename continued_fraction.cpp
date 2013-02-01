@@ -588,6 +588,8 @@ ContinuedFraction::extrapolate_mincount(const vector<double> &counts_hist,
                                         vector<double> &estimates) const {
   const double current_observed = 
     accumulate(counts_hist.begin() + mincount, counts_hist.end(), 0.0);
+  //  cerr << "current_observed = " << current_observed << endl;
+
   estimates.clear();
   estimates.push_back(current_observed);
   for (double t = step_size; t <= max_value; t += step_size)
@@ -963,18 +965,20 @@ construct_mincount_ps_coeffs(const vector<double> &counts_hist,
                              const size_t max_terms, const size_t mincount,
                              vector<double> &ps_coeffs) {
   ps_coeffs.clear();
-  for(size_t i = 1; i < max_terms; i++){
+  for(size_t i = 1; i <= max_terms; i++){
     double curr_coeff = 0.0;
-    for(size_t r = 0; r < mincount; r++){
-      for(size_t l = 0; l <= i; l++){
-        if(i - l >= r){
-          const double first_binom_coeff =
-            exp(gsl_sf_lnfact(l + r) - gsl_sf_lnfact(l) - gsl_sf_lnfact(r));
-          const double second_binom_coeff = 
-            exp(gsl_sf_lnfact(r) - gsl_sf_lnfact(i - l) - gsl_sf_lnfact(r - i + l));
-          curr_coeff += 
-            pow(-1.0, l + 1)*first_binom_coeff*counts_hist[r + l]*second_binom_coeff;
-        }
+    for(size_t l = 0; l < mincount; l++){
+      for(size_t j = 0; j <= i; j++){
+	if((l >= i - j) && (l + j > 0)){
+          const double binom_coeff_1 = 
+	    exp(gsl_sf_lnfact(j + l) - gsl_sf_lnfact(j)
+		-gsl_sf_lnfact(l));
+	  const double binom_coeff_2 = 
+	    exp(gsl_sf_lnfact(l) - gsl_sf_lnfact(i - j)
+		-gsl_sf_lnfact(l - (i - j)));
+	  curr_coeff += 
+	    pow(-1, j + 1)*binom_coeff_1*binom_coeff_2*counts_hist[l + j];
+	}
       }
     }
     ps_coeffs.push_back(curr_coeff);
@@ -988,10 +992,19 @@ check_mincount_estimates_stability(const vector<double> &estimates,
   // is below the initial distinct per step_size
   for (size_t i = 1; i < estimates.size(); ++i){
     if(!finite(estimates[i])){
+      //    cerr << "not finite at " << i << "\t" << estimates[i] << endl;
       return false;
     }
     if ((estimates[i] < estimates[i - 1]) ||
         (estimates[i] - estimates[i - 1] > max_change_per_time_step)){
+      /*     if(estimates[i] < estimates[i - 1])
+	cerr << i - 1 << "th estimate (" << estimates[i-1] 
+	     << ") greater than " << i << "th (" << estimates[i] << ")" << endl;
+      if(estimates[i] - estimates[i - 1] > max_change_per_time_step)
+	cerr << "change is more than max_change_per_time_step, change = "
+	     << estimates[i] - estimates[i - 1] 
+	     << ", max_change_per_time_step = " << max_change_per_time_step << endl;
+      */
       return false;
     }
   }
@@ -1009,11 +1022,19 @@ ContinuedFractionApproximation::optimal_cont_frac_mincount(const vector<double> 
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     counts_sum += i*counts_hist[i];
-  
+  const double max_reads_per_step = counts_sum*SEARCH_STEP_SIZE;
+
   vector<double> ps_coeffs;
   construct_mincount_ps_coeffs(counts_hist, max_terms, mincount, ps_coeffs);
 
-  int order = 0;
+  /*
+  cerr << "ps_coeffs = " << endl;
+  for(size_t i = 0; i < ps_coeffs.size(); i++)
+    cerr << ps_coeffs[i] << endl;
+  cerr << endl;
+  */
+
+  int order = -3;
 
   // if max_terms is too small, unacceptable extrapolation
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order))
@@ -1028,7 +1049,6 @@ ContinuedFractionApproximation::optimal_cont_frac_mincount(const vector<double> 
 
     curr_cf.extrapolate_mincount(counts_hist, SEARCH_MAX_VAL, 
                                  SEARCH_STEP_SIZE, mincount, estimates);
-    const double max_reads_per_step = counts_sum*SEARCH_STEP_SIZE;
     // return the continued fraction if it is stable
     if (check_mincount_estimates_stability(estimates, max_reads_per_step))
       return curr_cf;
