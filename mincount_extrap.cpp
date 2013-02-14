@@ -277,6 +277,7 @@ sample_count_reads_w_mincount(const gsl_rng *rng,
 
   double number_observed = 0.0;
   size_t current_count = 1;
+
   for (size_t i = 1; i < sample_umis.size(); i++){
     if(sample_umis[i] == sample_umis[i-1])
       current_count++;
@@ -286,9 +287,12 @@ sample_count_reads_w_mincount(const gsl_rng *rng,
       current_count = 1;
     }
   }
+  if(current_count >= mincount)
+    number_observed++;
 
   return number_observed;
 }
+
 
 static bool
 check_mincount_estimates_stability(const vector<double> &estimates,
@@ -312,7 +316,7 @@ check_mincount_estimates_stability(const vector<double> &estimates,
 void
 estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values, 
 		    const size_t bootstraps, const size_t orig_max_terms, 
-		    const int diagonal, const double step_size, 
+		    const int order, const double step_size, 
 		    const double max_extrapolation, const size_t mincount,
 		    vector< vector<double> > &full_estimates) {
   // clear returning vectors
@@ -382,13 +386,13 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       ++counts_before_first_zero;   
 
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - mincount);
-    max_terms = max_terms - (max_terms % 2 == 1);
+    max_terms = max_terms - (max_terms % 2 == 0);
 
     const ContinuedFractionApproximation 
-      mincount_cfa(diagonal, max_terms, step_size, max_extrapolation);
+      mincount_cfa(order, max_terms, step_size, max_extrapolation);
     
     const ContinuedFraction 
-      mincount_cf(mincount_cfa.optimal_cont_frac_mincount(hist, mincount));
+      mincount_cf(mincount_cfa.optimal_cont_frac_mincount(hist, mincount, order));
 
 
     //extrapolate the curve start
@@ -486,7 +490,7 @@ main(const int argc, const char **argv) {
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
     size_t bootstraps = 100;
-    int diagonal = -3;
+    int order = 0;
     double c_level = 0.95;
     size_t mincount = 2;
     
@@ -595,11 +599,13 @@ main(const int argc, const char **argv) {
     
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
+      /*
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
       for (size_t i = 0; i < counts_hist.size(); i++)
 	if (counts_hist[i] > 0)
 	  cerr << i << '\t' << counts_hist[i] << endl;
       cerr << endl;
+      */
     }
     
     /////////////////////////////////////////////////////////////////////
@@ -617,7 +623,7 @@ main(const int argc, const char **argv) {
     vector< vector<double> > sat_estimates;
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, 
+			order, step_size, max_extrapolation, 
 			mincount, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////

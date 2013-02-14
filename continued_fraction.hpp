@@ -119,7 +119,7 @@ public:
   // find best cont frac approx for estimating # reads w/ mincount
   ContinuedFraction
   optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
-                             const size_t mincount) const;
+                             const size_t mincount, const int order) const;
 
   // find a local maximum located btwn 0 & deriv_upper_bound
   double

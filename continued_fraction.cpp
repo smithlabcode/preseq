@@ -1015,7 +1015,8 @@ check_mincount_estimates_stability(const vector<double> &estimates,
 
 ContinuedFraction
 ContinuedFractionApproximation::optimal_cont_frac_mincount(const vector<double> &counts_hist,
-                                                           const size_t mincount) const {
+                                                           const size_t mincount,
+const int order) const {
   
 
   // counts_sum = number of total captures
@@ -1033,8 +1034,6 @@ ContinuedFractionApproximation::optimal_cont_frac_mincount(const vector<double> 
     cerr << ps_coeffs[i] << endl;
   cerr << endl;
   */
-
-  int order = -3;
 
   // if max_terms is too small, unacceptable extrapolation
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order))

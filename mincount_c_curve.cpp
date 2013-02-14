@@ -251,35 +251,32 @@ load_values(const string input_file_name, vector<double> &values) {
 }
 
 
-
 static double
-sample_count_mincount_reads(const gsl_rng *rng,
-			    const vector<size_t> &full_umis,
-			    const size_t sample_size,
-			    const size_t min_count) {
+sample_count_reads_w_mincount(const gsl_rng *rng,
+			      const vector<size_t> &full_umis,
+			      const size_t sample_size,
+			      const size_t mincount) {
   vector<size_t> sample_umis(sample_size);
   gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
 		 (size_t *)&full_umis.front(), full_umis.size(), 
 		 sizeof(size_t));
 
+  double number_observed = 0.0;
+  size_t current_count = 1;
 
-  vector<double> values;
-  double values_above_mincount = 0;
-  double count = 1.0;
   for (size_t i = 1; i < sample_umis.size(); i++){
     if(sample_umis[i] == sample_umis[i-1])
-      count++;
+      current_count++;
     else{
-      values.push_back(count);
-
-      if(count >= min_count)
-	values_above_mincount++;
-
-      count = 1.0;
+      if(current_count >= mincount)
+	number_observed++;
+      current_count = 1;
     }
   }
+  if(current_count >= mincount)
+    number_observed++;
 
-  return values_above_mincount;
+  return number_observed;
 }
 
 
@@ -378,17 +375,25 @@ int main(int argc, const char **argv) {
       vector<double> counts_hist(max_observed_count + 1, 0.0);
       for (size_t i = 0; i < values.size(); ++i)
 	++counts_hist[static_cast<size_t>(values[i])];
-    
-      cerr << "TOTAL READS     = " << accumulate(values.begin(), values.end(), 0.0) << endl
-	   << "DISTINCT READS  = " << values.size() << endl
-	   << "MAX COUNT       = " << max_observed_count << endl
-	   << "COUNTS OF 1     = " << counts_hist[1] << endl;
 
+      const double observed_mincount = accumulate(counts_hist.begin() + min_count,
+						  counts_hist.end(), 0.0);
+
+    
+      cerr << "TOTAL READS       = " << accumulate(values.begin(), values.end(), 0.0) << endl
+	   << "DISTINCT READS    = " << values.size() << endl
+	   << "MAX COUNT         = " << max_observed_count << endl
+	   << "COUNTS OF 1       = " << counts_hist[1] << endl
+	   << "OBSERVED MINCOUNT = " << observed_mincount << endl;
+
+      /*  
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
       for (size_t i = 0; i < counts_hist.size(); i++)
 	if (counts_hist[i] > 0)
 	  cerr << i << '\t' << counts_hist[i] << endl;
       cerr << endl;
+      */
+     
     }
       
     vector<size_t> full_umis;
@@ -398,17 +403,20 @@ int main(int argc, const char **argv) {
     
     if (upper_limit == 0)
       upper_limit = full_umis.size();
+    else
+      upper_limit = std::min(full_umis.size(), upper_limit);
     
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     
     out << "total_reads" << "\t" << "distinct_reads" << endl;
+    out << 0 << "\t" << 0 << endl;
     for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;
-      out << i << "\t" << sample_count_mincount_reads(rng, full_umis, 
-						      i, min_count) << endl;
+      out << i << "\t" << sample_count_reads_w_mincount(rng, full_umis, 
+							i, min_count) << endl;
     }
     
   }
