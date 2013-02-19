@@ -75,16 +75,16 @@ solve_linear_system(const vector<vector<double> > &A_in,
 
 void
 poly_solve_gauss_quad(const std::vector<double> &moments,
-		      const size_t n_moments,
+		      const size_t n_points,
 		      std::vector<double> &weights,
 		      std::vector<double> &points){
 
   vector<double> moment_estimates(moments);
-  moment_estimates.resize(2*n_moments);
+  moment_estimates.resize(2*n_points);
 
-  vector<vector<double> > matrix(n_moments, vector<double>(n_moments, 0.0));
-  for (size_t i = 0; i < n_moments; ++i) {
-    for (size_t j = 0; j < n_moments; ++j) {
+  vector<vector<double> > matrix(n_points, vector<double>(n_points, 0.0));
+  for (size_t i = 0; i < n_points; ++i) {
+    for (size_t j = 0; j < n_points; ++j) {
       matrix[i][j] = moment_estimates[j + i];
     }
   }
@@ -94,12 +94,145 @@ poly_solve_gauss_quad(const std::vector<double> &moments,
   c.push_back(1);
 
    gsl_poly_complex_workspace *w =
-      gsl_poly_complex_workspace_alloc(n_moments + 1);
+      gsl_poly_complex_workspace_alloc(n_points + 1);
     
-   vector<double> x(2*(n_moments + 1), 0.0);
+   vector<double> x(2*(n_points + 1), 0.0);
    gsl_poly_complex_solve(&c[0], c.size(), w, &x[0]);
 
    weights.swap(c);
    points.swap(x);
    gsl_poly_complex_workspace_free (w);
+}
+
+
+// Following Golub & Welsch 1968 (Sec 4)
+static void
+three_term_relation(const vector<double> &moments,
+		    const size_t n_points,
+		    vector<double> &a,
+		    vector<double> &b){
+
+  vector<double> moment_estimates(moments);
+  moment_estimates.resize(2*n_points);
+
+  // M is Hankel matrix of moments
+  gsl_matrix *M = gsl_matrix_alloc(2*n_points, 2*n_points);
+  for(size_t i = 0; i < n_points; i++){
+    for(size_t j = 0; j < n_points; j++){
+      gsl_matrix_set(M, i, j, moment_estimates[i + j]);
+    }
+  }
+
+  // cholesky decomp on M
+  // if M is not positive definite, error code GSL_EDOM should occur
+  gsl_linalg_cholesky_decomp(M);
+
+  // equations 4.3
+  a.clear();
+  for(size_t i = 0; i < n_points - 1; i++){
+    double recurrence_val = gsl_matrix_get(M, i, i + 1)/gsl_matrix_get(M, i, i);
+    if(i > 0)
+      recurrence_val -= 
+	gsl_matrix_get(M, i - 1, i)/gsl_matrix_get(M, i - 1, i - 1);
+    a.push_back(recurrence_val);
+  }
+
+  b.clear();
+  for(size_t i = 0; i < n_points - 2; i++)
+    b.push_back(gsl_matrix_get(M, i + 1, i + 1)/gsl_matrix_get(M, i, i));
+
+  gsl_matrix_free(M);  
+}
+
+// one iteration of QR: 
+// following eq's 3.3 of Golub & Welsh
+// make sure b is padded with an extra zero so b.size() = a.size()
+static double
+QR_iteration(vector<double> &a,
+	     vector<double> &b,
+	     vector<double> &z,
+	     double lambda_guess){
+  // error = b*b
+  double return_error = 0.0;
+
+  // initialize variables
+  double b_bar = a[0] - lambda_guess;
+  double d = b[0];
+  double b_tilde = b[0];
+  double z_bar = z[0];
+  double sin_theta, cos_theta;
+  vector<double> a_bar(a.size(), 0.0);
+  a_bar[0] = a[0];
+
+  for(size_t i = 0; i < a.size() - 1; i++){
+    const double trig_denom = sqrt(d*d + b_bar*b_bar);
+    sin_theta = d/trig_denom;
+    cos_theta = b_bar/trig_denom;
+    a[i] = a_bar*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta 
+      + a[i + 1]*sin_theta*sin_theta;
+
+    a_bar[i + 1] = a_bar[i]*sin_theta*sin_theta 
+      - 2*b_tilde*cos_theta*sin_theta + a[i + 1]*cos_theta*cos_theta;
+    b_bar = (a_bar[i] - a[i + 1])*sin_theta*cos_theta 
+      + b_tilde*(sin_theta*sin_theta - cos_theta*cos_theta);
+    z[i] = z_bar*cos_theta + z[i + 1]*sin_theta;
+
+    if(i != 0){
+      b[i - 1] = trig_denom;
+      return_error + = b[i - 1]*b[i - 1];
+    }
+
+    if(i < a.size() - 2){
+      b_tilde = -b[i + 1]*cos_theta;
+      d = b[i + 1]*sin_theta; 
+    }
+
+    z_bar = z_bar*sin_theta - z[i + 1]*cos_theta;
+  }
+
+  //Last iteration? (not explicit in Golub & Welsh)
+  const double trig_denom = sqrt(d*d + b_bar*b_bar);
+  sin_theta = d/trig_denom;
+  cos_theta = b_bar/trig_denom;
+  a.back() = a_bar*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta;
+  b.back() = trig_denom;
+  z.back() = z_bar*cos_theta;
+  return_error += b.back()*b.back();
+
+  return return_error;
+}
+
+
+void
+golub_welsh_quadrature(const vector<double> &moments,
+		       const size_t n_points,
+		       const double tol, const size_t max_iter,
+		       vector<double> &points,
+		       vector<double> &weights){
+  // compute the 3-term recursion that generates the 
+  // orthogonal polynomials
+  vector<double> alpha, beta;
+  three_term_relation(moments, n_points, alpha, beta);
+
+  // add a zero to the back of beta so it's same size as alpha
+  beta.push_back(0.0);
+
+  vector<double> points(alpha.size(), 0.0);
+  points[0] = 1.0;
+
+  // can change lambda guess to affect convergence
+  double lambda_guess = 0.0;
+
+  // in QR, off-diagonals go to zero
+  // use off diags for convergence
+  double error = 0.0;
+  for(size_t i = 0; i < beta.size(); i++)
+    error += beta[i]*beta[i];
+  size_t iter = 0;
+  while(error >= tol && iter < max_iter){
+    error = QR_iteration(alpha, beta, points, lambda_guess);
+    iter++;
+  }
+  // eigenvalues are on diagonal of J, i.e. alpha
+  weights.swap(alpha);
 }
