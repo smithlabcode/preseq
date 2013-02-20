@@ -104,6 +104,8 @@ poly_solve_gauss_quad(const std::vector<double> &moments,
    gsl_poly_complex_workspace_free (w);
 }
 
+/////////////////////////////////////////////////////
+// Golub & Welsh quadrature
 
 // Following Golub & Welsch 1968 (Sec 4)
 static void
@@ -217,8 +219,8 @@ golub_welsh_quadrature(const vector<double> &moments,
   // add a zero to the back of beta so it's same size as alpha
   beta.push_back(0.0);
 
-  vector<double> points(alpha.size(), 0.0);
-  points[0] = 1.0;
+  vector<double> eigenvec(alpha.size(), 0.0);
+  eigenvec[0] = 1.0;
 
   // can change lambda guess to affect convergence
   double lambda_guess = 0.0;
@@ -230,9 +232,126 @@ golub_welsh_quadrature(const vector<double> &moments,
     error += beta[i]*beta[i];
   size_t iter = 0;
   while(error >= tol && iter < max_iter){
-    error = QR_iteration(alpha, beta, points, lambda_guess);
+    error = QR_iteration(alpha, beta, eigenvec, lambda_guess);
     iter++;
   }
   // eigenvalues are on diagonal of J, i.e. alpha
-  weights.swap(alpha);
+  points.swap(alpha);
+
+  weights.swap(eigenvec);
+  for(size_t i = 0; i < weights.size(); i++)
+    weights[i] = weights[i]*weights[i];
+}
+
+
+
+////////////////////////////////////////////////////////////
+//modified Chebyshev quadrature
+
+// m[j] = 'th modified moment, v[j]=j'th moment
+// generalized laguerre polynomial w/ a=1 : l_{j}(x)
+// orthogonal to x e^{-x}
+// l_j(x) = \sum_l=0^j 1/l! binom{1+j}{j-l} (-1)^l x^l
+// m[j] = \sum_{l=0}^j 1/l! binom{1+j}{l-l} (-1)^l v[l]
+static void
+laguerre_modified_moments(const vector<double> &moments,
+			  const size_t n_points,
+			  vector<double> &modified_moments){
+  modified_moments.resize(2*n_points, 0.0);
+  for(size_t j = 0; j < modified_moments.size(); j++){
+    for(size_t l = 0; l <= j; l++){
+      modified_moments[j] += 
+	pow(-1, l)*exp(- gsl_sf_lnfact(l) 
+		       + gsl_sf_lnfact(j + 1)
+		       - gsl_sf_lnfact(l + 1) 
+		       - gsl_sf_lnfact(j - l))*moments[l]; 
+    } 
+  } 
+}
+
+// 3-term relation calculation by 
+// modified Chabyshev algorithm
+// Golub & Meurant (2010) pg 60 (bottom)
+// a & b are the known 3-term relation
+// of the modifying polynomials l_{j} (x),
+// i.e. b_{j} l_{j+1} (x) = (x - a_j) l_j(x) - c_j l_{j-1} (x)
+static void
+modified3term_relation(const vector<double> &modified_moments,
+		       const vector<double> &a,
+		       const vector<double> &b,
+		       const vector<double> &c,
+		       const size_t n_points,
+		       vector<double> &alpha,
+		       vector<double> &nu){
+  alpha.resize(n_points, 0.0);
+  nu.resize(n_points, 0.0);
+
+  vector< vector<double> > sigma(2*n_points, vector<double>(2*n_points, 0.0));
+  // initialization
+  alpha[0] = a[0] + modified_moments[0]/modified_moments[1];
+  // sigma[-1][l] = 0
+  for(size_t l = 0; l < 2*n_points, l++)
+    sigma[0][l] = modified_moments[l];
+
+  for(size_t k = 1; k < n_points; k++){
+    for(size_t l = k; l < 2*n_points - k; l++){
+      sigma[k][l] = b[l]*sigma[k-1][l+1] + (a[l] - alpha[k-1])*sigma[k-1][l]
+	+ c[l]*sigma[k-1][l-1];
+      if(k > 1)
+	sigma[k][l] -= nu[k-2]*sigma[k-2][l];
+    }
+    alpha[k] = a[k] + b[k]*sigma[k][k+1]/sigma[k][k] - b[k-1]*sigma[k-1][k]/sigma[k-1][k-1];
+    nu[k-1] = b[k-1]*sigma[k][k]/sigma[k-1][k-1];
+  }  
+}
+
+
+void
+laguerre_modified_quadrature(const vector<double> &moments,
+			     const size_t n_points,
+			     const double tol, const size_t max_iter,
+			     vector<double> &points,
+			     vector<double> &weights){
+  // change of basis to laguerre polynomials
+  vector<double> modified_moments;
+  laguerre_modified_moments(moments, n_points, modified_moments);
+ 
+  // b_{i+1} p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - c_i p_{i-2}(x)
+  // -i l_i (x) = (x - 2*i) l_{i-1} (x) + i l_{i-2} (x)
+  vector<double> a, b, c;
+  for(size_t i = 1; i <= 2*n_points; i++){
+    b.push_back(-i);
+    a.push_back(2*i);
+    c.push_back(-i); 
+  }
+
+  vector<double> alpha, beta;
+  modified3term_relation(modified_moments, a, b, c,
+			 n_points, alpha, beta);
+
+  // add a zero to the back of beta so it's same size as alpha
+  beta.push_back(0.0);
+
+  vector<double> eigenvec(alpha.size(), 0.0);
+  eigenvec[0] = 1.0;
+
+  // can change lambda guess to affect convergence
+  double lambda_guess = 0.0;
+
+  // in QR, off-diagonals go to zero
+  // use off diags for convergence
+  double error = 0.0;
+  for(size_t i = 0; i < beta.size(); i++)
+    error += beta[i]*beta[i];
+  size_t iter = 0;
+  while(error >= tol && iter < max_iter){
+    error = QR_iteration(alpha, beta, eigenvec, lambda_guess);
+    iter++;
+  }
+  // eigenvalues are on diagonal of J, i.e. alpha
+  points.swap(alpha);
+
+  weights.swap(eigenvec);
+  for(size_t i = 0; i < weights.size(); i++)
+    weights[i] = weights[i]*weights[i];
 }

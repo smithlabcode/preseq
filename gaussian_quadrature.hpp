@@ -38,4 +38,13 @@ golub_welsh_quadrature(const std::vector<double> &moments,
 		       std::vector<double> &points,
 		       std::vector<double> &weights);
 
+void
+laguerre_modified_quadrature(const std::vector<double> &moments,
+			     const size_t n_points,
+			     const double tol, const size_t max_iter,
+			     std::vector<double> &points,
+			     std::vector<double> &weights);
+
+
+
 #endif
