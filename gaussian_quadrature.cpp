@@ -170,7 +170,7 @@ QR_iteration(vector<double> &a,
     const double trig_denom = sqrt(d*d + b_bar*b_bar);
     sin_theta = d/trig_denom;
     cos_theta = b_bar/trig_denom;
-    a[i] = a_bar*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta 
+    a[i] = a_bar[i]*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta 
       + a[i + 1]*sin_theta*sin_theta;
 
     a_bar[i + 1] = a_bar[i]*sin_theta*sin_theta 
@@ -181,7 +181,7 @@ QR_iteration(vector<double> &a,
 
     if(i != 0){
       b[i - 1] = trig_denom;
-      return_error + = b[i - 1]*b[i - 1];
+      return_error += b[i - 1]*b[i - 1];
     }
 
     if(i < a.size() - 2){
@@ -196,7 +196,7 @@ QR_iteration(vector<double> &a,
   const double trig_denom = sqrt(d*d + b_bar*b_bar);
   sin_theta = d/trig_denom;
   cos_theta = b_bar/trig_denom;
-  a.back() = a_bar*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta;
+  a.back() = a_bar.back()*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta;
   b.back() = trig_denom;
   z.back() = z_bar*cos_theta;
   return_error += b.back()*b.back();
@@ -206,7 +206,8 @@ QR_iteration(vector<double> &a,
 
 
 void
-golub_welsh_quadrature(const vector<double> &moments,
+golub_welsh_quadrature(const bool VERBOSE,
+		       const vector<double> &moments,
 		       const size_t n_points,
 		       const double tol, const size_t max_iter,
 		       vector<double> &points,
@@ -218,6 +219,24 @@ golub_welsh_quadrature(const vector<double> &moments,
 
   // add a zero to the back of beta so it's same size as alpha
   beta.push_back(0.0);
+
+  if(VERBOSE){
+    cerr << "moments = ";
+    for(size_t i = 0; i < 2*n_points; i++)
+      cerr << moments[i] << ", ";
+    cerr << endl;
+
+    cerr << "alpha = ";
+    for(size_t i = 0; i < alpha.size(); i++)
+      cerr << alpha[i] << ", ";
+    cerr << endl;
+
+    cerr << "beta = ";
+    for(size_t i = 0; i < beta.size(); i++)
+      cerr << beta[i] << ", ";
+    cerr << endl;
+  }
+
 
   vector<double> eigenvec(alpha.size(), 0.0);
   eigenvec[0] = 1.0;
@@ -290,7 +309,7 @@ modified3term_relation(const vector<double> &modified_moments,
   // initialization
   alpha[0] = a[0] + modified_moments[0]/modified_moments[1];
   // sigma[-1][l] = 0
-  for(size_t l = 0; l < 2*n_points, l++)
+  for(size_t l = 0; l < 2*n_points; l++)
     sigma[0][l] = modified_moments[l];
 
   for(size_t k = 1; k < n_points; k++){
@@ -307,7 +326,8 @@ modified3term_relation(const vector<double> &modified_moments,
 
 
 void
-laguerre_modified_quadrature(const vector<double> &moments,
+laguerre_modified_quadrature(const bool VERBOSE,
+			     const vector<double> &moments,
 			     const size_t n_points,
 			     const double tol, const size_t max_iter,
 			     vector<double> &points,

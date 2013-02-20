@@ -24,6 +24,7 @@
 #include <numeric>
 
 #include "newtons_method.hpp"
+#include "gaussian_quadrature.hpp"
 
 double
 chao87_lowerbound_librarysize(const std::vector<double> &counts_hist);
@@ -40,11 +41,25 @@ harris_lowerbound_librarysize(const std::vector<double> &counts_hist,
 */
 
 double
-my_harris(const bool VERBOSE,
-	  const std::vector<double> &counts_hist,
-	  const double tolerance,
-	  const size_t max_iter,
-	  const size_t depth);
+harris_by_newton(const bool VERBOSE,
+		 const std::vector<double> &counts_hist,
+		 const double tolerance,
+		 const size_t max_iter,
+		 const size_t depth);
+
+double
+golub_welsh_libsize(const bool VERBOSE,
+		    const std::vector<double> &counts_hist,
+		    const double tolerance,
+		    const size_t max_iter,
+		    const size_t n_points);
+
+double
+laguerre_modified_libsize(const bool VERBOSE,
+			  const std::vector<double> &counts_hist,
+			  const double tolerance,
+			  const size_t max_iter,
+			  const size_t n_points);
 
 /*double
 upperbound_librarysize(const bool VERBOSE,

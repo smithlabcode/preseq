@@ -34,6 +34,7 @@
 
 #include "library_size_estimates.hpp"
 #include "newtons_method.hpp"
+#include "gaussian_quadrature.hpp"
 
 using std::string;
 using std::vector;
@@ -398,11 +399,11 @@ generate_rand_initial(const size_t dim, const double values_sum,
 }
 
 double
-my_harris(const bool VERBOSE,
-	  const vector<double> &counts_hist,
-	  const double tolerance,
-	  const size_t max_iter,
-	  const size_t depth){
+harris_by_newton(const bool VERBOSE,
+		 const vector<double> &counts_hist,
+		 const double tolerance,
+		 const size_t max_iter,
+		 const size_t depth){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
@@ -485,4 +486,114 @@ my_harris(const bool VERBOSE,
   
 
   return lower_bound;
+}
+
+
+///////////////////////////////////////////////////////
+// Quadrature Methods to Estimate Library Size
+
+
+double
+golub_welsh_libsize(const bool VERBOSE,
+		    const std::vector<double> &counts_hist,
+		    const double tol,
+		    const size_t max_iter,
+		    const size_t n_points){
+
+  double values_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    values_sum += i*counts_hist[i];
+
+  size_t counts_before_first_zero = 1;
+  while ((counts_before_first_zero < counts_hist.size()) &&
+	  (counts_hist[counts_before_first_zero] > 0))
+    ++counts_before_first_zero;
+  if(2*n_points < counts_before_first_zero - 2)
+    throw SMITHLABException("too many points for quadrature");
+  
+   
+  // initialize moments, 0th moment is 1
+  vector<double> measure_moments(1, 1.0);
+  // mu_r = (r + 1)! n_{r+1} / n_1
+  for(size_t i = 0; i < 2*n_points; i++)
+    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
+				  + log(counts_hist[i + 2])
+				  - log(counts_hist[1])));
+
+  vector<double> points, weights;
+  golub_welsh_quadrature(VERBOSE, measure_moments, n_points,
+			 tol,  max_iter, points, weights);
+
+  // En_1 * int_0^\infty 1/x d \nu (x)
+  double estimated_integral = 0.0;
+  for(size_t i = 0; i < points.size(); i++)
+    estimated_integral += counts_hist[1]*weights[i]/points[i];
+
+  if(VERBOSE){
+    cerr << "points = ";
+    for(size_t i = 0; i < points.size(); i++)
+      cerr << points[i] << ", ";
+    cerr << endl;
+
+    cerr << "weights = ";
+    for(size_t i = 0; i < weights.size(); i++)
+      cerr << weights[i] << ", ";
+    cerr << endl;
+
+    cerr << "estimated lib size = " << estimated_integral << endl;
+  }
+
+  return estimated_integral;
+}
+
+double
+laguerre_modified_libsize(const bool VERBOSE,
+			  const std::vector<double> &counts_hist,
+			  const double tol,
+			  const size_t max_iter,
+			  const size_t n_points){
+  double values_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    values_sum += i*counts_hist[i];
+
+  size_t counts_before_first_zero = 1;
+  while ((counts_before_first_zero < counts_hist.size()) &&
+	  (counts_hist[counts_before_first_zero] > 0))
+    ++counts_before_first_zero;
+  if(2*n_points < counts_before_first_zero - 2)
+    throw SMITHLABException("too many points for quadrature");
+  
+   
+  // initialize moments, 0th moment is 1
+  vector<double> measure_moments(1, 1.0);
+  // mu_r = (r + 1)! n_{r+1} / n_1
+  for(size_t i = 0; i < 2*n_points; i++)
+    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
+				  + log(counts_hist[i + 2])
+				  - log(counts_hist[1])));
+
+  vector<double> points, weights;
+  laguerre_modified_quadrature(VERBOSE, measure_moments, n_points,
+			       tol,  max_iter, points, weights);
+
+  // En_1 * int_0^\infty 1/x d \nu (x)
+  double estimated_integral = 0.0;
+  for(size_t i = 0; i < points.size(); i++)
+    estimated_integral += counts_hist[1]*weights[i]/points[i];
+
+  if(VERBOSE){
+    cerr << "points = ";
+    for(size_t i = 0; i < points.size(); i++)
+      cerr << points[i] << ", ";
+    cerr << endl;
+
+    cerr << "weights = ";
+    for(size_t i = 0; i < weights.size(); i++)
+      cerr << weights[i] << ", ";
+    cerr << endl;
+
+    cerr << "estimated lib size = " << estimated_integral << endl;
+  }
+
+  return estimated_integral;
 }
