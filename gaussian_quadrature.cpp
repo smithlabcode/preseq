@@ -118,12 +118,16 @@ three_term_relation(const vector<double> &moments,
   moment_estimates.resize(2*n_points);
 
   // M is Hankel matrix of moments
-  gsl_matrix *M = gsl_matrix_alloc(2*n_points, 2*n_points);
+  cerr << "Hankel matrix:" << endl;
+  gsl_matrix *M = gsl_matrix_alloc(n_points, n_points);
   for(size_t i = 0; i < n_points; i++){
     for(size_t j = 0; j < n_points; j++){
       gsl_matrix_set(M, i, j, moment_estimates[i + j]);
+      cerr << moment_estimates[i + j] << ", ";
     }
+    cerr << endl;
   }
+
 
   // cholesky decomp on M
   // if M is not positive definite, error code GSL_EDOM should occur
@@ -146,62 +150,72 @@ three_term_relation(const vector<double> &moments,
   gsl_matrix_free(M);  
 }
 
+
 // one iteration of QR: 
 // following eq's 3.3 of Golub & Welsh
-// make sure b is padded with an extra zero so b.size() = a.size()
-static double
-QR_iteration(vector<double> &a,
-	     vector<double> &b,
-	     vector<double> &z,
-	     double lambda_guess){
-  // error = b*b
-  double return_error = 0.0;
 
+static void
+QRiteration(vector<double> &alpha,
+	    vector<double> &beta,
+	    vector<double> &weights){
   // initialize variables
-  double b_bar = a[0] - lambda_guess;
-  double d = b[0];
-  double b_tilde = b[0];
-  double z_bar = z[0];
-  double sin_theta, cos_theta;
-  vector<double> a_bar(a.size(), 0.0);
-  a_bar[0] = a[0];
+  vector<double> sin_theta(alpha.size(), 0.0);
+  vector<double> cos_theta(alpha.size(), 0.0);
 
-  for(size_t i = 0; i < a.size() - 1; i++){
-    const double trig_denom = sqrt(d*d + b_bar*b_bar);
-    sin_theta = d/trig_denom;
-    cos_theta = b_bar/trig_denom;
-    a[i] = a_bar[i]*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta 
-      + a[i + 1]*sin_theta*sin_theta;
+  vector<double> a(alpha.size(), 0.0);
+  vector<double> a_bar(alpha.size(), 0.0);
+  a_bar[0] = alpha[0];
 
-    a_bar[i + 1] = a_bar[i]*sin_theta*sin_theta 
-      - 2*b_tilde*cos_theta*sin_theta + a[i + 1]*cos_theta*cos_theta;
-    b_bar = (a_bar[i] - a[i + 1])*sin_theta*cos_theta 
-      + b_tilde*(sin_theta*sin_theta - cos_theta*cos_theta);
-    z[i] = z_bar*cos_theta + z[i + 1]*sin_theta;
+  vector<double> b(beta);
+  vector<double> b_bar(alpha.size(), 0.0);
+  b_bar[0] = alpha[0];
+  vector<double> b_tilde(alpha.size(), 0.0);
+  b_tilde[0] = beta[0];
 
-    if(i != 0){
-      b[i - 1] = trig_denom;
-      return_error += b[i - 1]*b[i - 1];
-    }
+  vector<double> d(alpha.size(), 0.0);
+  d[0] = beta[0];
 
-    if(i < a.size() - 2){
-      b_tilde = -b[i + 1]*cos_theta;
-      d = b[i + 1]*sin_theta; 
-    }
+  vector<double> z(weights);
+  vector<double> z_bar(weights.size(), 0.0);
+  z_bar[0] = z[0];
 
-    z_bar = z_bar*sin_theta - z[i + 1]*cos_theta;
+
+  for(size_t j = 0; j < alpha.size() - 1; j++){
+    // for d and b_bar, j here is j-1 in G&W 
+    sin_theta[j] = d[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+    cos_theta[j] = b_bar[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+
+    a[j] = a_bar[j]*cos_theta[j]*cos_theta[j]
+      + 2*b_tilde[j]*cos_theta[j]*sin_theta[j] 
+      + alpha[j+1]*sin_theta[j]*sin_theta[j];
+
+    a_bar[j+1] = a_bar[j]*sin_theta[j]*sin_theta[j]
+      - 2*b_tilde[j]*cos_theta[j]*sin_theta[j] 
+      + alpha[j+1]*cos_theta[j]*cos_theta[j];
+
+    if(j != 0)
+      b[j-1] = sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+
+    b_bar[j+1] = (a_bar[j] - alpha[j+1])*sin_theta[j]*cos_theta[j]
+      + b_tilde[j]*(sin_theta[j]*sin_theta[j] - cos_theta[j]*cos_theta[j]);
+
+    b_tilde[j+1] = -beta[j+1]*cos_theta[j];
+    
+    d[j+1] = beta[j+1]*sin_theta[j];
+ 
+    z[j] = z_bar[j]*cos_theta[j] + weights[j+1]*sin_theta[j];
+
+    z_bar[j+1] = z_bar[j]*sin_theta[j] - weights[j+1]*cos_theta[j];
   }
 
-  //Last iteration? (not explicit in Golub & Welsh)
-  const double trig_denom = sqrt(d*d + b_bar*b_bar);
-  sin_theta = d/trig_denom;
-  cos_theta = b_bar/trig_denom;
-  a.back() = a_bar.back()*cos_theta*cos_theta + 2*b_tilde*cos_theta*sin_theta;
-  b.back() = trig_denom;
-  z.back() = z_bar*cos_theta;
-  return_error += b.back()*b.back();
+// last entries set equal to final "holding" values
+  a.back() = a_bar.back();
+  b.back() = b_bar.back();
+  z.back() = z_bar.back();
 
-  return return_error;
+  alpha.swap(a);
+  beta.swap(b);
+  weights.swap(z);
 }
 
 
@@ -216,9 +230,6 @@ golub_welsh_quadrature(const bool VERBOSE,
   // orthogonal polynomials
   vector<double> alpha, beta;
   three_term_relation(moments, n_points, alpha, beta);
-
-  // add a zero to the back of beta so it's same size as alpha
-  beta.push_back(0.0);
 
   if(VERBOSE){
     cerr << "moments = ";
@@ -241,9 +252,6 @@ golub_welsh_quadrature(const bool VERBOSE,
   vector<double> eigenvec(alpha.size(), 0.0);
   eigenvec[0] = 1.0;
 
-  // can change lambda guess to affect convergence
-  double lambda_guess = 0.0;
-
   // in QR, off-diagonals go to zero
   // use off diags for convergence
   double error = 0.0;
@@ -251,7 +259,11 @@ golub_welsh_quadrature(const bool VERBOSE,
     error += beta[i]*beta[i];
   size_t iter = 0;
   while(error >= tol && iter < max_iter){
-    error = QR_iteration(alpha, beta, eigenvec, lambda_guess);
+    QRiteration(alpha, beta, eigenvec);
+
+    error = 0.0;
+    for(size_t i = 0; i < beta.size(); i++)
+      error += beta[i]*beta[i];
     iter++;
   }
   // eigenvalues are on diagonal of J, i.e. alpha
@@ -349,14 +361,8 @@ laguerre_modified_quadrature(const bool VERBOSE,
   modified3term_relation(modified_moments, a, b, c,
 			 n_points, alpha, beta);
 
-  // add a zero to the back of beta so it's same size as alpha
-  beta.push_back(0.0);
-
   vector<double> eigenvec(alpha.size(), 0.0);
   eigenvec[0] = 1.0;
-
-  // can change lambda guess to affect convergence
-  double lambda_guess = 0.0;
 
   // in QR, off-diagonals go to zero
   // use off diags for convergence
@@ -365,7 +371,7 @@ laguerre_modified_quadrature(const bool VERBOSE,
     error += beta[i]*beta[i];
   size_t iter = 0;
   while(error >= tol && iter < max_iter){
-    error = QR_iteration(alpha, beta, eigenvec, lambda_guess);
+    QRiteration(alpha, beta, eigenvec);
     iter++;
   }
   // eigenvalues are on diagonal of J, i.e. alpha

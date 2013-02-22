@@ -508,7 +508,7 @@ golub_welsh_libsize(const bool VERBOSE,
   while ((counts_before_first_zero < counts_hist.size()) &&
 	  (counts_hist[counts_before_first_zero] > 0))
     ++counts_before_first_zero;
-  if(2*n_points < counts_before_first_zero - 2)
+  if(2*n_points > counts_before_first_zero - 2)
     throw SMITHLABException("too many points for quadrature");
   
    
@@ -560,7 +560,7 @@ laguerre_modified_libsize(const bool VERBOSE,
   while ((counts_before_first_zero < counts_hist.size()) &&
 	  (counts_hist[counts_before_first_zero] > 0))
     ++counts_before_first_zero;
-  if(2*n_points < counts_before_first_zero - 2)
+  if(2*n_points > counts_before_first_zero - 2)
     throw SMITHLABException("too many points for quadrature");
   
    
