@@ -123,7 +123,7 @@ three_term_relation(const vector<double> &moments,
   for(size_t i = 0; i < n_points; i++){
     for(size_t j = 0; j < n_points; j++){
       gsl_matrix_set(M, i, j, moment_estimates[i + j]);
-      cerr << moment_estimates[i + j] << ", ";
+      cerr << gsl_matrix_get(M, i, j) << ", ";
     }
     cerr << endl;
   }
@@ -132,6 +132,14 @@ three_term_relation(const vector<double> &moments,
   // cholesky decomp on M
   // if M is not positive definite, error code GSL_EDOM should occur
   gsl_linalg_cholesky_decomp(M);
+
+  cerr << "Cholesky decomp:" << endl;
+  for(size_t i = 0; i < n_points; i++){
+    for(size_t j = 0; j < n_points; j++){
+      cerr << gsl_matrix_get(M, i, j) << ", ";
+    }
+    cerr << endl;
+  }
 
   // equations 4.3
   a.clear();
@@ -146,14 +154,16 @@ three_term_relation(const vector<double> &moments,
   b.clear();
   for(size_t i = 0; i < n_points - 2; i++)
     b.push_back(gsl_matrix_get(M, i + 1, i + 1)/gsl_matrix_get(M, i, i));
-
+  
+  
   gsl_matrix_free(M);  
 }
 
 
 // one iteration of QR: 
 // following eq's 3.3 of Golub & Welsh
-
+// one iteration is Z_N-1*Z_N-2*...*Z_1*X*Z_1*...*Z_N-1
+// Z_j is givens matrix to zero out the j+1,j'th element of X
 static void
 QRiteration(vector<double> &alpha,
 	    vector<double> &beta,
@@ -280,10 +290,10 @@ golub_welsh_quadrature(const bool VERBOSE,
 //modified Chebyshev quadrature
 
 // m[j] = 'th modified moment, v[j]=j'th moment
-// generalized laguerre polynomial w/ a=1 : l_{j}(x)
+// monic generalized laguerre polynomial w/ a=1 : l_{j}(x)
 // orthogonal to x e^{-x}
-// l_j(x) = \sum_l=0^j 1/l! binom{1+j}{j-l} (-1)^l x^l
-// m[j] = \sum_{l=0}^j 1/l! binom{1+j}{l-l} (-1)^l v[l]
+// l_j(x) = \sum_l=0^j j!/l! binom{1+j}{j-l} (-1)^{l+j} x^l
+// m[j] = \sum_{l=0}^j j!/l! binom{1+j}{j-l} (-1)^{l+j} v[l]
 static void
 laguerre_modified_moments(const vector<double> &moments,
 			  const size_t n_points,
@@ -292,10 +302,9 @@ laguerre_modified_moments(const vector<double> &moments,
   for(size_t j = 0; j < modified_moments.size(); j++){
     for(size_t l = 0; l <= j; l++){
       modified_moments[j] += 
-	pow(-1, l)*exp(- gsl_sf_lnfact(l) 
-		       + gsl_sf_lnfact(j + 1)
-		       - gsl_sf_lnfact(l + 1) 
-		       - gsl_sf_lnfact(j - l))*moments[l]; 
+	exp(gsl_sf_lnfact(j) - gsl_sf_lnfact(l)
+	    + gsl_sf_lnfact(1 + j) - gsl_sf_lnfact(j - l)
+	    - gsl_sf_lnfact(l + 1) + log(moments[l]))*pow(-1, l + j); 
     } 
   } 
 }
@@ -309,31 +318,36 @@ laguerre_modified_moments(const vector<double> &moments,
 static void
 modified3term_relation(const vector<double> &modified_moments,
 		       const vector<double> &a,
-		       const vector<double> &b,
 		       const vector<double> &c,
 		       const size_t n_points,
 		       vector<double> &alpha,
 		       vector<double> &nu){
   alpha.resize(n_points, 0.0);
-  nu.resize(n_points, 0.0);
+  nu.resize(n_points - 1, 0.0);
 
   vector< vector<double> > sigma(2*n_points, vector<double>(2*n_points, 0.0));
   // initialization
-  alpha[0] = a[0] + modified_moments[0]/modified_moments[1];
+  alpha[0] = a[0] + modified_moments[1]/modified_moments[0];
   // sigma[-1][l] = 0
   for(size_t l = 0; l < 2*n_points; l++)
     sigma[0][l] = modified_moments[l];
 
-  for(size_t k = 1; k < n_points; k++){
-    for(size_t l = k; l < 2*n_points - k; l++){
-      sigma[k][l] = b[l]*sigma[k-1][l+1] + (a[l] - alpha[k-1])*sigma[k-1][l]
+  for(size_t k = 1; k <= n_points; k++){
+    for(size_t l = k; l < 2*n_points - k + 1; l++){
+      sigma[k][l] = sigma[k-1][l+1] + (a[l] - alpha[k-1])*sigma[k-1][l]
 	+ c[l]*sigma[k-1][l-1];
       if(k > 1)
 	sigma[k][l] -= nu[k-2]*sigma[k-2][l];
     }
-    alpha[k] = a[k] + b[k]*sigma[k][k+1]/sigma[k][k] - b[k-1]*sigma[k-1][k]/sigma[k-1][k-1];
-    nu[k-1] = b[k-1]*sigma[k][k]/sigma[k-1][k-1];
+    alpha[k] = a[k] + sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
+    nu[k-1] = sigma[k][k]/sigma[k-1][k-1];
   }  
+
+  // See Gautschi pgs 10-13,
+  // the nu here is the square of the off-diagonal
+  // of the Jacobi matrix
+  for(size_t i = 0; i < nu.size(); i++)
+    nu[i] = sqrt(nu[i]);
 }
 
 
@@ -346,21 +360,53 @@ laguerre_modified_quadrature(const bool VERBOSE,
 			     vector<double> &weights){
   // change of basis to laguerre polynomials
   vector<double> modified_moments;
-  laguerre_modified_moments(moments, n_points, modified_moments);
+  laguerre_modified_moments(moments, n_points-1, modified_moments);
+
+  if(VERBOSE){
+    cerr << "ORIGINAL MOMENTS = ";
+    for(size_t i = 0; i < moments.size(); i++)
+      cerr << moments[i] << ", ";
+    cerr << endl;
+
+    cerr << "MODIFIED MOMENTS = ";
+    for(size_t i = 0; i < modified_moments.size(); i++)
+      cerr << modified_moments[i] << ", ";
+    cerr << endl;
+  }
  
-  // b_{i+1} p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - c_i p_{i-2}(x)
-  // -i l_i (x) = (x - 2*i) l_{i-1} (x) + i l_{i-2} (x)
-  vector<double> a, b, c;
-  for(size_t i = 1; i <= 2*n_points; i++){
-    b.push_back(-i);
-    a.push_back(2*i);
-    c.push_back(-i); 
+  //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
+  // l_i (x) = (x - 2*(i+1)) l_{i-1} (x) - i*(i+1) l_{i-2} (x)
+  vector<double> a, b;
+  for(size_t i = 0; i < 2*(n_points-1); i++){
+    b.push_back(i*(i + 1.0));
+    a.push_back(2.0*(i+1));
   }
 
   vector<double> alpha, beta;
-  modified3term_relation(modified_moments, a, b, c,
-			 n_points, alpha, beta);
+  modified3term_relation(modified_moments, a, b,
+			 n_points-1, alpha, beta);
 
+  if(VERBOSE){
+    cerr << "ORIGINAL 3-TERM RELATION:" << endl;
+    cerr << "a = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << a[i] << ", ";
+    cerr << endl;
+    cerr << "b = ";
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << b[i] << ", ";
+    cerr << endl;
+
+    cerr << "ESTIMATED 3=TERM RELATION:" << endl;
+    cerr << "alpha = ";
+    for(size_t i = 0; i < alpha.size(); i++)
+      cerr << alpha[i] << ", ";
+    cerr << endl;
+    cerr << "beta = ";
+    for(size_t i = 0; i < beta.size(); i++)
+      cerr << beta[i] << ", ";
+    cerr << endl; 
+  }
   vector<double> eigenvec(alpha.size(), 0.0);
   eigenvec[0] = 1.0;
 
@@ -372,6 +418,10 @@ laguerre_modified_quadrature(const bool VERBOSE,
   size_t iter = 0;
   while(error >= tol && iter < max_iter){
     QRiteration(alpha, beta, eigenvec);
+
+    error = 0.0;
+    for(size_t i = 0; i < beta.size(); i++)
+      error += beta[i]*beta[i];
     iter++;
   }
   // eigenvalues are on diagonal of J, i.e. alpha
@@ -380,4 +430,5 @@ laguerre_modified_quadrature(const bool VERBOSE,
   weights.swap(eigenvec);
   for(size_t i = 0; i < weights.size(); i++)
     weights[i] = weights[i]*weights[i];
+
 }

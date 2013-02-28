@@ -540,7 +540,7 @@ golub_welsh_libsize(const bool VERBOSE,
       cerr << weights[i] << ", ";
     cerr << endl;
 
-    cerr << "estimated lib size = " << estimated_integral << endl;
+    //  cerr << "estimated lib size = " << estimated_integral << endl;
   }
 
   return estimated_integral;
@@ -592,7 +592,7 @@ laguerre_modified_libsize(const bool VERBOSE,
       cerr << weights[i] << ", ";
     cerr << endl;
 
-    cerr << "estimated lib size = " << estimated_integral << endl;
+    //    cerr << "estimated lib size = " << estimated_integral << endl;
   }
 
   return estimated_integral;
