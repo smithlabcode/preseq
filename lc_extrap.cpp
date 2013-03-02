@@ -1,4 +1,4 @@
-/*    lc_extrap:
+/*    lc_extrap: extrapolate complexity curve
  *
  *    Copyright (C) 2012 University of Southern California and
  *			 Andrew D. Smith and Timothy Daley
@@ -61,23 +61,39 @@ using BamTools::RefData;
 
 static SimpleGenomicRegion
 BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-			 const BamAlignment &ba) {
+		   const BamAlignment &ba) {
   const unordered_map<size_t, string>::const_iterator
     the_chrom(chrom_lookup.find(ba.RefID));
   if (the_chrom == chrom_lookup.end())
     throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-  
+
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
   const size_t end = start + ba.Length;
-  
+
   return SimpleGenomicRegion(chrom, start, end);
+}
+
+static GenomicRegion
+BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
+		   const BamAlignment &ba){
+
+  const unordered_map<size_t, string>::const_iterator
+    the_chrom(chrom_lookup.find(ba.RefID));
+  if (the_chrom == chrom_lookup.end())
+    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+  const string chrom = the_chrom->second;
+  const size_t start = ba.Position;
+  const size_t end = ba.Position + ba.InsertSize;
+
+  return GenomicRegion(chrom, start, end);
+
 }
 
 
 static size_t
 load_values_BAM_se(const string &input_file_name, vector<double> &values) {
-  
+
   BamReader reader;
   reader.Open(input_file_name);
 
@@ -95,17 +111,23 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   SimpleGenomicRegion prev;
   BamAlignment bam;
   while (reader.GetNextAlignment(bam)) {
-    SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
-      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    // ignore unmapped reads & secondary alignments
+    if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
+
+      SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+      if (r.same_chrom(prev) && r.get_start() < prev.get_start())
+	throw SMITHLABException("locations unsorted in: " + input_file_name);
     
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-      values.push_back(1.0);
-    else values.back()++;
-    ++n_reads;
-    prev.swap(r);
+      if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
+	values.push_back(1.0);
+      else values.back()++;
+      ++n_reads;
+      prev.swap(r);
+    }
   }
   reader.Close();
+
+  cerr << n_reads << endl;
   return n_reads;
 }
 
@@ -126,18 +148,26 @@ load_values_BAM_pe(const string &input_file_name, vector<double> &values) {
   size_t n_reads = 1;
   values.push_back(1.0);
 
-  SimpleGenomicRegion prev;
+  GenomicRegion prev;
   BamAlignment bam;
   while (reader.GetNextAlignment(bam)) {
-    SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
-      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    // ignore unmapped reads & secondary alignments
+    if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
+      // ignore reads that do not map concoordantly
+      if(bam.IsPaired() && bam.IsProperPair() && bam.IsFirstMate()){
+	GenomicRegion r(BamToGenomicRegion(chrom_lookup, bam));
+	if (r.same_chrom(prev) && r.get_start() < prev.get_start()
+	    && r.get_end() < prev.get_end())
+	    throw SMITHLABException("locations unsorted in: " + input_file_name);
     
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-      values.push_back(1.0);
-    else values.back()++;
-    ++n_reads;
-    prev.swap(r);
+	if (!r.same_chrom(prev) || r.get_start() != prev.get_start()
+	    || r.get_end() != prev.get_end())
+	  values.push_back(1.0);
+	else values.back()++;
+	++n_reads;
+	prev.swap(r);
+      }
+    }
   }
   reader.Close();
   return n_reads;
@@ -147,28 +177,28 @@ load_values_BAM_pe(const string &input_file_name, vector<double> &values) {
 
 static size_t
 load_values_BED_se(const string input_file_name, vector<double> &values) {
-  
-  std::ifstream in(input_file_name.c_str());
-  if (!in)
-    throw SMITHLABException("problem opening file: " + input_file_name);
-  
-  SimpleGenomicRegion r, prev;
-  if (!(in >> prev))
-    throw SMITHLABException("problem reading from: " + input_file_name);
-  
-  size_t n_reads = 1;
-  values.push_back(1.0);
-  while (in >> r) {
+
+ std::ifstream in(input_file_name.c_str());
+ if (!in)
+   throw "problem opening file: " + input_file_name;
+
+ SimpleGenomicRegion r, prev;
+ if (!(in >> prev))
+   throw "problem reading from: " + input_file_name;
+
+ size_t n_reads = 1;
+ values.push_back(1.0);
+ while (in >> r) {
     if (r.same_chrom(prev) && r.get_start() < prev.get_start())
       throw SMITHLABException("locations unsorted in: " + input_file_name);
-
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-      values.push_back(1.0);
-    else values.back()++;
-    ++n_reads;
-    prev.swap(r);
-  }
-  return n_reads;
+    
+   if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
+     values.push_back(1.0);
+   else values.back()++;
+   ++n_reads;
+   prev.swap(r);
+ }
+ return n_reads;
 }
 
 static size_t

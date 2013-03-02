@@ -309,6 +309,7 @@ laguerre_modified_moments(const vector<double> &moments,
   } 
 }
 
+
 // 3-term relation calculation by 
 // modified Chabyshev algorithm
 // Golub & Meurant (2010) pg 60 (bottom)
@@ -318,7 +319,7 @@ laguerre_modified_moments(const vector<double> &moments,
 static void
 modified3term_relation(const vector<double> &modified_moments,
 		       const vector<double> &a,
-		       const vector<double> &c,
+		       const vector<double> &b,
 		       const size_t n_points,
 		       vector<double> &alpha,
 		       vector<double> &nu){
@@ -333,15 +334,27 @@ modified3term_relation(const vector<double> &modified_moments,
     sigma[0][l] = modified_moments[l];
 
   for(size_t k = 1; k <= n_points; k++){
-    for(size_t l = k; l < 2*n_points - k + 1; l++){
+    for(size_t l = k; l < 2*n_points - k; l++){
       sigma[k][l] = sigma[k-1][l+1] + (a[l] - alpha[k-1])*sigma[k-1][l]
-	+ c[l]*sigma[k-1][l-1];
+	+ b[l-1]*sigma[k-1][l-1];
       if(k > 1)
 	sigma[k][l] -= nu[k-2]*sigma[k-2][l];
     }
-    alpha[k] = a[k] + sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
-    nu[k-1] = sigma[k][k]/sigma[k-1][k-1];
+    if(k != n_points){
+      alpha[k] = a[k] + sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
+      nu[k-1] = sigma[k][k]/sigma[k-1][k-1];
+    }
   }  
+
+  cerr << "n_points = " << n_points << endl;  
+  cerr << "modified moments size = " << modified_moments.size() << endl;
+
+  cerr << "sigma = " << endl;
+  for(size_t i = 0; i < sigma.size(); i++){
+    for(size_t j = 0; j < sigma[i].size(); j++)
+      cerr << sigma[i][j] << ", ";
+    cerr << endl;
+  }
 
   // See Gautschi pgs 10-13,
   // the nu here is the square of the off-diagonal
@@ -360,7 +373,7 @@ laguerre_modified_quadrature(const bool VERBOSE,
 			     vector<double> &weights){
   // change of basis to laguerre polynomials
   vector<double> modified_moments;
-  laguerre_modified_moments(moments, n_points-1, modified_moments);
+  laguerre_modified_moments(moments, n_points, modified_moments);
 
   if(VERBOSE){
     cerr << "ORIGINAL MOMENTS = ";
@@ -376,15 +389,97 @@ laguerre_modified_quadrature(const bool VERBOSE,
  
   //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
   // l_i (x) = (x - 2*(i+1)) l_{i-1} (x) - i*(i+1) l_{i-2} (x)
-  vector<double> a, b;
-  for(size_t i = 0; i < 2*(n_points-1); i++){
-    b.push_back(i*(i + 1.0));
-    a.push_back(2.0*(i+1));
-  }
+  vector<double> a(2*n_points, 0.0);
+  for(size_t i = 0; i < a.size(); i++)
+    a[i] = 2.0*(i+1);
+  
+  vector<double> b(2*n_points - 1);
+  for(size_t i = 0; i < b.size(); i++)
+    b[i] = static_cast<double>((i + 1)*(i + 2));
 
   vector<double> alpha, beta;
   modified3term_relation(modified_moments, a, b,
-			 n_points-1, alpha, beta);
+			 n_points - 1, alpha, beta);
+
+  if(VERBOSE){
+    cerr << "ORIGINAL 3-TERM RELATION:" << endl;
+    cerr << "a = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << a[i] << ", ";
+    cerr << endl;
+    cerr << "b = ";
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << b[i] << ", ";
+    cerr << endl;
+
+    cerr << "ESTIMATED 3=TERM RELATION:" << endl;
+    cerr << "alpha = ";
+    for(size_t i = 0; i < alpha.size(); i++)
+      cerr << alpha[i] << ", ";
+    cerr << endl;
+    cerr << "beta = ";
+    for(size_t i = 0; i < beta.size(); i++)
+      cerr << beta[i] << ", ";
+    cerr << endl; 
+  }
+  vector<double> eigenvec(alpha.size(), 0.0);
+  eigenvec[0] = 1.0;
+
+  // in QR, off-diagonals go to zero
+  // use off diags for convergence
+  double error = 0.0;
+  for(size_t i = 0; i < beta.size(); i++)
+    error += beta[i]*beta[i];
+  size_t iter = 0;
+  while(error >= tol && iter < max_iter){
+    QRiteration(alpha, beta, eigenvec);
+
+    error = 0.0;
+    for(size_t i = 0; i < beta.size(); i++)
+      error += beta[i]*beta[i];
+    iter++;
+  }
+  // eigenvalues are on diagonal of J, i.e. alpha
+  points.swap(alpha);
+
+  weights.swap(eigenvec);
+  for(size_t i = 0; i < weights.size(); i++)
+    weights[i] = weights[i]*weights[i];
+
+}
+
+
+void
+chebyshev_quadrature(const bool VERBOSE,
+		     const vector<double> &moments,
+		     const size_t n_points,
+		     const double tol, const size_t max_iter,
+		     vector<double> &points,
+		     vector<double> &weights){
+  // change of basis to laguerre polynomials
+  vector<double> modified_moments(moments);
+  //  laguerre_modified_moments(moments, n_points, modified_moments);
+
+  if(VERBOSE){
+    cerr << "ORIGINAL MOMENTS = ";
+    for(size_t i = 0; i < moments.size(); i++)
+      cerr << moments[i] << ", ";
+    cerr << endl;
+
+    cerr << "MODIFIED MOMENTS = ";
+    for(size_t i = 0; i < modified_moments.size(); i++)
+      cerr << modified_moments[i] << ", ";
+    cerr << endl;
+  }
+ 
+  //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
+  // l_i (x) = (x - 2*(i+1)) l_{i-1} (x) - i*(i+1) l_{i-2} (x)
+  vector<double> a(2*n_points, 0.0);
+  vector<double> b(2*n_points - 1, 0.0);
+
+  vector<double> alpha, beta;
+  modified3term_relation(modified_moments, a, b,
+			 n_points - 1, alpha, beta);
 
   if(VERBOSE){
     cerr << "ORIGINAL 3-TERM RELATION:" << endl;

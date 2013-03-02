@@ -47,6 +47,14 @@ laguerre_modified_quadrature(const bool VERBOSE,
 			     std::vector<double> &points,
 			     std::vector<double> &weights);
 
+void
+chebyshev_quadrature(const bool VERBOSE,
+		     const std::vector<double> &moments,
+		     const size_t n_points,
+		     const double tol, const size_t max_iter,
+		     std::vector<double> &points,
+		     std::vector<double> &weights);
+
 
 
 #endif

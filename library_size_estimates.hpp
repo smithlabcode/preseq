@@ -61,6 +61,14 @@ laguerre_modified_libsize(const bool VERBOSE,
 			  const size_t max_iter,
 			  const size_t n_points);
 
+double
+chebyshev_libsize(const bool VERBOSE,
+		  const std::vector<double> &counts_hist,
+		  const double tolerance,
+		  const size_t max_iter,
+		  const size_t n_points);
+
+
 /*double
 upperbound_librarysize(const bool VERBOSE,
 		       const std::vector<double> &counts_hist, 
