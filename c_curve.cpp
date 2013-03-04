@@ -102,21 +102,24 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   while (reader.GetNextAlignment(bam)) {
     // ignore unmapped reads & secondary alignments
     if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
+      //only count unpaired reads or the left mate of paired reads
+      if(!(bam.IsPaired()) || 
+	 (bam.IsFirstMate())){
 
-      SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-      if (r.same_chrom(prev) && r.get_start() < prev.get_start())
+	SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
+	if (r.same_chrom(prev) && r.get_start() < prev.get_start())
 	throw SMITHLABException("locations unsorted in: " + input_file_name);
     
-      if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-	values.push_back(1.0);
-      else values.back()++;
-      ++n_reads;
-      prev.swap(r);
+	if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
+	  values.push_back(1.0);
+	else values.back()++;
+	++n_reads;
+	prev.swap(r);
+      }
     }
   }
   reader.Close();
 
-  cerr << n_reads << endl;
   return n_reads;
 }
 
