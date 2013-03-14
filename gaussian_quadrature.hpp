@@ -42,7 +42,8 @@ golub_welsh_quadrature(const bool VERBOSE,
 void
 laguerre_modified_quadrature(const bool VERBOSE,
 			     const std::vector<double> &moments,
-			     const size_t n_points,
+			     const size_t n_points,		     
+			     const double mu,
 			     const double tol, const size_t max_iter,
 			     std::vector<double> &points,
 			     std::vector<double> &weights);

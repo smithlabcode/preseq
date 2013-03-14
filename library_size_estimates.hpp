@@ -57,6 +57,7 @@ golub_welsh_libsize(const bool VERBOSE,
 double
 laguerre_modified_libsize(const bool VERBOSE,
 			  const std::vector<double> &counts_hist,
+			  const double mu,
 			  const double tolerance,
 			  const size_t max_iter,
 			  const size_t n_points);

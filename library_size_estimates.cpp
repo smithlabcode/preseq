@@ -549,6 +549,7 @@ golub_welsh_libsize(const bool VERBOSE,
 double
 laguerre_modified_libsize(const bool VERBOSE,
 			  const std::vector<double> &counts_hist,
+			  const double mu,
 			  const double tol,
 			  const size_t max_iter,
 			  const size_t n_points){
@@ -573,7 +574,7 @@ laguerre_modified_libsize(const bool VERBOSE,
 				  - log(counts_hist[1])));
 
   vector<double> points, weights;
-  laguerre_modified_quadrature(VERBOSE, measure_moments, n_points,
+  laguerre_modified_quadrature(VERBOSE, measure_moments, n_points, mu,
 			       tol,  max_iter, points, weights);
 
   // En_1 * int_0^\infty 1/x d \nu (x)

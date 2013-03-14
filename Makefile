@@ -61,7 +61,7 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 
 lc_extrap count_extrap mincount_extrap: continued_fraction.o
 
-test_quad: library_size_estimates.o gaussian_quadrature.o newtons_method.o
+test_quad: library_size_estimates.o gaussian_quadrature.o newtons_method.o ZTNB.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)

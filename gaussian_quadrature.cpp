@@ -254,7 +254,7 @@ golub_welsh_quadrature(const bool VERBOSE,
 
     cerr << "beta = ";
     for(size_t i = 0; i < beta.size(); i++)
-      cerr << beta[i] << ", ";
+      cerr << beta[i]*beta[i] << ", ";
     cerr << endl;
   }
 
@@ -295,16 +295,19 @@ golub_welsh_quadrature(const bool VERBOSE,
 // l_j(x) = \sum_l=0^j j!/l! binom{1+j}{j-l} (-1)^{l+j} x^l
 // m[j] = \sum_{l=0}^j j!/l! binom{1+j}{j-l} (-1)^{l+j} v[l]
 static void
-laguerre_modified_moments(const vector<double> &moments,
+laguerre_modified_moments(const vector<double> &orig_moments,\
+			  const double mu,
 			  const size_t n_points,
 			  vector<double> &modified_moments){
   modified_moments.resize(2*n_points, 0.0);
-  for(size_t j = 0; j < modified_moments.size(); j++){
-    for(size_t l = 0; l <= j; l++){
-      modified_moments[j] += 
-	exp(gsl_sf_lnfact(j) - gsl_sf_lnfact(l)
-	    + gsl_sf_lnfact(1 + j) - gsl_sf_lnfact(j - l)
-	    - gsl_sf_lnfact(l + 1) + log(moments[l]))*pow(-1, l + j); 
+  const double theta = (mu + 1)/mu;
+  for(size_t n = 0; n < modified_moments.size(); n++){
+    for(size_t l = 0; l <= n; l++){
+      modified_moments[n] += 
+	exp(gsl_sf_lnfact(n) - gsl_sf_lnfact(l)
+	    + gsl_sf_lnfact(n + 1) - gsl_sf_lnfact(n - l)
+	    - gsl_sf_lnfact(l + 1) + log(orig_moments[l])
+	    - (n - l)*log(theta))*pow(-1, l + n); 
     } 
   } 
 }
@@ -368,12 +371,13 @@ void
 laguerre_modified_quadrature(const bool VERBOSE,
 			     const vector<double> &moments,
 			     const size_t n_points,
+			     const double mu,
 			     const double tol, const size_t max_iter,
 			     vector<double> &points,
 			     vector<double> &weights){
   // change of basis to laguerre polynomials
   vector<double> modified_moments;
-  laguerre_modified_moments(moments, n_points, modified_moments);
+  laguerre_modified_moments(moments, mu, n_points, modified_moments);
 
   if(VERBOSE){
     cerr << "ORIGINAL MOMENTS = ";
@@ -388,14 +392,15 @@ laguerre_modified_quadrature(const bool VERBOSE,
   }
  
   //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
-  // l_i (x) = (x - 2*(i+1)) l_{i-1} (x) - i*(i+1) l_{i-2} (x)
+  // l_i (x) = (x - 2*(i+1)/theta) l_{i-1} (x) - i*(i+1)/theta l_{i-2} (x)
+  const double theta = (mu + 1)/mu;
   vector<double> a(2*n_points, 0.0);
   for(size_t i = 0; i < a.size(); i++)
-    a[i] = 2.0*(i+1);
+    a[i] = 2.0*(i+1)/theta;
   
   vector<double> b(2*n_points - 1);
   for(size_t i = 0; i < b.size(); i++)
-    b[i] = static_cast<double>((i + 1)*(i + 2));
+    b[i] = (i + 1)*(i + 2)/(theta*theta);
 
   vector<double> alpha, beta;
   modified3term_relation(modified_moments, a, b,
@@ -419,7 +424,7 @@ laguerre_modified_quadrature(const bool VERBOSE,
     cerr << endl;
     cerr << "beta = ";
     for(size_t i = 0; i < beta.size(); i++)
-      cerr << beta[i] << ", ";
+      cerr << beta[i]*beta[i] << ", ";
     cerr << endl; 
   }
   vector<double> eigenvec(alpha.size(), 0.0);
@@ -499,7 +504,7 @@ chebyshev_quadrature(const bool VERBOSE,
     cerr << endl;
     cerr << "beta = ";
     for(size_t i = 0; i < beta.size(); i++)
-      cerr << beta[i] << ", ";
+      cerr << beta[i]*beta[i] << ", ";
     cerr << endl; 
   }
   vector<double> eigenvec(alpha.size(), 0.0);
