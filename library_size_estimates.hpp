@@ -27,10 +27,10 @@
 #include "gaussian_quadrature.hpp"
 
 double
-chao87_lowerbound_librarysize(const std::vector<double> &counts_hist);
+chao87_lowerbound_unobserved(const std::vector<double> &counts_hist);
 
 double 
-cl92_estimate_librarysize(const std::vector<double> &counts_hist);
+cl92_estimate_unobserved(const std::vector<double> &counts_hist);
 
 /*
 double
@@ -39,6 +39,12 @@ harris_lowerbound_librarysize(const std::vector<double> &counts_hist,
 			      const size_t max_iter,
 			      const size_t depth);
 */
+
+
+double
+harris_3moments(const bool VERBOSE,
+		const std::vector<double> &counts_hist);
+
 
 double
 harris_by_newton(const bool VERBOSE,
@@ -52,7 +58,7 @@ golub_welsh_libsize(const bool VERBOSE,
 		    const std::vector<double> &counts_hist,
 		    const double tolerance,
 		    const size_t max_iter,
-		    const size_t n_points);
+		    size_t n_points);
 
 double
 laguerre_modified_libsize(const bool VERBOSE,
@@ -60,14 +66,14 @@ laguerre_modified_libsize(const bool VERBOSE,
 			  const double mu,
 			  const double tolerance,
 			  const size_t max_iter,
-			  const size_t n_points);
+			  size_t n_points);
 
 double
 chebyshev_libsize(const bool VERBOSE,
 		  const std::vector<double> &counts_hist,
 		  const double tolerance,
 		  const size_t max_iter,
-		  const size_t n_points);
+		  size_t n_points);
 
 
 /*double

@@ -1,4 +1,4 @@
-/*    Copyright (C) 2012 University of Southern California and
+/*    Copyright (C) 2013 University of Southern California and
  *                       Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -32,6 +32,7 @@
 
 
 #include "smithlab_utils.hpp"
+
 
 using std::string;
 using std::vector;
@@ -104,8 +105,43 @@ poly_solve_gauss_quad(const std::vector<double> &moments,
    gsl_poly_complex_workspace_free (w);
 }
 
+
+/////////////////////////////////////////////////////
+// Quadrature Methods
+
+// check 3 term recurrence to avoid non-positive elements
+// truncate if non-positive element found
+static void
+check_three_term_relation(vector<double> &alpha,
+			  vector<double> &beta){
+  // first entry is zero! Abort
+  if(alpha[0] <= 0.0)
+    throw SMITHLABException("alpha[0] is non positive! Abort!");
+
+  for(size_t i = 0; i < beta.size(); i++){
+    if(beta[i] <= 0.0 || !finite(beta[i])
+       || alpha[i + 1] <= 0.0 || !finite(alpha[i + 1])){
+      beta.resize(i);
+      alpha.resize(i + 1);
+    }
+  }
+}
+
+static bool
+check_positivity(const vector<double> &points){
+  for(size_t i = 0; i < points.size(); i++)
+    if(points[i] < 0.0 || !(finite(points[i])))
+      return false;
+
+  return true;
+}
+
+
 /////////////////////////////////////////////////////
 // Golub & Welsh quadrature
+
+
+
 
 // Following Golub & Welsch 1968 (Sec 4)
 static void
@@ -115,13 +151,13 @@ three_term_relation(const vector<double> &moments,
 		    vector<double> &b){
 
   vector<double> moment_estimates(moments);
-  moment_estimates.resize(2*n_points);
+  moment_estimates.resize(2*n_points + 2);
 
   // M is Hankel matrix of moments
   cerr << "Hankel matrix:" << endl;
   gsl_matrix *M = gsl_matrix_alloc(n_points, n_points);
-  for(size_t i = 0; i < n_points; i++){
-    for(size_t j = 0; j < n_points; j++){
+  for(size_t i = 0; i < n_points + 1; i++){
+    for(size_t j = 0; j < n_points + 1; j++){
       gsl_matrix_set(M, i, j, moment_estimates[i + j]);
       cerr << gsl_matrix_get(M, i, j) << ", ";
     }
@@ -133,17 +169,19 @@ three_term_relation(const vector<double> &moments,
   // if M is not positive definite, error code GSL_EDOM should occur
   gsl_linalg_cholesky_decomp(M);
 
+  /*
   cerr << "Cholesky decomp:" << endl;
-  for(size_t i = 0; i < n_points; i++){
-    for(size_t j = 0; j < n_points; j++){
+  for(size_t i = 0; i < n_points + 1; i++){
+    for(size_t j = 0; j < n_points + 1; j++){
       cerr << gsl_matrix_get(M, i, j) << ", ";
     }
     cerr << endl;
   }
+  */
 
   // equations 4.3
   a.clear();
-  for(size_t i = 0; i < n_points - 1; i++){
+  for(size_t i = 0; i < n_points; i++){
     double recurrence_val = gsl_matrix_get(M, i, i + 1)/gsl_matrix_get(M, i, i);
     if(i > 0)
       recurrence_val -= 
@@ -152,7 +190,7 @@ three_term_relation(const vector<double> &moments,
   }
 
   b.clear();
-  for(size_t i = 0; i < n_points - 2; i++)
+  for(size_t i = 0; i < n_points; i++)
     b.push_back(gsl_matrix_get(M, i + 1, i + 1)/gsl_matrix_get(M, i, i));
   
   
@@ -258,28 +296,42 @@ golub_welsh_quadrature(const bool VERBOSE,
     cerr << endl;
   }
 
+  check_three_term_relation(alpha, beta);
 
-  vector<double> eigenvec(alpha.size(), 0.0);
-  eigenvec[0] = 1.0;
+  bool POSITIVE_POINTS = false;
 
+  while(!(POSITIVE_POINTS)){
+    vector<double> eigenvec(alpha.size(), 0.0);
+    eigenvec[0] = 1.0;
+    vector<double> eigenvals(alpha);
+    vector<double> qr_beta(beta);
   // in QR, off-diagonals go to zero
   // use off diags for convergence
-  double error = 0.0;
-  for(size_t i = 0; i < beta.size(); i++)
-    error += beta[i]*beta[i];
-  size_t iter = 0;
-  while(error >= tol && iter < max_iter){
-    QRiteration(alpha, beta, eigenvec);
+    double error = 0.0;
+    for(size_t i = 0; i < qr_beta.size(); i++)
+      error += qr_beta[i]*qr_beta[i];
+    size_t iter = 0;
+    while(error >= tol && iter < max_iter){
+      QRiteration(eigenvals, qr_beta, eigenvec);
 
-    error = 0.0;
-    for(size_t i = 0; i < beta.size(); i++)
-      error += beta[i]*beta[i];
-    iter++;
+      error = 0.0;
+      for(size_t i = 0; i < qr_beta.size(); i++)
+	error += qr_beta[i]*qr_beta[i];
+      iter++;
+    }
+  // eigenvalues are on diagonal of J
+    POSITIVE_POINTS = check_positivity(eigenvals);
+    if(POSITIVE_POINTS){
+      points.swap(eigenvals);
+      weights.swap(eigenvec);
+    }
+    else{
+      alpha.pop_back();
+      beta.pop_back();
+    }
+
   }
-  // eigenvalues are on diagonal of J, i.e. alpha
-  points.swap(alpha);
 
-  weights.swap(eigenvec);
   for(size_t i = 0; i < weights.size(); i++)
     weights[i] = weights[i]*weights[i];
 }
@@ -320,7 +372,8 @@ laguerre_modified_moments(const vector<double> &orig_moments,\
 // of the modifying polynomials l_{j} (x),
 // i.e. b_{j} l_{j+1} (x) = (x - a_j) l_j(x) - c_j l_{j-1} (x)
 static void
-modified3term_relation(const vector<double> &modified_moments,
+modified3term_relation(const bool VERBOSE,
+		       const vector<double> &modified_moments,
 		       const vector<double> &a,
 		       const vector<double> &b,
 		       const size_t n_points,
@@ -349,15 +402,19 @@ modified3term_relation(const vector<double> &modified_moments,
     }
   }  
 
-  cerr << "n_points = " << n_points << endl;  
-  cerr << "modified moments size = " << modified_moments.size() << endl;
+  if(VERBOSE){
+    cerr << "n_points = " << n_points << endl;  
+    cerr << "modified moments size = " << modified_moments.size() << endl;
+  }
 
+  /*
   cerr << "sigma = " << endl;
   for(size_t i = 0; i < sigma.size(); i++){
     for(size_t j = 0; j < sigma[i].size(); j++)
       cerr << sigma[i][j] << ", ";
     cerr << endl;
   }
+  */
 
   // See Gautschi pgs 10-13,
   // the nu here is the square of the off-diagonal
@@ -394,17 +451,19 @@ laguerre_modified_quadrature(const bool VERBOSE,
   //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
   // l_i (x) = (x - 2*(i+1)/theta) l_{i-1} (x) - i*(i+1)/theta l_{i-2} (x)
   const double theta = (mu + 1)/mu;
-  vector<double> a(2*n_points, 0.0);
+  vector<double> a(2*n_points + 2, 0.0);
   for(size_t i = 0; i < a.size(); i++)
     a[i] = 2.0*(i+1)/theta;
   
-  vector<double> b(2*n_points - 1);
+  vector<double> b(2*n_points + 1);
   for(size_t i = 0; i < b.size(); i++)
     b[i] = (i + 1)*(i + 2)/(theta*theta);
 
   vector<double> alpha, beta;
-  modified3term_relation(modified_moments, a, b,
-			 n_points - 1, alpha, beta);
+  modified3term_relation(VERBOSE, modified_moments, a, b,
+			 n_points, alpha, beta);
+
+  check_three_term_relation(alpha, beta);
 
   if(VERBOSE){
     cerr << "ORIGINAL 3-TERM RELATION:" << endl;
@@ -427,32 +486,44 @@ laguerre_modified_quadrature(const bool VERBOSE,
       cerr << beta[i]*beta[i] << ", ";
     cerr << endl; 
   }
-  vector<double> eigenvec(alpha.size(), 0.0);
-  eigenvec[0] = 1.0;
 
+  bool POSITIVE_POINTS = false;
+
+  while(!(POSITIVE_POINTS)){
+    vector<double> eigenvec(alpha.size(), 0.0);
+    eigenvec[0] = 1.0;
+    vector<double> eigenvals(alpha);
+    vector<double> qr_beta(beta);
   // in QR, off-diagonals go to zero
   // use off diags for convergence
-  double error = 0.0;
-  for(size_t i = 0; i < beta.size(); i++)
-    error += beta[i]*beta[i];
-  size_t iter = 0;
-  while(error >= tol && iter < max_iter){
-    QRiteration(alpha, beta, eigenvec);
+    double error = 0.0;
+    for(size_t i = 0; i < qr_beta.size(); i++)
+      error += qr_beta[i]*qr_beta[i];
+    size_t iter = 0;
+    while(error >= tol && iter < max_iter){
+      QRiteration(eigenvals, qr_beta, eigenvec);
 
-    error = 0.0;
-    for(size_t i = 0; i < beta.size(); i++)
-      error += beta[i]*beta[i];
-    iter++;
+      error = 0.0;
+      for(size_t i = 0; i < qr_beta.size(); i++)
+	error += qr_beta[i]*qr_beta[i];
+      iter++;
+    }
+  // eigenvalues are on diagonal of J
+    POSITIVE_POINTS = check_positivity(eigenvals);
+    if(POSITIVE_POINTS){
+      points.swap(eigenvals);
+      weights.swap(eigenvec);
+    }
+    else{
+      alpha.pop_back();
+      beta.pop_back();
+    }
+
   }
-  // eigenvalues are on diagonal of J, i.e. alpha
-  points.swap(alpha);
 
-  weights.swap(eigenvec);
   for(size_t i = 0; i < weights.size(); i++)
     weights[i] = weights[i]*weights[i];
-
 }
-
 
 void
 chebyshev_quadrature(const bool VERBOSE,
@@ -463,7 +534,6 @@ chebyshev_quadrature(const bool VERBOSE,
 		     vector<double> &weights){
   // change of basis to laguerre polynomials
   vector<double> modified_moments(moments);
-  //  laguerre_modified_moments(moments, n_points, modified_moments);
 
   if(VERBOSE){
     cerr << "ORIGINAL MOMENTS = ";
@@ -479,24 +549,16 @@ chebyshev_quadrature(const bool VERBOSE,
  
   //  p_{i+1}(x) = (x - a_{i+1}) p_{i}(x) - b_i p_{i-2}(x)
   // l_i (x) = (x - 2*(i+1)) l_{i-1} (x) - i*(i+1) l_{i-2} (x)
-  vector<double> a(2*n_points, 0.0);
-  vector<double> b(2*n_points - 1, 0.0);
+  vector<double> a(2*n_points + 2, 0.0);
+  vector<double> b(2*n_points + 1, 0.0);
 
   vector<double> alpha, beta;
-  modified3term_relation(modified_moments, a, b,
-			 n_points - 1, alpha, beta);
+  modified3term_relation(VERBOSE, modified_moments, a, b,
+			 n_points, alpha, beta);
+
+  check_three_term_relation(alpha, beta);
 
   if(VERBOSE){
-    cerr << "ORIGINAL 3-TERM RELATION:" << endl;
-    cerr << "a = ";
-    for(size_t i = 0; i < a.size(); i++)
-      cerr << a[i] << ", ";
-    cerr << endl;
-    cerr << "b = ";
-    for(size_t i = 0; i < b.size(); i++)
-      cerr << b[i] << ", ";
-    cerr << endl;
-
     cerr << "ESTIMATED 3=TERM RELATION:" << endl;
     cerr << "alpha = ";
     for(size_t i = 0; i < alpha.size(); i++)
@@ -507,28 +569,43 @@ chebyshev_quadrature(const bool VERBOSE,
       cerr << beta[i]*beta[i] << ", ";
     cerr << endl; 
   }
-  vector<double> eigenvec(alpha.size(), 0.0);
-  eigenvec[0] = 1.0;
 
+  bool POSITIVE_POINTS = false;
+
+  while(!(POSITIVE_POINTS)){
+    vector<double> eigenvec(alpha.size(), 0.0);
+    eigenvec[0] = 1.0;
+    vector<double> eigenvals(alpha);
+    vector<double> qr_beta(beta);
   // in QR, off-diagonals go to zero
   // use off diags for convergence
-  double error = 0.0;
-  for(size_t i = 0; i < beta.size(); i++)
-    error += beta[i]*beta[i];
-  size_t iter = 0;
-  while(error >= tol && iter < max_iter){
-    QRiteration(alpha, beta, eigenvec);
+    double error = 0.0;
+    for(size_t i = 0; i < qr_beta.size(); i++)
+      error += qr_beta[i]*qr_beta[i];
+    size_t iter = 0;
+    while(//error >= tol && 
+	  iter < max_iter){
+      QRiteration(eigenvals, qr_beta, eigenvec);
 
-    error = 0.0;
-    for(size_t i = 0; i < beta.size(); i++)
-      error += beta[i]*beta[i];
-    iter++;
+      error = 0.0;
+      for(size_t i = 0; i < qr_beta.size(); i++)
+	error += qr_beta[i]*qr_beta[i];
+      iter++;
+    }
+  // eigenvalues are on diagonal of J
+    POSITIVE_POINTS = check_positivity(eigenvals);
+    if(POSITIVE_POINTS){
+      points.swap(eigenvals);
+      weights.swap(eigenvec);
+    }
+    else{
+      alpha.pop_back();
+      beta.pop_back();
+    }
+
   }
-  // eigenvalues are on diagonal of J, i.e. alpha
-  points.swap(alpha);
 
-  weights.swap(eigenvec);
   for(size_t i = 0; i < weights.size(); i++)
     weights[i] = weights[i]*weights[i];
-
 }
+

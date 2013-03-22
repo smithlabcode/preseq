@@ -24,6 +24,7 @@
 #include <ostream>
 #include <cassert>
 #include <limits>
+#include <iomanip>
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -41,76 +42,24 @@ using std::vector;
 using std::max;
 using std::cerr;
 using std::endl;
+using std::setprecision;
+
 
 using smithlab::log_sum_log_vec;
 
 static const size_t MIN_ALLOWED_DEGREE = 6;
 
-/* compute the upperbound on library size by noting that p(x)/q(x) is
- * a constant in the limit if p & q are of equal degree. furthermore
- * if p & q are equal degree then the library_yield estimates are
- * liberal, i.e. they overestimate the library_yield on average
- */
-/*
-double
-upperbound_librarysize(const bool VERBOSE, const vector<double> &counts_hist, 
-		       size_t max_terms) {
-  // need max_terms = L + M + 1 to be even so that L + M is odd so
-  // that we can take lim_{t \to \infty} [L+1, M]
-  
-  if (max_terms % 2 == 1)
-    --max_terms;
-  
-  vector<double> ps_coeffs;
-  for (size_t i = 0; i < max_terms; ++i)
-    ps_coeffs.push_back(pow(-1, i + 2)*counts_hist[i + 1]);
-  
-  for (; max_terms >= MIN_ALLOWED_DEGREE; max_terms -= 2) {
-    const size_t numer_degree = max_terms/2;  
-    const size_t denom_degree = max_terms - numer_degree;
-    assert(numer_degree == denom_degree);
-    // numer_degree = degree(p)+1, denom_degree = degree(q); and
-    // library_yield = x*p(x)/q(x), ensure that degree(x*p)=degree(q)
-    
-    // consider upper bound if pade approx is acceptable
-    vector<double> numers, denoms;
-    const bool accept_approx = 
-      compute_pade_coeffs(ps_coeffs, numer_degree, denom_degree, numers, denoms); 
-    
-    // lim(xp(x)/q(x)) = p_{numer_size-1}/q_{denom_size} coefficients
-    // are in order of degree
-    const double upper_bound = numers.back()/denoms.back();
-    if (accept_approx && upper_bound > 0.0 && std::isfinite(upper_bound)){
-      if(VERBOSE){
-	cerr << "UPPER_BOUND_NUMERATOR_COEFFICIENTS" <<  endl;
-	for(size_t j = 0; j < numers.size(); j++)
-	  cerr << numers[j] << endl;
-	cerr << "UPPER_BOUND_DENOMINATOR_COEFFICIENTS" << endl;
-	for(size_t j = 0; j < denoms.size(); j++)
-	  cerr << denoms[j] << endl;
-      }
-
-      // use highest order acceptable approximation
-      return upper_bound;
-
-    }
-  }
-  return -std::numeric_limits<double>::max();
-}
-*/
-
 // Chao (Biometrics 1987) lower bound
 double
-chao87_lowerbound_librarysize(const vector<double> &counts_hist) {
+chao87_lowerbound_unobserved(const vector<double> &counts_hist) {
   assert(counts_hist.size() >= 2);
-  return accumulate(counts_hist.begin(), counts_hist.end(), 0.0) +
-    counts_hist[1]*counts_hist[1]/(2.0*counts_hist[2]);
+  return counts_hist[1]*counts_hist[1]/(2.0*counts_hist[2]);
 }
 
 
 // Chao & Lee (JASA 1992) lower bound
 double 
-cl92_estimate_librarysize(const vector<double> &counts_hist) {
+cl92_estimate_unobserved(const vector<double> &counts_hist) {
   
   double sample_size = 0.0;
   for(size_t i = 0; i <  counts_hist.size(); i++)
@@ -131,7 +80,36 @@ cl92_estimate_librarysize(const vector<double> &counts_hist) {
     naive_lowerbound*exp(log_sum_log_vec(log_coeff_var, log_coeff_var.size())
 			 -log(sample_size) - log(sample_size - 1)) - 1;
   
-  return naive_lowerbound + counts_hist[1]*coeff_var/estim_coverage;
+  return naive_lowerbound + sample_size*(1.0 - estim_coverage)*coeff_var/estim_coverage;
+}
+
+//Harris(1959) formula 48
+double
+harris_3moments(const bool VERBOSE,
+		const vector<double> &counts_hist){
+  const double m1 = exp(gsl_sf_lnfact(2) + log(counts_hist[2])
+			- log(counts_hist[1]));
+  const double m2 = exp(gsl_sf_lnfact(3) + log(counts_hist[3])
+			- log(counts_hist[1]));
+  const double m3 = exp(gsl_sf_lnfact(4) + log(counts_hist[4])
+			- log(counts_hist[1]));
+
+  const double sigma2 = m2 - m1*m1;
+  const double m3prime = m3 - 3*m1*sigma2 - pow(m1, 3);
+  const double y0 = 
+    (-m3prime - sqrt(m3prime*m3prime + 4*pow(sigma2, 3)))/(2*sigma2);
+
+  // x's are points, lambda's are weights
+  const double x1 = (m1*y0 + sigma2)/y0;
+  const double x2 = m1 - y0;
+  const double lambda1 = y0*y0/(y0*y0 + sigma2);
+  const double lambda2 = 1.0 - lambda1;
+  if(VERBOSE){
+    cerr << "POINTS = " << setprecision(16) << x2 << ", " << x1 << endl;
+    cerr << "WEIGHTS = " << setprecision(16) << lambda2 << ", " << lambda1 << endl;
+  }
+
+  return counts_hist[1]*(lambda1/x1 + lambda2/x2);
 }
 
 //////////////////////////////////////////////////
@@ -498,7 +476,7 @@ golub_welsh_libsize(const bool VERBOSE,
 		    const std::vector<double> &counts_hist,
 		    const double tol,
 		    const size_t max_iter,
-		    const size_t n_points){
+		    size_t n_points){
 
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
@@ -509,8 +487,9 @@ golub_welsh_libsize(const bool VERBOSE,
 	  (counts_hist[counts_before_first_zero] > 0))
     ++counts_before_first_zero;
   if(2*n_points > counts_before_first_zero - 2)
-    throw SMITHLABException("too many points for quadrature");
-  
+    n_points = 
+      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
+    
    
   // initialize moments, 0th moment is 1
   vector<double> measure_moments(1, 1.0);
@@ -552,7 +531,7 @@ laguerre_modified_libsize(const bool VERBOSE,
 			  const double mu,
 			  const double tol,
 			  const size_t max_iter,
-			  const size_t n_points){
+			  size_t n_points){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
@@ -562,7 +541,8 @@ laguerre_modified_libsize(const bool VERBOSE,
 	  (counts_hist[counts_before_first_zero] > 0))
     ++counts_before_first_zero;
   if(2*n_points > counts_before_first_zero - 2)
-    throw SMITHLABException("too many points for quadrature");
+    n_points = 
+      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
   
    
   // initialize moments, 0th moment is 1
@@ -605,7 +585,7 @@ chebyshev_libsize(const bool VERBOSE,
 		  const std::vector<double> &counts_hist,
 		  const double tol,
 		  const size_t max_iter,
-		  const size_t n_points){
+		  size_t n_points){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
@@ -615,7 +595,8 @@ chebyshev_libsize(const bool VERBOSE,
 	  (counts_hist[counts_before_first_zero] > 0))
     ++counts_before_first_zero;
   if(2*n_points > counts_before_first_zero - 2)
-    throw SMITHLABException("too many points for quadrature");
+    n_points = 
+      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
   
    
   // initialize moments, 0th moment is 1
@@ -630,6 +611,14 @@ chebyshev_libsize(const bool VERBOSE,
   chebyshev_quadrature(VERBOSE, measure_moments, n_points,
 		       tol,  max_iter, points, weights);
 
+  const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
+  if(weights_sum != 1){
+    cerr << "weights sum = " << weights_sum << endl;
+    for(size_t i = 0; i < weights.size(); i++)
+      weights[i] = weights[i]/weights_sum;
+  }
+
+
   // En_1 * int_0^\infty 1/x d \nu (x)
   double estimated_integral = 0.0;
   for(size_t i = 0; i < points.size(); i++)
@@ -638,16 +627,17 @@ chebyshev_libsize(const bool VERBOSE,
   if(VERBOSE){
     cerr << "points = ";
     for(size_t i = 0; i < points.size(); i++)
-      cerr << points[i] << ", ";
+      cerr << setprecision(16) << points[i] << ", ";
     cerr << endl;
 
     cerr << "weights = ";
     for(size_t i = 0; i < weights.size(); i++)
-      cerr << weights[i] << ", ";
+      cerr << setprecision(16) << weights[i] << ", ";
     cerr << endl;
 
     //    cerr << "estimated lib size = " << estimated_integral << endl;
   }
+
 
   return estimated_integral;
 }
