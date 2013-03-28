@@ -1,4 +1,4 @@
-/*    Copyright (C) 2012 University of Southern California and
+/*    Copyright (C) 2013 University of Southern California and
  *                       Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -23,62 +23,34 @@
 #include <vector>
 #include <numeric>
 
-#include "newtons_method.hpp"
-#include "gaussian_quadrature.hpp"
-
 double
 chao87_lowerbound_unobserved(const std::vector<double> &counts_hist);
 
 double 
 cl92_estimate_unobserved(const std::vector<double> &counts_hist);
 
-/*
-double
-harris_lowerbound_librarysize(const std::vector<double> &counts_hist,
-			      const double tolerance,
-			      const size_t max_iter,
-			      const size_t depth);
-*/
-
+double 
+cl92_truncated_estimate_unobserved(const std::vector<double> &counts_hist,
+				   const size_t truncation_count);
 
 double
-harris_3moments(const bool VERBOSE,
-		const std::vector<double> &counts_hist);
+harris_3moments_unobserved(const bool VERBOSE,
+			   const std::vector<double> &counts_hist);
+
+double
+harris_newton_unobserved(const bool VERBOSE,
+			 const std::vector<double> &counts_hist,
+			 const double tolerance,
+			 const size_t max_iter,
+			 const size_t n_points);
 
 
 double
-harris_by_newton(const bool VERBOSE,
-		 const std::vector<double> &counts_hist,
-		 const double tolerance,
-		 const size_t max_iter,
-		 const size_t depth);
-
-double
-golub_welsh_libsize(const bool VERBOSE,
-		    const std::vector<double> &counts_hist,
-		    const double tolerance,
-		    const size_t max_iter,
-		    size_t n_points);
-
-double
-laguerre_modified_libsize(const bool VERBOSE,
-			  const std::vector<double> &counts_hist,
-			  const double mu,
-			  const double tolerance,
-			  const size_t max_iter,
-			  size_t n_points);
-
-double
-chebyshev_libsize(const bool VERBOSE,
-		  const std::vector<double> &counts_hist,
-		  const double tolerance,
-		  const size_t max_iter,
-		  size_t n_points);
+quadrature_libsize(const bool VERBOSE,
+		   const std::vector<double> &counts_hist,
+		   const double tolerance,
+		   const size_t max_iter,
+		   size_t &n_points);
 
 
-/*double
-upperbound_librarysize(const bool VERBOSE,
-		       const std::vector<double> &counts_hist, 
-		       size_t max_terms);
-*/
 #endif

@@ -1,4 +1,4 @@
-/*    Copyright (C) 2012 University of Southern California and
+/*    Copyright (C) 2013 University of Southern California and
  *                       Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -32,10 +32,10 @@
 #include <gsl/gsl_sf_gamma.h>
 
 #include "smithlab_utils.hpp"
-
-#include "library_size_estimates.hpp"
 #include "newtons_method.hpp"
-#include "gaussian_quadrature.hpp"
+#include "moment_sequence.hpp"
+#include "library_size_estimates.hpp"
+
 
 using std::string;
 using std::vector;
@@ -44,15 +44,12 @@ using std::cerr;
 using std::endl;
 using std::setprecision;
 
-
 using smithlab::log_sum_log_vec;
-
-static const size_t MIN_ALLOWED_DEGREE = 6;
 
 // Chao (Biometrics 1987) lower bound
 double
 chao87_lowerbound_unobserved(const vector<double> &counts_hist) {
-  assert(counts_hist.size() >= 2);
+  assert(counts_hist.size() >= 3);
   return counts_hist[1]*counts_hist[1]/(2.0*counts_hist[2]);
 }
 
@@ -83,10 +80,41 @@ cl92_estimate_unobserved(const vector<double> &counts_hist) {
   return naive_lowerbound + sample_size*(1.0 - estim_coverage)*coeff_var/estim_coverage;
 }
 
+// Chao & Lee (JASA 1992) lower bound
+double 
+cl92_truncated_estimate_unobserved(const vector<double> &counts_hist,
+				   const size_t truncation_count) {
+  
+  double sample_size = 0.0;
+  for(size_t i = 0; i <  counts_hist.size(); i++)
+    sample_size += i*counts_hist[i];
+  
+  const double distinct_vals = 
+    accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+
+  const double estim_coverage = 1.0 - counts_hist[1]/sample_size;
+  const double naive_lowerbound = distinct_vals/estim_coverage;
+  
+  vector<double> log_coeff_var;
+  for (size_t i = 2; i < std::min(counts_hist.size(), 
+				  truncation_count + 1); ++i)
+    if (counts_hist[i] > 0)
+      log_coeff_var.push_back(log(i) + log(i - 1) + log(counts_hist[i]));
+  
+  const double coeff_var = 
+    naive_lowerbound*exp(log_sum_log_vec(log_coeff_var, log_coeff_var.size())
+			 -log(sample_size) - log(sample_size - 1)) - 1;
+  
+  return naive_lowerbound + sample_size*(1.0 - estim_coverage)*coeff_var/estim_coverage;
+}
+
+///////////////////////////////////////////////
+// Methods for Harris lower bounds
+
 //Harris(1959) formula 48
 double
-harris_3moments(const bool VERBOSE,
-		const vector<double> &counts_hist){
+harris_3moments_unobserved(const bool VERBOSE,
+			   const vector<double> &counts_hist){
   const double m1 = exp(gsl_sf_lnfact(2) + log(counts_hist[2])
 			- log(counts_hist[1]));
   const double m2 = exp(gsl_sf_lnfact(3) + log(counts_hist[3])
@@ -112,244 +140,7 @@ harris_3moments(const bool VERBOSE,
   return counts_hist[1]*(lambda1/x1 + lambda2/x2);
 }
 
-//////////////////////////////////////////////////
-// Harris (1959) lower bound
-/*
-struct pars{
-  // observed moments
-  vector<double> moments;
-  // number of captures, i.e. mapped reads
-  double N;
-};
 
-static void
-set_lambdas(const gsl_vector *lambdas_xs,
-	    const size_t dim,
-	    vector<double> &lambdas){
-  lambdas.clear();
-  // lambdas are first dim + 1 terms
-  for(size_t i = 0; i < dim; i++)
-    lambdas.push_back(gsl_vector_get(lambdas_xs, i));
-  lambdas.push_back(gsl_vector_get(lambdas_xs, dim));
-}
-
-static void
-set_xs(const gsl_vector *lambdas_xs,
-       const size_t dim,
-       vector<double> &xs){
-  xs.clear();
-  // x's are last dim terms
-  for(size_t  i = dim + 1; i < lambdas_xs->size; i++)
-    xs.push_back(gsl_vector_get(lambdas_xs, i));
-}
-
-// lambdas_xs is lambdas followed by x's
-// last x = N
-// eqns: sum_i lambda_i = 1
-// sum_i lambda_i x_i = mu_1
-// sum_i lambda_i x_i^2 = mu_2
-// ....
-// sum_i lambda_i x_i^k = mu_k
-static int
-set_system_eqns(const gsl_vector *lambdas_xs, 
-		void *param,
-		gsl_vector *f){
-  const vector<double> mmnts = ((struct pars*) param)->moments;
-  const double vals_sum = ((struct pars*) param)->N;
-
-  const size_t dim = mmnts.size()/2;
-  assert(lambdas_xs->size == mmnts.size() + 1);
-  vector<double> lambdas, xs;
-
-  set_lambdas(lambdas_xs, dim, lambdas);
-  set_xs(lambdas_xs, dim, xs);
-
-  // sum lambda_{i} = 1
-  gsl_vector_set(f, 0, accumulate(lambdas.begin(), 
-				  lambdas.end(), 0.0) - 1.0);
-
-  for(size_t i = 0; i < mmnts.size(); i++){
-    // sum_j lambda_{j}*x_{j}^k = \mu_{k} (last x = N)
-    double function_value = - mmnts[i];
-    for(size_t j = 0; j < xs.size(); j++)
-      function_value += lambdas[j]*pow(xs[j], i + 1);
-    function_value += lambdas.back()*pow(vals_sum, i + 1);
-    gsl_vector_set(f, i + 1, function_value);
-  }
-
-  return GSL_SUCCESS;
-}
-
-
-// compute and set the jacobian
-static int
-set_system_jacobian(const gsl_vector *lambdas_xs,
-		    void *param,
-		    gsl_matrix *Jacob){
-  const vector<double> mmnts = ((struct pars*) param)->moments;
-  const double vals_sum = ((struct pars*) param)->N;
-  const size_t dim = mmnts.size()/2;
-
-  vector<double> lambdas, xs;
-
-  set_lambdas(lambdas_xs, dim, lambdas);
-  set_xs(lambdas_xs, dim, xs);
-
-  for(size_t j = 0; j < dim + 1; j++)
-    gsl_matrix_set(Jacob, 0, j, 1.0);
-
-  // sum lambda_j*x_j^i - mu_k
-  for(size_t i = 0; i < 2*dim; i++)
-    for(size_t j = 0; j < dim; j++)
-      gsl_matrix_set(Jacob, i + 1, j, pow(xs[j], i + 1));
-
-  // last lambda
-  for(size_t i = 0; i < 2*dim; i++)
-    gsl_matrix_set(Jacob, i + 1, dim, pow(vals_sum, i + 1));
-
-  // now for the x's
-  for(size_t i = 0; i < 2*dim; i++)
-    for(size_t j = 0; j < dim; j++)
-      gsl_matrix_set(Jacob, i + 1, j + dim + 1, 
-		     lambdas[j]*(i + 1)*pow(xs[j], i));
-
-  return GSL_SUCCESS;
-}
-
-
-// set function value and jacobian
-static int
-set_fdf(const gsl_vector *lambdas_xs,
-	void *param,
-	gsl_vector *f,
-	gsl_matrix *Jacob){
-
-  set_system_eqns(lambdas_xs, param, f);
-  set_system_jacobian(lambdas_xs, param, Jacob);
-
-  return GSL_SUCCESS;
-}
-
-static inline void
-print_state(const size_t iter, 
-	    const size_t total_dim,
-	    const gsl_multiroot_fdfsolver *s){
-  cerr << "iter = " << iter << endl;
-  double residual = 0.0;
-  for(size_t i = 0; i < total_dim; i++)
-    residual += pow(gsl_vector_get(s->f, i), 2);
-  cerr << "residual = " << residual << endl;
-  cerr << "system of equations : ";
-  for(size_t i = 0; i < total_dim; i++)
-    cerr << gsl_vector_get(s->f, i) << "\t";
-  cerr << endl;
-}
-
-
-//Harris (AnnalsMathStat 1959) lower bound, 
-// Chao's(1987) bound is a simple approx
-// uses gsl's newton's method
-double 
-harris_lowerbound_librarysize(const vector<double> &counts_hist,
-			      const double tolerance,
-			      const size_t max_iter,
-			      const size_t depth){
-  double vals_sum = 0.0;
-  for(size_t i = 0; i < counts_hist.size(); i++)
-    vals_sum += i*counts_hist[i];
-
-  // depth corresponds to k in Harris
-  vector<double> measure_moments;
-  // mu_r = (r + 1)! n_{r+1} / n_1
-  for(size_t i = 0; i < depth; i++)
-    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
-				  + log(counts_hist[i + 2])
-				  - log(counts_hist[1])));
-
-
-  // need to use an even number of coefficients
-  // odd number gives upper bound ( = infty)
-  if(depth % 2 == 1)
-    measure_moments.pop_back();
-
-  const gsl_multiroot_fdfsolver_type *solver_type;
-  gsl_multiroot_fdfsolver *solver;
-  int status = GSL_CONTINUE;
-  size_t iter = 0;
-
-  const size_t total_dim = measure_moments.size() + 1;
-  const size_t dim = measure_moments.size()/2;
-  gsl_vector *lambdas_xs = gsl_vector_alloc(total_dim);
-  
-
-  // set initial lambdas to be uniform
-  for(size_t i = 0; i < dim + 1; i++)
-    gsl_vector_set(lambdas_xs, i, 1.0/(dim + 1.0));
-
-  // set initial x's to be random
-  srand(time(NULL));
-  vector<double> initial_xs;
-  for(size_t i = 0; i < dim; i++)
-    initial_xs.push_back(static_cast<double>(rand() % static_cast<int>(vals_sum)));
-
-  sort(initial_xs.begin(), initial_xs.end());
-  cerr << "initial x's = ";
-  for(size_t i = 0; i < initial_xs.size(); i++)
-    cerr << initial_xs[i] << ", ";
-  cerr << endl;
-  for(size_t i = 0 ; i < dim; i++)
-    gsl_vector_set(lambdas_xs, i + dim + 1, initial_xs[i]);
-
-
-  struct pars p = {measure_moments, vals_sum};
-
-  gsl_multiroot_function_fdf fdf = {&set_system_eqns,
-				    &set_system_jacobian,
-				    &set_fdf,
-				    total_dim, &p};
-
-  solver_type = gsl_multiroot_fdfsolver_hybridsj;
-  solver = gsl_multiroot_fdfsolver_alloc(solver_type, total_dim);
-  gsl_multiroot_fdfsolver_set(solver, &fdf, lambdas_xs);
-
-  gsl_vector *current_lambdas_xs = gsl_vector_alloc(total_dim);
-
-  // print_state(iter, total_dim, solver);
-
-  while(iter < max_iter & status == GSL_CONTINUE){
-    iter++;
-    status = gsl_multiroot_fdfsolver_iterate(solver);
-    //  print_state(iter, total_dim, solver);
-    
-    status = gsl_multiroot_test_residual(solver->f, tolerance);
-    current_lambdas_xs = gsl_multiroot_fdfsolver_root(solver);
-  }
-
-  double lower_bound = 0.0;
-  if(status != GSL_CONTINUE){
-    vector<double> lambdas;
-    vector<double> xs;
-    set_lambdas(current_lambdas_xs, measure_moments.size()/2, lambdas);
-    set_xs(current_lambdas_xs, measure_moments.size()/2, xs);
-
-    cerr << "lambdas = ";
-    for(size_t i = 0; i < lambdas.size(); i++)
-      cerr << lambdas[i] << ", ";
-    cerr << endl;
-    cerr << "x's = ";
-    for(size_t i = 0; i < xs.size(); i++)
-      cerr << xs[i] << ", ";
-    cerr << vals_sum << endl;
-
-    for(size_t i = 0; i < xs.size(); i++)
-      lower_bound += counts_hist[1]*lambdas[i]/xs[i];
-
-    lower_bound += counts_hist[1]*lambdas.back()/vals_sum;
-  }
-
-  return lower_bound;
-}
-*/
 
 
 // generate random initial starting position
@@ -365,7 +156,6 @@ generate_rand_initial(const size_t dim, const double values_sum,
     initial_xs.push_back(static_cast<double>(rand() % static_cast<int>(values_sum)));
     initial_lambdas.push_back(static_cast<double>(rand()));
   }
-  initial_lambdas.push_back(rand());
 
   // normalize lambdas
   const double lambdas_sum = accumulate(initial_lambdas.begin(), 
@@ -377,28 +167,22 @@ generate_rand_initial(const size_t dim, const double values_sum,
 }
 
 double
-harris_by_newton(const bool VERBOSE,
-		 const vector<double> &counts_hist,
-		 const double tolerance,
-		 const size_t max_iter,
-		 const size_t depth){
+harris_newton_unobserved(const bool VERBOSE,
+			 const vector<double> &counts_hist,
+			 const double tolerance,
+			 const size_t max_iter,
+			 const size_t n_points){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
-
+  const size_t depth = 2*n_points;
   // depth corresponds to k in Harris
   vector<double> measure_moments;
   // mu_r = (r + 1)! n_{r+1} / n_1
   for(size_t i = 0; i < depth; i++)
-    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
-				  + log(counts_hist[i + 2])
+    measure_moments.push_back(exp(gsl_sf_lnfact(i + 1)
+				  + log(counts_hist[i + 1])
 				  - log(counts_hist[1])));
-
-
-  // need to use an even number of coefficients
-  // odd # gives upper bound
-  if(depth % 2 == 1)
-    measure_moments.pop_back();
 
   const size_t dim = measure_moments.size()/2;
   vector<double> initial_xs, initial_lambdas;
@@ -442,7 +226,7 @@ harris_by_newton(const bool VERBOSE,
       cerr << "x = ";
       for(size_t i = 0; i < root_xs.size(); i++)
 	cerr << root_xs[i] << ", ";
-      cerr << values_sum << endl;
+      cerr << endl;
       cerr << "lambdas = ";
       for(size_t i = 0; i < root_lambdas.size(); i++)
 	cerr << root_lambdas[i] << ", ";
@@ -453,11 +237,6 @@ harris_by_newton(const bool VERBOSE,
 			 + log(root_lambdas[i])
 			 - log(root_xs[i]));
 
-    lower_bound += exp(log(counts_hist[1]) 
-		       + log(root_lambdas.back()) 
-		       -log(values_sum));
-    lower_bound += 
-      accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   }
   else
     cerr << "did not converge" << endl;
@@ -470,68 +249,12 @@ harris_by_newton(const bool VERBOSE,
 ///////////////////////////////////////////////////////
 // Quadrature Methods to Estimate Library Size
 
-
 double
-golub_welsh_libsize(const bool VERBOSE,
-		    const std::vector<double> &counts_hist,
-		    const double tol,
-		    const size_t max_iter,
-		    size_t n_points){
-
-  double values_sum = 0.0;
-  for(size_t i = 0; i < counts_hist.size(); i++)
-    values_sum += i*counts_hist[i];
-
-  size_t counts_before_first_zero = 1;
-  while ((counts_before_first_zero < counts_hist.size()) &&
-	  (counts_hist[counts_before_first_zero] > 0))
-    ++counts_before_first_zero;
-  if(2*n_points > counts_before_first_zero - 2)
-    n_points = 
-      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
-    
-   
-  // initialize moments, 0th moment is 1
-  vector<double> measure_moments(1, 1.0);
-  // mu_r = (r + 1)! n_{r+1} / n_1
-  for(size_t i = 0; i < 2*n_points; i++)
-    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
-				  + log(counts_hist[i + 2])
-				  - log(counts_hist[1])));
-
-  vector<double> points, weights;
-  golub_welsh_quadrature(VERBOSE, measure_moments, n_points,
-			 tol,  max_iter, points, weights);
-
-  // En_1 * int_0^\infty 1/x d \nu (x)
-  double estimated_integral = 0.0;
-  for(size_t i = 0; i < points.size(); i++)
-    estimated_integral += counts_hist[1]*weights[i]/points[i];
-
-  if(VERBOSE){
-    cerr << "points = ";
-    for(size_t i = 0; i < points.size(); i++)
-      cerr << points[i] << ", ";
-    cerr << endl;
-
-    cerr << "weights = ";
-    for(size_t i = 0; i < weights.size(); i++)
-      cerr << weights[i] << ", ";
-    cerr << endl;
-
-    //  cerr << "estimated lib size = " << estimated_integral << endl;
-  }
-
-  return estimated_integral;
-}
-
-double
-laguerre_modified_libsize(const bool VERBOSE,
-			  const std::vector<double> &counts_hist,
-			  const double mu,
-			  const double tol,
-			  const size_t max_iter,
-			  size_t n_points){
+quadrature_libsize(const bool VERBOSE,
+		   const std::vector<double> &counts_hist,
+		   const double tol,
+		   const size_t max_iter,
+		   size_t &n_points){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
@@ -549,67 +272,17 @@ laguerre_modified_libsize(const bool VERBOSE,
   vector<double> measure_moments(1, 1.0);
   // mu_r = (r + 1)! n_{r+1} / n_1
   for(size_t i = 0; i < 2*n_points; i++)
-    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
+    measure_moments.push_back(exp(gsl_sf_lnfact(i + 2)
 				  + log(counts_hist[i + 2])
 				  - log(counts_hist[1])));
 
-  vector<double> points, weights;
-  laguerre_modified_quadrature(VERBOSE, measure_moments, n_points, mu,
-			       tol,  max_iter, points, weights);
-
-  // En_1 * int_0^\infty 1/x d \nu (x)
-  double estimated_integral = 0.0;
-  for(size_t i = 0; i < points.size(); i++)
-    estimated_integral += counts_hist[1]*weights[i]/points[i];
-
-  if(VERBOSE){
-    cerr << "points = ";
-    for(size_t i = 0; i < points.size(); i++)
-      cerr << points[i] << ", ";
-    cerr << endl;
-
-    cerr << "weights = ";
-    for(size_t i = 0; i < weights.size(); i++)
-      cerr << weights[i] << ", ";
-    cerr << endl;
-
-    //    cerr << "estimated lib size = " << estimated_integral << endl;
-  }
-
-  return estimated_integral;
-}
-
-
-double
-chebyshev_libsize(const bool VERBOSE,
-		  const std::vector<double> &counts_hist,
-		  const double tol,
-		  const size_t max_iter,
-		  size_t n_points){
-  double values_sum = 0.0;
-  for(size_t i = 0; i < counts_hist.size(); i++)
-    values_sum += i*counts_hist[i];
-
-  size_t counts_before_first_zero = 1;
-  while ((counts_before_first_zero < counts_hist.size()) &&
-	  (counts_hist[counts_before_first_zero] > 0))
-    ++counts_before_first_zero;
-  if(2*n_points > counts_before_first_zero - 2)
-    n_points = 
-      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
-  
-   
-  // initialize moments, 0th moment is 1
-  vector<double> measure_moments(1, 1.0);
-  // mu_r = (r + 1)! n_{r+1} / n_1
-  for(size_t i = 0; i < 2*n_points; i++)
-    measure_moments.push_back(exp(gsl_sf_lngamma(i + 3)
-				  + log(counts_hist[i + 2])
-				  - log(counts_hist[1])));
+  MomentSequence mom_seq(measure_moments);
 
   vector<double> points, weights;
-  chebyshev_quadrature(VERBOSE, measure_moments, n_points,
-		       tol,  max_iter, points, weights);
+  mom_seq.QR_quadrature_rules(VERBOSE, n_points,
+			      tol,  max_iter, points, weights);
+
+  n_points = points.size();
 
   const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
   if(weights_sum != 1){

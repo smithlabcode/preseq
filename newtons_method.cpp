@@ -65,16 +65,13 @@ system_eqns(const parameters &params,
   moms = params.moments;
   lambs = params.lambdas;
   x = params.xs;
-  const double N = params.vals_sum; 
-  output.resize(moms.size() + 1, 0.0);
-  output[0] = accumulate(lambs.begin(), 
-			 lambs.end(), 0.0) - 1.0;
+  output.resize(moms.size(), 0.0);
+
   for(size_t i = 0; i < moms.size(); i++){
     double eqn_value = 0.0;
     for(size_t j = 0; j < x.size(); j++)
-      eqn_value += lambs[j]*pow(x[j], i + 1);
-    eqn_value += lambs.back()*pow(N, i + 1);
-    output[i + 1] = eqn_value - moms[i];
+      eqn_value += lambs[j]*pow(x[j], i);
+    output[i] = eqn_value - moms[i];
   }
 }
 
@@ -84,7 +81,6 @@ jacobian(const parameters &params,
   vector<double> lambs, x;
   lambs = params.lambdas;
   x = params.xs;
-  const double N = params.vals_sum; 
 
   const size_t variable_dim = lambs.size() + x.size();
   vector< vector<double> > computed_jacobian(variable_dim,
@@ -96,12 +92,8 @@ jacobian(const parameters &params,
 
   // dervatives of sum_i lambda_i x_i^k = mu_k for lambdas
   for(size_t k = 1; k < computed_jacobian.size(); k++)
-    for(size_t j = 0; j < lambs.size() - 1; j++)
+    for(size_t j = 0; j < lambs.size(); j++)
       computed_jacobian[k][j] = pow(x[j], k);
-
-  // last lambda
-  for(size_t k = 1; k < computed_jacobian.size(); k++)
-    computed_jacobian[k][lambs.size() - 1] = pow(N, k);
 
   // derivative of sum_i lambda_i x_i^k = mu_k for xs
   for(size_t k = 1; k < computed_jacobian.size(); k++)
