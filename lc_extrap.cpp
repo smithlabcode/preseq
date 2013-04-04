@@ -22,6 +22,7 @@
 #include <fstream>
 #include <numeric>
 #include <vector>
+#include <iomanip>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>

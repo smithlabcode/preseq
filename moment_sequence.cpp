@@ -38,6 +38,7 @@ using std::vector;
 using std::endl;
 using std::max;
 using std::cerr;
+using std::setprecision;
 
 
 
@@ -421,6 +422,17 @@ MomentSequence::QR_quadrature_rules(const bool VERBOSE,
   vector<double> b(beta);
   b.resize((n_points - 1 < beta.size()) ? n_points - 1 : beta.size());
 
+  if(VERBOSE){
+    cerr << "QR" << endl;
+    cerr << "alpha = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << setprecision(16) << a[i] << ", ";
+    cerr << endl;
+    cerr << "beta = ";
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << setprecision(16) << b[i] << ", ";
+    cerr << endl;
+  }
   bool POSITIVE_POINTS = false;
 
   while(!(POSITIVE_POINTS) && a.size() > 0){
@@ -432,14 +444,14 @@ MomentSequence::QR_quadrature_rules(const bool VERBOSE,
   // use off diags for convergence
     double error = 0.0;
     for(size_t i = 0; i < qr_beta.size(); i++)
-      error += qr_beta[i]*qr_beta[i];
+      error += fabs(qr_beta[i]);
     size_t iter = 0;
-    while(iter < max_iter){
+    while(iter < max_iter && error > tol){
       QRiteration(eigenvals, qr_beta, eigenvec);
 
       error = 0.0;
       for(size_t i = 0; i < qr_beta.size(); i++)
-	error += qr_beta[i]*qr_beta[i];
+	error += fabs(qr_beta[i]);
       iter++;
     }
   // eigenvalues are on diagonal of J
