@@ -362,8 +362,14 @@ QRiteration(vector<double> &alpha,
 
   for(size_t j = 0; j < alpha.size() - 1; j++){
     // for d and b_bar, j here is j-1 in G&W 
-    sin_theta[j] = d[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
-    cos_theta[j] = b_bar[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+    if(d[j] == 0.0 && b_bar[j] == 0.0){
+      sin_theta[j] = 0.0;
+      cos_theta[j] = 1.0;
+    }
+    else {
+      sin_theta[j] = d[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+      cos_theta[j] = b_bar[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+    }
 
     a[j] = a_bar[j]*cos_theta[j]*cos_theta[j]
       + 2*b_tilde[j]*cos_theta[j]*sin_theta[j] 
@@ -382,7 +388,7 @@ QRiteration(vector<double> &alpha,
     b_tilde[j+1] = -beta[j+1]*cos_theta[j];
     
     d[j+1] = beta[j+1]*sin_theta[j];
- 
+
     z[j] = z_bar[j]*cos_theta[j] + weights[j+1]*sin_theta[j];
 
     z_bar[j+1] = z_bar[j]*sin_theta[j] - weights[j+1]*cos_theta[j];
@@ -453,6 +459,7 @@ MomentSequence::QR_quadrature_rules(const bool VERBOSE,
       for(size_t i = 0; i < qr_beta.size(); i++)
 	error += fabs(qr_beta[i]);
       iter++;
+
     }
   // eigenvalues are on diagonal of J
     POSITIVE_POINTS = check_positivity(eigenvals);
