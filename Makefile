@@ -29,7 +29,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  lc_extrap c_curve mincount_c_curve count_extrap count_c_curve mincount_extrap test_quad_replace
+PROGS =  lc_extrap c_curve mincount_c_curve count_extrap count_c_curve mincount_extrap saturation_extrap
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
@@ -59,9 +59,7 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o MappedRead.o RNG.o)
 
-lc_extrap count_extrap mincount_extrap: continued_fraction.o
-
-test_quad_replace: moment_sequence.o newtons_method.o ZTNB.o library_size_estimates.o
+saturation_extrap lc_extrap count_extrap mincount_extrap: continued_fraction.o
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)

@@ -1062,3 +1062,62 @@ const int order) const {
   // no stable continued fraction: return null
   return ContinuedFraction();  
 }
+
+static inline bool
+check_saturation_estimates(const vector<double> estimates){
+  if(estimates.empty())
+    return false;
+
+  // make sure estimates are decreasing and
+  // between 0 & 1
+  if(estimates[0] >= 1.0 || estimates[0] < 0.0)
+    return false;
+
+  for(size_t i = 1; i < estimates.size(); i++)
+    if(estimates[i] > estimates[i-1] ||
+       estimates[i] >= 1.0 ||
+       estimates[i] < 0.0) 
+      return false;
+  
+  return true;
+}
+
+/* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
+ * continued fraction by checking for stability of estimates at
+ * specific points for saturation estimates.
+ */
+ContinuedFraction
+ContinuedFractionApproximation::optimal_cont_frac_satur(const vector<double> &counts_hist) const { 
+
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    counts_sum += i*counts_hist[i];
+  
+  vector<double> ps_coeffs;
+  for (size_t j = 1; j < max_terms; j++)
+    ps_coeffs.push_back(counts_hist[j]*j*pow(-1, j + 1));
+
+  ContinuedFraction old_cf(ps_coeffs, diagonal_idx, max_terms - 1);
+  ContinuedFraction new_cf;
+
+  while(old_cf.degree >= MIN_ALLOWED_DEGREE) {    
+    // compute the estimates for the desired set of points
+    vector<double> estimates;
+    old_cf.extrapolate_yield_deriv(counts_hist, counts_sum,
+                                  SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    
+    // return the continued fraction if it is stable
+    if (check_saturation_estimates(estimates))
+      return old_cf;
+
+    // if not cf not acceptable, decrease degree
+    new_cf = old_cf.decrease_degree(old_cf, 2);
+    old_cf = new_cf;
+  }
+  
+  //  throw SMITHLABException("unable to fit continued fraction");
+  
+  // no stable continued fraction: return null
+  return ContinuedFraction();  
+}

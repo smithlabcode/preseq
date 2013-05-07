@@ -1,4 +1,4 @@
-/*    Copyright (C) 2011 University of Southern California and
+/*    Copyright (C) 2013 University of Southern California and
  *                       Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -120,6 +120,9 @@ public:
   ContinuedFraction
   optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
                              const size_t mincount, const int order) const;
+
+  ContinuedFraction
+  optimal_cont_frac_satur(const std::vector<double> &counts_hist) const;
 
   // find a local maximum located btwn 0 & deriv_upper_bound
   double
