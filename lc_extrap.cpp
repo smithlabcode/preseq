@@ -337,30 +337,13 @@ check_yield_estimates(const vector<double> &estimates) {
   return true;
 }
 
-static inline bool
-check_saturation_estimates(const vector<double> estimates) {
-  if (estimates.empty())
-    return false;
-
-  // make sure estimates are decreasing and
-  // between 0 & 1
-  if (estimates[0] >= 1.0 || estimates[0] < 0.0)
-    return false;
-
-  for (size_t i = 1; i < estimates.size(); i++)
-    if (estimates[i] > estimates[i-1] ||
-	estimates[i] >= 1.0 ||
-	estimates[i] < 0.0) 
-      return false;
-  
-  return true;
-}
-
 void
 estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values, 
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, 
+		    const double tolerance, const size_t max_iter,
+		    vector<double> &Y50_estimates,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -380,6 +363,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     ++orig_hist[static_cast<size_t>(orig_values[i])];
   
   const double vals_sum = accumulate(orig_values.begin(), orig_values.end(), 0.0);
+  const double max_val = max_extrapolation/vals_sum;
   
   for (size_t iter = 0; 
        (iter < 2*bootstraps && yield_estimates.size() < bootstraps); ++iter) {
@@ -448,6 +432,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       if (check_yield_estimates(yield_vector)) {
 	yield_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
+	Y50_estimates.push_back(lower_cf.Y50(hist, vals_sum, max_val, tolerance, max_iter));
       }
       else if (VERBOSE){
 	cerr << '_';
@@ -475,7 +460,7 @@ alpha_log_confint_multiplier(const double estimate,
 
 
 static void
-return_median_and_ci(const vector<vector<double> > &estimates,
+vector_median_and_ci(const vector<vector<double> > &estimates,
 		     const double alpha, 
 		     vector<double> &median_estimates,
 		     vector<double> &lower_ci_lognormal, 
@@ -503,6 +488,27 @@ return_median_and_ci(const vector<vector<double> > &estimates,
     lower_ci_lognormal.push_back(curr_median*confint_mltr);
     upper_ci_lognormal.push_back(curr_median/confint_mltr);
   }
+}
+
+static void
+median_and_ci(const vector<double> &estimates,
+	      const double alpha,
+	      double &median_estimate,
+	      double &lower_ci_estimate,
+	      double &upper_ci_estimate){
+  assert(!estimates.empty());
+  const size_t n_est = estimates.size();
+  vector<double> sorted_estimates(estimates);
+  sort(sorted_estimates.begin(), sorted_estimates.end());
+  median_estimate = 
+    gsl_stats_median_from_sorted_data(&sorted_estimates[0], 1, n_est);
+  const double variance = gsl_stats_variance(&sorted_estimates[0], 1, n_est);
+  const double confint_mltr = 
+    alpha_log_confint_multiplier(median_estimate, variance, alpha);
+
+  lower_ci_estimate = median_estimate/confint_mltr;
+  upper_ci_estimate = median_estimate*confint_mltr;
+
 }
 
 static void
@@ -547,6 +553,8 @@ main(const int argc, const char **argv) {
     size_t bootstraps = 100;
     int diagonal = -1;
     double c_level = 0.95;
+    double tolerance = 1e-20;
+    size_t max_iter = 100;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -573,8 +581,11 @@ main(const int argc, const char **argv) {
 		      false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
-    //	opt_parse.add_opt("terms",'t',"maximum number of terms", false, 
+    //	opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
     //	     orig_max_terms);
+    //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
+    //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
+    //		      false, max_iter);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
 #ifdef HAVE_BAMTOOLS
@@ -670,24 +681,33 @@ main(const int argc, const char **argv) {
       cerr << "[BOOTSTRAP ESTIMATES]" << endl;
       
     vector<vector <double> > yield_estimates;
-    vector< vector<double> > sat_estimates;
+    //    vector< vector<double> > sat_estimates;
+    vector<double> Y50_estimates;
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, yield_estimates);
+			diagonal, step_size, max_extrapolation, tolerance,
+			max_iter, Y50_estimates, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
-    // BOOTSTRAPS
     if (VERBOSE)
       cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
-      
+ 
+    // yield vector median and ci    
     vector<double> median_yield_estimates;
     vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal,
       yield_upper_ci_quantile, yield_lower_ci_quantile;
-    return_median_and_ci(yield_estimates, 1.0 - c_level, 
+    vector_median_and_ci(yield_estimates, 1.0 - c_level, 
 			 median_yield_estimates, 
 			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
+
+    // Y50 median and ci
+    double Y50_median = 0.0;
+    double Y50_lower_ci = 0.0;
+    double Y50_upper_ci = 0.0;
+    median_and_ci(Y50_estimates, 1.0 - c_level, Y50_median,
+		  Y50_lower_ci, Y50_upper_ci);
 
     
     /////////////////////////////////////////////////////////////////////
@@ -699,6 +719,12 @@ main(const int argc, const char **argv) {
     write_predicted_curve(outfile, values_sum, c_level, step_size,
 			  median_yield_estimates,
 			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
+
+    if(VERBOSE){
+      cerr << "Y50 MEASURE OF LIBRARY QUALITY: EXPECTED # READS TO REACH 50% DUPLICATES" << endl;
+      cerr << "Y50 = " << Y50_median << endl;
+      cerr << 100*c_level << "%CI: (" << Y50_lower_ci << ", " << Y50_upper_ci << ")" << endl;
+    } 
       
   }
   catch (SMITHLABException &e) {

@@ -21,6 +21,8 @@
 #include <smithlab_utils.hpp>
 #include <RNG.hpp>
 #include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_rng.h>
 
 #include <vector>
 #include <cmath>
@@ -619,6 +621,147 @@ ContinuedFraction::extrapolate_yield_deriv(const vector<double> &counts_hist,
   for(double t = step_size; t <= max_value; t += step_size)
     saturation_estimates.push_back((operator()(t) 
                                     + t*complex_deriv(t))/vals_sum);
+}
+
+//////////////////////////////////////////////////////////
+// Y50: expected # reads to have 50% distinct (or 50% duplicates)
+// A measure of library quality 
+static double
+sample_count_distinct(const gsl_rng *rng,
+		      const vector<size_t> &full_umis,
+		      const size_t sample_size) {
+  vector<size_t> sample_umis(sample_size);
+  gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
+		 (size_t *)&full_umis.front(), full_umis.size(), 
+		 sizeof(size_t));
+  double count = 1.0;
+  for (size_t i = 1; i < sample_umis.size(); i++)
+    if(sample_umis[i] != sample_umis[i-1])
+      count++;
+
+  return count;
+}
+
+
+// calculate the expected number of reads to reach
+// 50% saturation
+// use bisection since the yield curve is concave
+// assuming the CF is optimal
+double
+ContinuedFraction::Y50(const vector<double> &counts_hist,
+		       const double vals_sum, const double max_val,
+		       const double tol, const size_t max_iter) const {
+
+  const double observed_distinct = 
+    accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+
+  // case 1: the observed library is already above 50% duplicates
+    // search by bisection, subsampling the library
+  if(observed_distinct < 0.5*vals_sum){
+    // Setup the random number generator
+    gsl_rng_env_setup();
+    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+    srand(time(0) + getpid());
+    gsl_rng_set(rng, rand());
+
+    // set to sample from
+    vector<size_t> full_umis;
+    size_t indx = 1;
+    for (size_t i = 1; i < counts_hist.size(); i++){
+      for (size_t j = 0; j < counts_hist[i]; j++){
+	for (size_t k = 0; k < i; k++){
+	  full_umis.push_back(indx);
+	}
+	indx++;
+      }
+    }
+
+    double upper_distinct = observed_distinct;
+    size_t upper_sample_size = static_cast<size_t>(vals_sum);
+    double lower_distinct = 0.0;
+    size_t lower_sample_size = 0;
+    size_t mid_sample_size = upper_sample_size/2;
+    double mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
+    
+    size_t iter = 0;
+    double rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+    while(rel_error > tol && iter < max_iter){
+      // if observed_distinct < 0.5*sample_size, the intersection is lower
+      if(mid_distinct < 0.5*mid_sample_size){
+	upper_sample_size = mid_sample_size;
+	upper_distinct = mid_distinct;
+	mid_sample_size = (upper_sample_size + lower_sample_size)/2;
+	mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
+      }
+      // if observed_distinct > 0.5*sample_size, the intersection is higher
+      else if(mid_distinct > 0.5*mid_sample_size){
+	lower_sample_size = mid_sample_size;
+	lower_distinct = mid_distinct;
+	mid_sample_size = (upper_sample_size + lower_sample_size)/2;
+	mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
+      }
+
+      rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+      iter++;
+    }
+    // return estimated sample size as double
+    return static_cast<double>(mid_sample_size);
+  }
+
+  // case 2: observed distinct is less that 50% of sample size
+  // need to extrapolate
+  else{
+    double upper_val = max_val;
+    double upper_distinct = observed_distinct + upper_val*operator()(upper_val);
+    double upper_sample_size = vals_sum*(upper_val + 1.0);
+    double lower_val = 0.0;
+    double lower_distinct = observed_distinct;
+    double lower_sample_size = vals_sum;
+
+    // max_val to low, double it
+    while(upper_distinct > 0.5*upper_sample_size){
+      lower_val = upper_val;
+      lower_distinct = upper_distinct;
+      lower_sample_size = upper_sample_size;
+      upper_val = 2.0*upper_val;
+      upper_distinct = observed_distinct + upper_val*operator()(upper_val);
+      upper_sample_size = vals_sum*(upper_val + 1.0);
+    }
+
+    double mid_val = (upper_val + lower_val)/2.0;
+    double mid_distinct = observed_distinct + mid_val*operator()(mid_val);
+    double mid_sample_size = vals_sum*(mid_val + 1.0);
+
+    // find Y50 by bisection
+    size_t iter = 0;
+    double rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+    while(rel_error > tol && iter < max_iter){
+      // if observed_distinct < 0.5*sample_size, the intersection is lower
+      if(mid_distinct < 0.5*mid_sample_size){
+	upper_val = mid_val;
+	upper_sample_size = mid_sample_size;
+	upper_distinct = mid_distinct;
+	mid_val = (upper_val + lower_val)/2.0;
+	mid_sample_size = vals_sum*(mid_val + 1.0);
+	mid_distinct = observed_distinct + mid_val*operator()(mid_val);
+      }
+      // if observed_distinct > 0.5*sample_size, the intersection is higher
+      else if(mid_distinct > 0.5*mid_sample_size){
+	lower_val = mid_val;
+	lower_sample_size = mid_sample_size;
+	lower_distinct = mid_distinct;
+	mid_val = (upper_val + lower_val)/2.0;
+	mid_sample_size = vals_sum*(mid_val + 1.0);
+	mid_distinct = observed_distinct + mid_val*operator()(mid_val);
+      }
+
+      rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+      iter++;
+    }
+
+    return mid_sample_size;
+  }
+
 }
 
 

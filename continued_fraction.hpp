@@ -36,6 +36,9 @@ struct ContinuedFraction {
   // Evaluate the continued fraction
   double operator()(const double val) const;
 
+  //////////////////////////////////////////
+  // Extrapolation functions
+
   // Evaluate the continued fraction estimating distinct
   // along a curve from 0 to max_value
   void 
@@ -79,6 +82,11 @@ struct ContinuedFraction {
                           const double max_value, 
                           const double step_size,
                           std::vector<double> &saturation) const;
+
+  // expected number of reads to reach 50% duplication
+  double Y50(const std::vector<double> &counts_hist,
+	     const double vals_sum, const double max_value,
+	     const double tol, const size_t max_iter) const;
 
   // Evaluate derivative by complex #s
   double complex_deriv(const double val) const;
