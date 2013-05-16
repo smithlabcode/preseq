@@ -149,10 +149,10 @@ private:
   static const size_t MIN_ALLOWED_DEGREE = 5;
   
   // largest value to search for lowerbound and stability
-  static const double SEARCH_MAX_VAL = 500; 
+  static const double SEARCH_MAX_VAL = 200; 
   
   //step size for search of lowerbound and stability
-  static const double SEARCH_STEP_SIZE = 0.02; 
+  static const double SEARCH_STEP_SIZE = 0.001; 
 
 };
 
