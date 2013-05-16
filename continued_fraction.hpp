@@ -152,7 +152,7 @@ private:
   static const double SEARCH_MAX_VAL = 200; 
   
   //step size for search of lowerbound and stability
-  static const double SEARCH_STEP_SIZE = 0.001; 
+  static const double SEARCH_STEP_SIZE = 0.01; 
 
 };
 
