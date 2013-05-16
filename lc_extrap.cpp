@@ -433,13 +433,13 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	yield_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
 	Y50_estimates.push_back(lower_cf.Y50(hist, vals_sum, max_val, tolerance, max_iter));
-      }
+	}
       else if (VERBOSE){
-	cerr << '_';
+	cerr << "Y";
       }
     }
     else if (VERBOSE){
-      cerr << '_';
+      cerr << "C";
     }
     
   }
@@ -581,8 +581,8 @@ main(const int argc, const char **argv) {
 		      false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
-    //	opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
-    //	     orig_max_terms);
+    	opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
+    	     orig_max_terms);
     //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
     //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
     //		      false, max_iter);
@@ -635,14 +635,23 @@ main(const int argc, const char **argv) {
 
     
     // JUST A SANITY CHECK
-    const double values_sum = accumulate(values.begin(), values.end(), 0.0);
-        
+    const double total_reads = accumulate(values.begin(), values.end(), 0.0);
+
+    // for large initial experiments need to adjust step size
+    // otherwise small relative steps do not account for variance
+    // in extrapolation
+    if(step_size < (total_reads/20)){
+       step_size = std::max(1e6, 1e6*round(total_reads/(20*step_size)));
+       if(VERBOSE)
+	 cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
+    }
+       
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
 
     // catch if all reads are distinct
     if (max_observed_count < MIN_REQUIRED_COUNTS)
-      throw SMITHLABException("sample appears too uniform");
+      throw SMITHLABException("sample not sufficiently deep or duplicates removed");
     
     // BUILD THE HISTOGRAM
     vector<double> counts_hist(max_observed_count + 1, 0.0);
@@ -653,7 +662,7 @@ main(const int argc, const char **argv) {
       static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
 					bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
-      cerr << "TOTAL READS     = " << values_sum << endl
+      cerr << "TOTAL READS     = " << total_reads << endl
 	   << "DISTINCT READS  = " << values.size() << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
@@ -716,7 +725,7 @@ main(const int argc, const char **argv) {
     if (VERBOSE) 
       cerr << "[WRITING OUTPUT]" << endl;
     
-    write_predicted_curve(outfile, values_sum, c_level, step_size,
+    write_predicted_curve(outfile, total_reads, c_level, step_size,
 			  median_yield_estimates,
 			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
