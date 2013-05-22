@@ -649,9 +649,7 @@ main(const int argc, const char **argv) {
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
 
-    // catch if all reads are distinct
-    if (max_observed_count < MIN_REQUIRED_COUNTS)
-      throw SMITHLABException("sample not sufficiently deep or duplicates removed");
+
     
     // BUILD THE HISTOGRAM
     vector<double> counts_hist(max_observed_count + 1, 0.0);
@@ -677,6 +675,10 @@ main(const int argc, const char **argv) {
 	  cerr << i << '\t' << counts_hist[i] << endl;
       cerr << endl;
     }
+
+    // catch if all reads are distinct
+    if (max_observed_count < MIN_REQUIRED_COUNTS)
+      throw SMITHLABException("sample not sufficiently deep or duplicates removed");
     
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
