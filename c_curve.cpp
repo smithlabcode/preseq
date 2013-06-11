@@ -37,7 +37,9 @@ using std::endl;
 using std::cerr;
 using std::tr1::unordered_map;
 
-
+/*
+ * This code is used to deal with read data in BAM format.
+ */
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
 #include "api/BamAlignment.h"
@@ -102,13 +104,13 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   while (reader.GetNextAlignment(bam)) {
     // ignore unmapped reads & secondary alignments
     if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
-      //only count unpaired reads or the left mate of paired reads
+     //only count unpaired reads or the left mate of paired reads
       if(!(bam.IsPaired()) || 
 	 (bam.IsFirstMate())){
 
 	SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
 	if (r.same_chrom(prev) && r.get_start() < prev.get_start())
-	throw SMITHLABException("locations unsorted in: " + input_file_name);
+	  throw SMITHLABException("locations unsorted in: " + input_file_name);
     
 	if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
 	  values.push_back(1.0);
@@ -221,7 +223,6 @@ load_values_BED_pe(const string input_file_name, vector<double> &values) {
  return n_reads;
 }
 
-
 static size_t
 load_values(const string input_file_name, vector<double> &values) {
 
@@ -235,11 +236,10 @@ load_values(const string input_file_name, vector<double> &values) {
   while(!in.eof()){
     char buffer[buffer_size];
     in.getline(buffer, buffer_size);
-    full_values.push_back(atof(buffer));
-    if(full_values.back() <= 0.0){
-      cerr << "INVALID INPUT\t" << buffer << endl;
-      throw SMITHLABException("ERROR IN INPUT");
-    }
+    double val = atof(buffer);
+    if(val > 0.0)
+      full_values.push_back(val);
+
     ++n_reads;
     in.peek();
   }
@@ -293,12 +293,12 @@ int main(int argc, const char **argv) {
 			   "<bed-file|bam-file>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
-    //    opt_parse.add_opt("lower", 'l', "lower limit for samples", 
-    //		      false , lower_limit);
-    //    opt_parse.add_opt("upper", 'u', "upper limit for samples", 
-    //		      false , upper_limit);
-    //    opt_parse.add_opt("step", 's', "step size for samples", 
-    //		      false , step_size);
+        opt_parse.add_opt("lower", 'l', "lower limit for samples", 
+    		      false , lower_limit);
+	      opt_parse.add_opt("upper", 'u', "upper limit for samples", 
+    		      false , upper_limit);
+        opt_parse.add_opt("step", 's', "step size for samples", 
+    		      false , step_size);
     opt_parse.add_opt("verbose", 'v', "print more run information", 
 		      false , VERBOSE);
 #ifdef HAVE_BAMTOOLS

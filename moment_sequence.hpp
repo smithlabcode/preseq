@@ -39,6 +39,10 @@ struct MomentSequence {
 			  const std::vector<double> &mod_beta,
 			  const std::vector<double> &modified_moments);
 
+  void full_3term_recurrence(const bool VERBOSE,
+			     std::vector<double> &full_alpha,
+			     std::vector<double> &full_beta);
+
   // quadrature rules using polynomial solver
   void poly_solve_gauss_quad(const size_t n_points,
 			     std::vector<double> &weights,
@@ -51,6 +55,18 @@ struct MomentSequence {
 			   const size_t max_iter,
 			   std::vector<double> &points,
 			   std::vector<double> &weights);
+
+  // points are determined assuming data is NegBin distrbuted
+  // 3-term recurrence is therefore known
+  // weights are determined by satisfying observed moment conditions
+  void NegBin_quadrature_rules(const bool VERBOSE,
+			       const size_t n_points,
+			       const double tolerance,
+			       const size_t max_iter,
+			       const double estimated_mu,
+			       const double estimated_alpha,
+			       std::vector<double> &points,
+			       std::vector<double> &weights);
 
 
   std::vector<double> moments;

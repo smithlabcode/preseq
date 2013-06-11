@@ -31,13 +31,22 @@
 #include "smithlab_utils.hpp"
 #include "GenomicRegion.hpp"
 
+
 using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
+using std::max;
+
+using std::setw;
+using std::fixed;
+using std::setprecision;
 using std::tr1::unordered_map;
 
 
+/*
+ * This code is used to deal with read data in BAM format.
+ */
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
 #include "api/BamAlignment.h"
@@ -73,7 +82,7 @@ BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
     throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
   const string chrom = the_chrom->second;
   const size_t start = ba.Position;
-  const size_t end = ba.InsertSize;
+  const size_t end = ba.Position + ba.InsertSize;
 
   return GenomicRegion(chrom, start, end);
 
@@ -102,10 +111,10 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) {
   while (reader.GetNextAlignment(bam)) {
     // ignore unmapped reads & secondary alignments
     if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
-      if(bam.IsPaired()) // throw error if paired end read found
-	throw SMITHLABException("paired end input unexpectedly found in " 
-				+ input_file_name);
-      else{
+     //only count unpaired reads or the left mate of paired reads
+      if(!(bam.IsPaired()) || 
+	 (bam.IsFirstMate())){
+
 	SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
 	if (r.same_chrom(prev) && r.get_start() < prev.get_start())
 	  throw SMITHLABException("locations unsorted in: " + input_file_name);
@@ -119,6 +128,7 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) {
     }
   }
   reader.Close();
+
   return n_reads;
 }
 
@@ -220,7 +230,6 @@ load_values_BED_pe(const string input_file_name, vector<double> &values) {
  return n_reads;
 }
 
-
 static size_t
 load_values(const string input_file_name, vector<double> &values) {
 
@@ -234,8 +243,10 @@ load_values(const string input_file_name, vector<double> &values) {
   while(!in.eof()){
     char buffer[buffer_size];
     in.getline(buffer, buffer_size);
-    full_values.push_back(atof(buffer));
-    if(full_values.back() <= 0.0){
+    double val = atof(buffer);
+    if(val > 0.0)
+    full_values.push_back(val);
+    if(full_values.back() < 0.0){
       cerr << "INVALID INPUT\t" << buffer << endl;
       throw SMITHLABException("ERROR IN INPUT");
     }
@@ -249,7 +260,6 @@ load_values(const string input_file_name, vector<double> &values) {
   values.swap(full_values);
   return n_reads;
 }
-
 
 static double
 sample_count_reads_w_mincount(const gsl_rng *rng,

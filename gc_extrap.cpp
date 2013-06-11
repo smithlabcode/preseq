@@ -1,4 +1,4 @@
-/*    lc_extrap: extrapolate complexity curve
+/*    gc_extrap: extrapolate genomic complexity 
  *
  *    Copyright (C) 2012 University of Southern California and
  *			 Andrew D. Smith and Timothy Daley
@@ -31,6 +31,7 @@
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
 #include <GenomicRegion.hpp>
+#include <MappedRead.hpp>
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
@@ -47,9 +48,11 @@ using std::fixed;
 using std::setprecision;
 using std::tr1::unordered_map;
 
+
 /*
  * This code is used to deal with read data in BAM format.
  */
+/* dealing with bam version later
 #ifdef HAVE_BAMTOOLS
 #include "api/BamReader.h"
 #include "api/BamAlignment.h"
@@ -59,160 +62,121 @@ using BamTools::SamHeader;
 using BamTools::RefVector;
 using BamTools::BamReader;
 using BamTools::RefData;
-
-static SimpleGenomicRegion
-BamToSimpleGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-		   const BamAlignment &ba) {
-  const unordered_map<size_t, string>::const_iterator
-    the_chrom(chrom_lookup.find(ba.RefID));
-  if (the_chrom == chrom_lookup.end())
-    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-
-  const string chrom = the_chrom->second;
-  const size_t start = ba.Position;
-  const size_t end = start + ba.Length;
-
-  return SimpleGenomicRegion(chrom, start, end);
-}
-
-static GenomicRegion
-BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
-		   const BamAlignment &ba){
-
-  const unordered_map<size_t, string>::const_iterator
-    the_chrom(chrom_lookup.find(ba.RefID));
-  if (the_chrom == chrom_lookup.end())
-    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-  const string chrom = the_chrom->second;
-  const size_t start = ba.Position;
-  const size_t end = ba.Position + ba.InsertSize;
-
-  return GenomicRegion(chrom, start, end);
-
-}
-
-
-static size_t
-load_values_BAM_se(const string &input_file_name, vector<double> &values) {
-
-  BamReader reader;
-  reader.Open(input_file_name);
-
-  // Get header and reference
-  string header = reader.GetHeaderText();
-  RefVector refs = reader.GetReferenceData();
-
-  unordered_map<size_t, string> chrom_lookup;
-  for (size_t i = 0; i < refs.size(); ++i)
-    chrom_lookup[i] = refs[i].RefName;
-
-  size_t n_reads = 1;
-  values.push_back(1.0);
-
-  SimpleGenomicRegion prev;
-  BamAlignment bam;
-  while (reader.GetNextAlignment(bam)) {
-    // ignore unmapped reads & secondary alignments
-    if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
-     //only count unpaired reads or the left mate of paired reads
-      if(!(bam.IsPaired()) || 
-	 (bam.IsFirstMate())){
-
-	SimpleGenomicRegion r(BamToSimpleGenomicRegion(chrom_lookup, bam));
-	if (r.same_chrom(prev) && r.get_start() < prev.get_start())
-	  throw SMITHLABException("locations unsorted in: " + input_file_name);
-    
-	if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-	  values.push_back(1.0);
-	else values.back()++;
-	++n_reads;
-	prev.swap(r);
-      }
-    }
-  }
-  reader.Close();
-
-  return n_reads;
-}
-
-static size_t
-load_values_BAM_pe(const string &input_file_name, vector<double> &values) {
-
-  BamReader reader;
-  reader.Open(input_file_name);
-
-  // Get header and reference
-  string header = reader.GetHeaderText();
-  RefVector refs = reader.GetReferenceData();
-
-  unordered_map<size_t, string> chrom_lookup;
-  for (size_t i = 0; i < refs.size(); ++i)
-    chrom_lookup[i] = refs[i].RefName;
-
-  size_t n_reads = 1;
-  values.push_back(1.0);
-
-  GenomicRegion prev;
-  BamAlignment bam;
-  while (reader.GetNextAlignment(bam)) {
-    // ignore unmapped reads & secondary alignments
-    if(bam.IsMapped() && bam.IsPrimaryAlignment()){ 
-      // ignore reads that do not map concoordantly
-      if(bam.IsPaired() && bam.IsProperPair() && bam.IsFirstMate()){
-	GenomicRegion r(BamToGenomicRegion(chrom_lookup, bam));
-	if (r.same_chrom(prev) && r.get_start() < prev.get_start()
-	    && r.get_end() < prev.get_end())
-	    throw SMITHLABException("locations unsorted in: " + input_file_name);
-    
-	if (!r.same_chrom(prev) || r.get_start() != prev.get_start()
-	    || r.get_end() != prev.get_end())
-	  values.push_back(1.0);
-	else values.back()++;
-	++n_reads;
-	prev.swap(r);
-      }
-    }
-  }
-  reader.Close();
-  return n_reads;
-}
 #endif
+*/
 
 
-static size_t
-load_values_BED_se(const string input_file_name, vector<double> &values) {
+/**************** FOR CLARITY BELOW WHEN COMPARING MAPPED READS **************/
+static inline bool
+same_strand(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_strand() == b.get_strand();
+}
+static inline bool
+strand_less(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_strand() <= b.get_strand();
+}
+static inline bool
+start_leq(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_start() <= b.get_start();
+}
+static inline bool
+same_end(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_end() == b.get_end();
+}
+static inline bool
+end_less(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_end() < b.get_end();
+}
+/******************************************************************************/
 
- std::ifstream in(input_file_name.c_str());
- if (!in)
-   throw "problem opening file: " + input_file_name;
 
- SimpleGenomicRegion r, prev;
- if (!(in >> prev))
-   throw "problem reading from: " + input_file_name;
+struct GenomicRegionOrderChecker {
+  bool operator()(const GenomicRegion &prev, const GenomicRegion &gr) const {
+    return end_two_check(prev, gr);
+  }
+  static bool 
+  is_ready(const priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> &pq,
+	   const GenomicRegion &gr) {
+    return !pq.top().same_chrom(gr) || pq.top().get_end() < gr.get_start();
+  }
+  static bool 
+  end_two_check(const GenomicRegion &prev, const GenomicRegion &gr) {
+    return (end_less(prev, gr) || 
+	    (same_end(prev, gr) &&
+	     (strand_less(prev, gr) ||
+	      (same_strand(prev, gr) && start_leq(prev, gr)))));
+  }
+};
 
- size_t n_reads = 1;
- values.push_back(1.0);
- while (in >> r) {
-    if (r.same_chrom(prev) && r.get_start() < prev.get_start())
-      throw SMITHLABException("locations unsorted in: " + input_file_name);
-    
-   if (!r.same_chrom(prev) || r.get_start() != prev.get_start())
-     values.push_back(1.0);
-   else values.back()++;
-   ++n_reads;
-   prev.swap(r);
- }
- return n_reads;
+
+
+// add inputGR to the priority queue and if the priority queue is ready
+static GenomicRegion
+reorderGenomicRegions(const GenomicRegion &inputGR,
+		   priority_queue<GenomicRegion, vector<GenomicRegion>, 
+				  GenomicRegionOrderChecker> &PQ){
+  GenomicRegion outputGR;
+  if(!PQ.empty() && GenomicRegionOrderChecker::is_ready(PQ, inputGR)){
+    outputGR = PQ.top();
+    PQ.pop();
+  }
+
+  PQ.push_back(inputGR);
+
+  return outputGR;
+}
+
+
+
+
+// probabilistically split genomic regions into mutiple
+// genomic regions of width equal to bin_size
+static void
+SplitGenomicRegion(const GenomicRegion &inputGR,
+		       const size_t bin_size,
+		       vector<GenomicRegion> &outputGRs){
+  outputGRs.clear();
+  GenomicRegion gr(inputGR);
+
+  double frac =
+    static_cast<double>(gr.get_start() % bin_size)/bin_size;
+  const size_t width = gr.get_width();
+
+  if(runif.runif(0.0, 1.0) > frac){
+    gr.set_start(std::floor(static_cast<double>(gr.get_start())/
+			    bin_size)*bin_size);
+    gr.set_end(gr.get_start() + width);
+  }
+  else {
+    gr.set_start(std::ceil(static_cast<double>(gr.get_start())/
+			   bin_size)*bin_size);
+    gr.set_end(gr.get_start() + width);
+  }
+
+  for(size_t i = 0; i < gr.get_width(); i += bin_size){
+
+    const size_t curr_start = gr.get_start() + i;
+    const size_t curr_end = std::min(gr.get_end(), curr_start + bin_size);
+    frac = static_cast<double>(curr_end - curr_start)/bin_size;
+
+    if(runif.runif(0.0, 1.0) <= frac){
+      GenomicRegion binned_gr(gr.get_chrom(), curr_start, curr_end,
+			      gr.get_name(), gr.get_score(), 
+			      gr.get_strand());
+
+      outputGRs.push_back(binned_gr);
+    }
+  }
 }
 
 static size_t
-load_values_BED_pe(const string input_file_name, vector<double> &values) {
+load_values_MR_pe(const string input_file_name, vector<double> &values) {
 
  std::ifstream in(input_file_name.c_str());
  if (!in)
    throw "problem opening file: " + input_file_name;
 
- GenomicRegion r, prev;
+ MappedRead r, prev;
  if (!(in >> prev))
    throw "problem reading from: " + input_file_name;
 
@@ -233,37 +197,46 @@ load_values_BED_pe(const string input_file_name, vector<double> &values) {
  return n_reads;
 }
 
-
 static size_t
-load_values(const string input_file_name, vector<double> &values) {
+load_values_MR_se(const string input_file_name, 
+		  const size_t bin_size,
+		  vector<double> &values) {
 
-  std::ifstream in(input_file_name.c_str());
-  if (!in)
-    throw SMITHLABException("problem opening file: " + input_file_name);
+ std::ifstream in(input_file_name.c_str());
+ if (!in)
+   throw "problem opening file: " + input_file_name;
 
-  vector<double> full_values;
-  size_t n_reads = 0;
-  static const size_t buffer_size = 10000; // Magic!
-  while(!in.eof()){
-    char buffer[buffer_size];
-    in.getline(buffer, buffer_size);
-    double val = atof(buffer);
-    if(val > 0.0)
-      full_values.push_back(val);
-    if(full_values.back() < 0.0){
-      cerr << "INVALID INPUT\t" << buffer << endl;
-      throw SMITHLABException("ERROR IN INPUT");
+ MappedRead mr, prev_mr;
+ if (!(in >> prev_mr))
+   throw "problem reading from: " + input_file_name;
+
+ GenomicRegion curr_gr, prev_gr;
+ size_t n_reads = 1;
+ values.push_back(1.0);
+ size_t n_copies = 1;
+ const size_t read_length = mr.r.get_width();
+ const size_t min_size = read_length/bin_size + 1;
+ while (in >> mr) {
+    if (mr.r.same_chrom(prev.r) && mr.r.get_start() < prev.r.get_start() 
+	&& mr.r.get_end() < prev.r.get_end())
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    
+    // if the reads are different
+    if (!mr.r.same_chrom(prev.r) || mr.r.get_start() != prev.r.get_start() 
+	|| mr.r.get_end() != prev.r.get_end()){
+      // I don't know what to do
     }
-    ++n_reads;
-    in.peek();
-  }
-  in.close();
-  if(full_values.back() == 0)
-    full_values.pop_back();
-
-  values.swap(full_values);
-  return n_reads;
+    //  if the reads are the same
+    else{
+      n_copies++;
+    }
+   ++n_reads;
+   prev.swap(r);
+ }
+ return n_reads;
 }
+
+
 
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
@@ -523,9 +496,9 @@ write_predicted_curve(const string outfile, const double values_sum,
   if (!outfile.empty()) of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
   
-  out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
-      << "LOGNORMAL_LOWER_" << 100*c_level << "%CI\t"
-      << "LOGNORMAL_UPPER_" << 100*c_level << "%CI" << endl;
+  out << "TOTAL_READS\tEXPECTED_COVERED_BASES\t"
+      << "LOWER_" << 100*c_level << "%CI\t"
+      << "UPPER_" << 100*c_level << "%CI" << endl;
   
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
@@ -560,12 +533,8 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    bool VALS_INPUT = false;
     bool PAIRED_END = false;
     
-#ifdef HAVE_BAMTOOLS
-    bool BAM_FORMAT_INPUT = false;
-#endif
     
     /**************** GET COMMAND LINE ARGUMENTS ***********************/
     OptionParser opt_parse(strip_path(argv[0]), 
@@ -590,15 +559,8 @@ main(const int argc, const char **argv) {
     //		      false, max_iter);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
-#ifdef HAVE_BAMTOOLS
-    opt_parse.add_opt("bam", 'B', "input is in BAM format", 
-		      false, BAM_FORMAT_INPUT);
-#endif
     opt_parse.add_opt("pe", 'P', "input is paired end read file",
 		      false, PAIRED_END);
-    opt_parse.add_opt("vals", 'V', 
-		      "input is a text file containing only the observed counts",
-		      false, VALS_INPUT);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -622,15 +584,8 @@ main(const int argc, const char **argv) {
     /******************************************************************/
     
     vector<double> values;
-    if(VALS_INPUT)
-      load_values(input_file_name, values);
-#ifdef HAVE_BAMTOOLS
-    else if (BAM_FORMAT_INPUT && PAIRED_END)
-      load_values_BAM_pe(input_file_name, values);
-    else if(BAM_FORMAT_INPUT)
-      load_values_BAM_se(input_file_name, values);
-#endif
-    else if(PAIRED_END)
+
+    if(PAIRED_END)
       load_values_BED_pe(input_file_name, values);  
     else
       load_values_BED_se(input_file_name, values);

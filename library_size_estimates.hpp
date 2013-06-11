@@ -46,11 +46,18 @@ harris_newton_unobserved(const bool VERBOSE,
 
 
 double
-quadrature_libsize(const bool VERBOSE,
-		   const std::vector<double> &counts_hist,
-		   const double tolerance,
-		   const size_t max_iter,
-		   size_t &n_points);
+quadrature_unobserved(const bool VERBOSE,
+		      const std::vector<double> &counts_hist,
+		      const double tolerance,
+		      const size_t max_iter,
+		      size_t &n_points);
+
+double
+NegBin_quadrature_unobserved(const bool VERBOSE,
+			     const std::vector<double> &counts_hist,
+			     const double tolerance,
+			     const size_t max_iter,
+			     size_t &n_points);
 
 
 #endif

@@ -723,7 +723,7 @@ main(const int argc, const char **argv) {
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-      out << "#TOTAL_READS" << '\t' 
+      out << "TOTAL_READS" << '\t' 
 	  << "SATURATION" << '\t' 
 	  << "LOWER_" << 100*c_level << "%CI" << '\t' 
 	  << "UPPER_" << 100*c_level << "%CI" << endl;

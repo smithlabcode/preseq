@@ -35,6 +35,7 @@
 #include "newtons_method.hpp"
 #include "moment_sequence.hpp"
 #include "library_size_estimates.hpp"
+#include "ZTNB.hpp"
 
 
 using std::string;
@@ -250,11 +251,11 @@ harris_newton_unobserved(const bool VERBOSE,
 // Quadrature Methods to Estimate Library Size
 
 double
-quadrature_libsize(const bool VERBOSE,
-		   const std::vector<double> &counts_hist,
-		   const double tol,
-		   const size_t max_iter,
-		   size_t &n_points){
+quadrature_unobserved(const bool VERBOSE,
+		      const std::vector<double> &counts_hist,
+		      const double tol,
+		      const size_t max_iter,
+		      size_t &n_points){
   double values_sum = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
     values_sum += i*counts_hist[i];
@@ -281,6 +282,83 @@ quadrature_libsize(const bool VERBOSE,
   vector<double> points, weights;
   mom_seq.QR_quadrature_rules(VERBOSE, n_points,
 			      tol,  max_iter, points, weights);
+
+  n_points = points.size();
+
+  const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
+  if(weights_sum != 1){
+    cerr << "weights sum = " << weights_sum << endl;
+    for(size_t i = 0; i < weights.size(); i++)
+      weights[i] = weights[i]/weights_sum;
+  }
+
+
+  // En_1 * int_0^\infty 1/x d \nu (x)
+  double estimated_integral = 0.0;
+  for(size_t i = 0; i < points.size(); i++)
+    estimated_integral += counts_hist[1]*weights[i]/points[i];
+
+  if(VERBOSE){
+    cerr << "points = ";
+    for(size_t i = 0; i < points.size(); i++)
+      cerr << setprecision(16) << points[i] << ", ";
+    cerr << endl;
+
+    cerr << "weights = ";
+    for(size_t i = 0; i < weights.size(); i++)
+      cerr << setprecision(16) << weights[i] << ", ";
+    cerr << endl;
+
+    //    cerr << "estimated lib size = " << estimated_integral << endl;
+  }
+
+
+  return estimated_integral;
+}
+
+
+// need a better name
+// computes quadrature rules using points determined 
+// assuming NegBin count distribution 
+// then computes weights to match moment conditions
+double
+NegBin_quadrature_unobserved(const bool VERBOSE,
+			     const std::vector<double> &counts_hist,
+			     const double tol,
+			     const size_t max_iter,
+			     size_t &n_points){
+  double values_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    values_sum += i*counts_hist[i];
+
+  size_t counts_before_first_zero = 1;
+  while ((counts_before_first_zero < counts_hist.size()) &&
+	  (counts_hist[counts_before_first_zero] > 0))
+    ++counts_before_first_zero;
+  if(2*n_points > counts_before_first_zero - 2)
+    n_points = 
+      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
+  
+   
+  // initialize moments, 0th moment is 1
+  vector<double> measure_moments(1, 1.0);
+  // mu_r = (r + 1)! n_{r+1} / n_1
+  for(size_t i = 0; i < 2*n_points; i++)
+    measure_moments.push_back(exp(gsl_sf_lnfact(i + 2)
+				  + log(counts_hist[i + 2])
+				  - log(counts_hist[1])));
+
+  MomentSequence mom_seq(measure_moments);
+  vector<double> NBhist(counts_hist);
+  ZTNBD distro(1.0, 1.0);
+  distro.EM_estim_params(tol, max_iter, NBhist);
+
+  vector<double> points, weights;
+  mom_seq.NegBin_quadrature_rules(VERBOSE, n_points,
+				  tol,  max_iter, 
+				  distro.get_mu(),
+				  distro.get_alpha(),
+				  points, weights);
 
   n_points = points.size();
 

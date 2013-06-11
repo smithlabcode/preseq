@@ -244,6 +244,50 @@ MomentSequence::unmodified_Chebyshev(const bool VERBOSE){
   beta = b;
 }
 
+void
+MomentSequence::full_3term_recurrence(const bool VERBOSE,
+				      vector<double> &full_alpha,
+				      vector<double> &full_beta){
+
+  const size_t n_points = static_cast<size_t>(floor(moments.size()/2));
+  vector<double> a(n_points, 0.0);
+  vector<double> b(n_points - 1, 0.0);
+
+  vector< vector<double> > sigma(2*n_points, vector<double>(2*n_points, 0.0));
+  // initialization
+  a[0] = moments[1]/moments[0];
+  // sigma[-1][l] = 0
+  for(size_t l = 0; l < 2*n_points; l++)
+    sigma[0][l] = moments[l];
+
+  for(size_t k = 1; k <= n_points; k++){
+    for(size_t l = k; l < 2*n_points - k; l++){
+      sigma[k][l] = sigma[k-1][l+1] - a[k-1]*sigma[k-1][l];
+      if(k > 1)
+	sigma[k][l] -= b[k-2]*sigma[k-2][l];
+    }
+    if(k != n_points){
+      a[k] = sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
+      b[k-1] = sigma[k][k]/sigma[k-1][k-1];
+    }
+  }  
+
+  if(VERBOSE){
+    cerr << "3-term relations:" << endl;
+    cerr << "alpha = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << a[i] << ", ";
+    cerr << endl;
+    cerr << "beta = ";
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << b[i] << ", ";
+    cerr << endl;
+  }
+
+  full_alpha.swap(a);
+  full_beta.swap(b);
+}
+
 
 ////////////////////////////////////////////////////
 // Constructor
@@ -256,7 +300,7 @@ MomentSequence::MomentSequence(const vector<double> &obs_moms) :
   moments = holding_moms;
 
   // calculate 3-term recurrence
-  unmodified_Chebyshev(true);
+  unmodified_Chebyshev(false);
 }
 
 
@@ -428,6 +472,7 @@ MomentSequence::QR_quadrature_rules(const bool VERBOSE,
   vector<double> b(beta);
   b.resize((n_points - 1 < beta.size()) ? n_points - 1 : beta.size());
 
+
   if(VERBOSE){
     cerr << "QR" << endl;
     cerr << "alpha = ";
@@ -486,5 +531,116 @@ MomentSequence::QR_quadrature_rules(const bool VERBOSE,
     weights[i] = weights[i]*weights[i];
 }
 
+static void
+NegBin_3term_recurrence(const size_t n_points,
+			const double estimated_mu,
+			const double estimated_alpha,
+			vector<double> &a,
+			vector<double> &b){
+  a.clear();
+  b.clear();
 
+  const double k = 1.0/estimated_alpha;
+  const double phi = (estimated_mu + k)/estimated_mu;
+  for(size_t i = 0; i < n_points; i++)
+    a.push_back((2.0*i + 1.0 + k)/phi);
+
+  for(size_t i = 0; i < n_points - 1; i++)
+    b.push_back((n_points + k)*n_points/(phi*phi));
+}
+
+void
+MomentSequence::NegBin_quadrature_rules(const bool VERBOSE,
+					const size_t n_points,
+					const double tol, 
+					const size_t max_iter,
+					const double estimated_mu,
+					const double estimated_alpha,
+					vector<double> &points,
+					vector<double> &weights){
+
+  // make sure that points.size() will be less than n_points
+  vector<double> a, b;
+  NegBin_3term_recurrence(n_points, estimated_mu, 
+			  estimated_alpha, a, b);
+
+
+  if(VERBOSE){
+    cerr << "QR" << endl;
+    cerr << "alpha = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << setprecision(16) << a[i] << ", ";
+    cerr << endl;
+    cerr << "beta = ";
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << setprecision(16) << b[i] << ", ";
+    cerr << endl;
+  }
+  bool POSITIVE_POINTS = false;
+
+  while(!(POSITIVE_POINTS) && a.size() > 0){
+    vector<double> eigenvec(a.size(), 0.0);
+    eigenvec[0] = 1.0;
+    vector<double> eigenvals(a);
+    vector<double> qr_beta(b);
+  // in QR, off-diagonals go to zero
+  // use off diags for convergence
+    double error = 0.0;
+    for(size_t i = 0; i < qr_beta.size(); i++)
+      error += fabs(qr_beta[i]);
+    size_t iter = 0;
+    while(iter < max_iter && error > tol){
+      QRiteration(eigenvals, qr_beta, eigenvec);
+
+      error = 0.0;
+      for(size_t i = 0; i < qr_beta.size(); i++)
+	error += fabs(qr_beta[i]);
+      iter++;
+
+    }
+  // eigenvalues are on diagonal of J
+    POSITIVE_POINTS = check_positivity(eigenvals);
+
+    if(VERBOSE){
+      cerr << "POINTS = ";
+      for(size_t i = 0; i < eigenvals.size(); i++)
+	cerr << eigenvals[i] << ", ";
+      cerr << endl;
+    }
+
+    if(POSITIVE_POINTS){
+      points.swap(eigenvals);
+    }
+    else{
+      a.pop_back();
+      b.pop_back();
+    }
+
+  }
+
+  // now with fixed points, solve for the weights using moment equations
+  // linear system in the weights
+  gsl_matrix *M = gsl_matrix_alloc(points.size(), points.size());
+  for(size_t i = 0; i < points.size(); i++)
+    for(size_t j = 0; j < points.size(); j++)
+      gsl_matrix_set(M, i, j, pow(points[j], i));
+
+  int signum = 0;
+
+  gsl_permutation *perm = gsl_permutation_alloc(points.size());
+
+  gsl_vector *w = gsl_vector_alloc(points.size());
+
+  gsl_vector *moms = gsl_vector_alloc(points.size());
+  for(size_t i = 0; i < points.size(); i++)
+    gsl_vector_set(moms, i, moments[i]);
+
+  gsl_linalg_LU_decomp(M, perm, &signum);
+
+  gsl_linalg_LU_solve(M, perm, moms, w);
+
+  weights.resize(points.size());
+  for(size_t i = 0; i < weights.size(); i++)
+    weights[i] = gsl_vector_get(moms, i);
+}
 

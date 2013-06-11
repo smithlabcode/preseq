@@ -199,7 +199,6 @@ load_values_BED_pe(const string input_file_name, vector<double> &values) {
  return n_reads;
 }
 
-
 static size_t
 load_values(const string input_file_name, vector<double> &values) {
 
@@ -213,8 +212,10 @@ load_values(const string input_file_name, vector<double> &values) {
   while(!in.eof()){
     char buffer[buffer_size];
     in.getline(buffer, buffer_size);
-    full_values.push_back(atof(buffer));
-    if(full_values.back() <= 0.0){
+    double val = atof(buffer);
+    if(val > 0.0)
+      full_values.push_back(val);
+    if(full_values.back() < 0.0){
       cerr << "INVALID INPUT\t" << buffer << endl;
       throw SMITHLABException("ERROR IN INPUT");
     }
@@ -599,13 +600,13 @@ main(const int argc, const char **argv) {
     
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
-      /*
+      
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
       for (size_t i = 0; i < counts_hist.size(); i++)
 	if (counts_hist[i] > 0)
 	  cerr << i << '\t' << counts_hist[i] << endl;
       cerr << endl;
-      */
+      
     }
     
     /////////////////////////////////////////////////////////////////////
