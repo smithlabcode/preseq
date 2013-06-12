@@ -68,33 +68,30 @@ using BamTools::RefData;
 */
 
 
-/**************** FOR CLARITY BELOW WHEN COMPARING MAPPED READS **************/
+/**************** FOR CLARITY BELOW WHEN COMPARING READS **************/
+
 static inline bool
-same_strand(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_strand() == b.get_strand();
+chrom_greater(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_chrom() > b.get_chrom();
 }
 static inline bool
-strand_less(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_strand() <= b.get_strand();
+same_start(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_start() == b.get_start();
 }
 static inline bool
-start_leq(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_start() <= b.get_start();
+start_greater(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_start() > b.get_start();
 }
 static inline bool
-same_end(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_end() == b.get_end();
-}
-static inline bool
-start_less(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_start() < b.get_start();
+end_greater(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_end() > b.get_end();
 }
 /******************************************************************************/
 
 
 struct GenomicRegionOrderChecker {
   bool operator()(const GenomicRegion &prev, const GenomicRegion &gr) const {
-    return end_two_check(prev, gr);
+    return start_check(prev, gr);
   }
   static bool 
   is_ready(const priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> &pq,
@@ -102,11 +99,10 @@ struct GenomicRegionOrderChecker {
     return !pq.top().same_chrom(gr) || pq.top().get_end() + max_width < gr.get_start();
   }
   static bool 
-  end_two_check(const GenomicRegion &prev, const GenomicRegion &gr) {
-    return (start_less(prev, gr) || 
-	    (same_end(prev, gr) &&
-	     (strand_less(prev, gr) ||
-	      (same_strand(prev, gr) && start_leq(prev, gr)))));
+  start_check(const GenomicRegion &prev, const GenomicRegion &gr) {
+    return (chrom_greater(prev, gr)
+	    || (prev.same_chrom(gr) && start_greater(prev, gr))
+	    || (prev.same_chrom(gr) && same_start(prev, gr) && end_greater(prev, gr)));
   }
 };
 
@@ -144,7 +140,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
     frac = static_cast<double>(curr_end - curr_start)/bin_size;
 
     if(runif.runif(0.0, 1.0) <= frac){
-      GenomicRegion binned_gr(gr.get_chrom(), curr_start, curr_end,
+      GenomicRegion binned_gr(gr.get_chrom(), curr_start, curr_start + bin_size,
 			      gr.get_name(), gr.get_score(), 
 			      gr.get_strand());
 
@@ -197,8 +193,8 @@ load_values_MR_se(const string input_file_name,
  if (!in)
    throw "problem opening file: " + input_file_name;
 
- MappedRead mr;
- if (!(in >> mr))
+ GenomicRegion inputGR;
+ if (!(in >> inputGR))
    throw "problem reading from: " + input_file_name;
 
  // initialize prioirty queue to reorder the split reads
@@ -206,15 +202,15 @@ load_values_MR_se(const string input_file_name,
 
  // prev and current Genomic Regions to compare
  GenomicRegion curr_gr, prev_gr;
- size_t n_reads = 1;
+ size_t n_reads = 0;
  values.push_back(1.0);
  do {
    vector<GenomicRegion> splitGRs;
-   SplitGenomicRegion(mr.r, runif, bin_size, splitGRs);
+   SplitGenomicRegion(inputGR, runif, bin_size, splitGRs);
    // add split Genomic Regions to the priority queue
-   for(size_t i = 0; i < splitGRs.size(); i++)
+   for(size_t i = 0; i < splitGRs.size(); i++){
      PQ.push(splitGRs[i]);
-
+   }
    // update average bins per read
    avg_bins_per_read = avg_bins_per_read*(n_reads - 1)/n_reads 
      + static_cast<double>(splitGRs.size())/n_reads;
@@ -223,9 +219,11 @@ load_values_MR_se(const string input_file_name,
    while(!PQ.empty() && 
 	 GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width)){
      curr_gr = PQ.top();
+     PQ.pop();
+
      // only compare if the previous is not null (in the 1st iteration)
      if(prev_gr.get_chrom() != "(NULL)"){
-       if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() > prev_gr.get_start()){
+       if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
 	 cerr << "current:\t" << curr_gr << endl;
 	 cerr << "previous:\t" << prev_gr << endl;
 	 throw SMITHLABException("split reads unsorted");
@@ -239,7 +237,28 @@ load_values_MR_se(const string input_file_name,
    }
 
    n_reads++;
- } while (in >> mr);
+
+
+ } while (in >> inputGR);
+
+ // done adding reads, now spit the rest out
+ while(!PQ.empty()){
+   curr_gr = PQ.top();
+   PQ.pop();
+     // only compare if the previous is not null (in the 1st iteration)
+   if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
+     cerr << "current:\t" << curr_gr << endl;
+     cerr << "previous:\t" << prev_gr << endl;
+     throw SMITHLABException("split reads unsorted");
+   }
+   if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev_gr.get_start())
+     values.push_back(1.0);
+   else 
+     values.back()++;
+   
+   prev_gr.swap(curr_gr);
+ }
+
  return n_reads;
 }
 
@@ -557,7 +576,7 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("max_width", 'w', "max fragment length, "
 		      "set equal to read length for single end reads",
 		      false, max_width);
-    opt_parse.add_opt("bin_size", 'b', "bin size "
+    opt_parse.add_opt("bin_size", 'n', "bin size "
 		      "(default: " + toa(bin_size) + ")",
 		      false, bin_size);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation "
