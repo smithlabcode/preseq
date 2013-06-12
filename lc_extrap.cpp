@@ -648,7 +648,7 @@ main(const int argc, const char **argv) {
     // otherwise small relative steps do not account for variance
     // in extrapolation
     if(step_size < (total_reads/20)){
-       step_size = std::max(1e6, 1e6*round(total_reads/(20*step_size)));
+       step_size = std::max(step_size, step_size*round(total_reads/(20*step_size)));
        if(VERBOSE)
 	 cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
     }
