@@ -644,20 +644,20 @@ sample_count_distinct(const gsl_rng *rng,
 
 
 // calculate the expected number of reads to reach
-// 50% saturation
+// dupl_level% saturation
 // use bisection since the yield curve is concave
 // assuming the CF is optimal
 double
-ContinuedFraction::Y50(const vector<double> &counts_hist,
-		       const double vals_sum, const double max_val,
-		       const double tol, const size_t max_iter) const {
+ContinuedFraction::Ylevel(const vector<double> &counts_hist, const double dupl_level,
+			  const double vals_sum, const double max_val,
+			  const double tol, const size_t max_iter) const {
 
   const double observed_distinct = 
     accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
 
-  // case 1: the observed library is already above 50% duplicates
+  // case 1: the observed library is already above dupl_level% duplicates
     // search by bisection, subsampling the library
-  if(observed_distinct < 0.5*vals_sum){
+  if(observed_distinct < dupl_level*vals_sum){
     // Setup the random number generator
     gsl_rng_env_setup();
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
@@ -684,31 +684,31 @@ ContinuedFraction::Y50(const vector<double> &counts_hist,
     double mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
     
     size_t iter = 0;
-    double rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+    double rel_error = fabs(mid_distinct - dupl_level*mid_sample_size)/mid_sample_size;
     while(rel_error > tol && iter < max_iter){
-      // if observed_distinct < 0.5*sample_size, the intersection is lower
-      if(mid_distinct < 0.5*mid_sample_size){
+      // if observed_distinct < dupl_level*sample_size, the intersection is lower
+      if(mid_distinct < dupl_level*mid_sample_size){
 	upper_sample_size = mid_sample_size;
 	upper_distinct = mid_distinct;
 	mid_sample_size = (upper_sample_size + lower_sample_size)/2;
 	mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
       }
-      // if observed_distinct > 0.5*sample_size, the intersection is higher
-      else if(mid_distinct > 0.5*mid_sample_size){
+      // if observed_distinct > dupl_level*sample_size, the intersection is higher
+      else if(mid_distinct > dupl_level*mid_sample_size){
 	lower_sample_size = mid_sample_size;
 	lower_distinct = mid_distinct;
 	mid_sample_size = (upper_sample_size + lower_sample_size)/2;
 	mid_distinct = sample_count_distinct(rng, full_umis, mid_sample_size);
       }
 
-      rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+      rel_error = fabs(mid_distinct - dupl_level*mid_sample_size)/mid_sample_size;
       iter++;
     }
     // return estimated sample size as double
     return static_cast<double>(mid_sample_size);
   }
 
-  // case 2: observed distinct is less that 50% of sample size
+  // case 2: observed distinct is less that dupl_level% of sample size
   // need to extrapolate
   else{
     double upper_val = max_val;
@@ -719,7 +719,7 @@ ContinuedFraction::Y50(const vector<double> &counts_hist,
     double lower_sample_size = vals_sum;
 
     // max_val to low, double it
-    while(upper_distinct > 0.5*upper_sample_size){
+    while(upper_distinct > dupl_level*upper_sample_size){
       lower_val = upper_val;
       lower_distinct = upper_distinct;
       lower_sample_size = upper_sample_size;
@@ -734,10 +734,10 @@ ContinuedFraction::Y50(const vector<double> &counts_hist,
 
     // find Y50 by bisection
     size_t iter = 0;
-    double rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+    double rel_error = fabs(mid_distinct - dupl_level*mid_sample_size)/mid_sample_size;
     while(rel_error > tol && iter < max_iter){
-      // if observed_distinct < 0.5*sample_size, the intersection is lower
-      if(mid_distinct < 0.5*mid_sample_size){
+      // if observed_distinct < dupl_level*sample_size, the intersection is lower
+      if(mid_distinct < dupl_level*mid_sample_size){
 	upper_val = mid_val;
 	upper_sample_size = mid_sample_size;
 	upper_distinct = mid_distinct;
@@ -745,8 +745,8 @@ ContinuedFraction::Y50(const vector<double> &counts_hist,
 	mid_sample_size = vals_sum*(mid_val + 1.0);
 	mid_distinct = observed_distinct + mid_val*operator()(mid_val);
       }
-      // if observed_distinct > 0.5*sample_size, the intersection is higher
-      else if(mid_distinct > 0.5*mid_sample_size){
+      // if observed_distinct > dupl_level*sample_size, the intersection is higher
+      else if(mid_distinct > dupl_level*mid_sample_size){
 	lower_val = mid_val;
 	lower_sample_size = mid_sample_size;
 	lower_distinct = mid_distinct;
@@ -755,7 +755,7 @@ ContinuedFraction::Y50(const vector<double> &counts_hist,
 	mid_distinct = observed_distinct + mid_val*operator()(mid_val);
       }
 
-      rel_error = fabs(mid_distinct - 0.5*mid_sample_size)/mid_sample_size;
+      rel_error = fabs(mid_distinct - dupl_level*mid_sample_size)/mid_sample_size;
       iter++;
     }
 

@@ -84,9 +84,9 @@ struct ContinuedFraction {
                           std::vector<double> &saturation) const;
 
   // expected number of reads to reach 50% duplication
-  double Y50(const std::vector<double> &counts_hist,
-	     const double vals_sum, const double max_value,
-	     const double tol, const size_t max_iter) const;
+  double Ylevel(const std::vector<double> &counts_hist, const double dupl_level,
+		const double vals_sum, const double max_value,
+		const double tol, const size_t max_iter) const;
 
   // Evaluate derivative by complex #s
   double complex_deriv(const double val) const;

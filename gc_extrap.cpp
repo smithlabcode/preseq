@@ -84,8 +84,8 @@ same_end(const GenomicRegion &a, const GenomicRegion &b) {
   return a.get_end() == b.get_end();
 }
 static inline bool
-end_less(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_end() < b.get_end();
+start_less(const GenomicRegion &a, const GenomicRegion &b) {
+  return a.get_start() < b.get_start();
 }
 /******************************************************************************/
 
@@ -96,12 +96,12 @@ struct GenomicRegionOrderChecker {
   }
   static bool 
   is_ready(const priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> &pq,
-	   const GenomicRegion &gr) {
-    return !pq.top().same_chrom(gr) || pq.top().get_end() < gr.get_start();
+	   const GenomicRegion &gr, const size_t max_width) {
+    return !pq.top().same_chrom(gr) || pq.top().get_end() + max_width < gr.get_start();
   }
   static bool 
   end_two_check(const GenomicRegion &prev, const GenomicRegion &gr) {
-    return (end_less(prev, gr) || 
+    return (start_less(prev, gr) || 
 	    (same_end(prev, gr) &&
 	     (strand_less(prev, gr) ||
 	      (same_strand(prev, gr) && start_leq(prev, gr)))));
@@ -113,10 +113,11 @@ struct GenomicRegionOrderChecker {
 // add inputGR to the priority queue and if the priority queue is ready
 static GenomicRegion
 reorderGenomicRegions(const GenomicRegion &inputGR,
-		   priority_queue<GenomicRegion, vector<GenomicRegion>, 
-				  GenomicRegionOrderChecker> &PQ){
+		      const size_t max_width,
+		      priority_queue<GenomicRegion, vector<GenomicRegion>, 
+				     GenomicRegionOrderChecker> &PQ){
   GenomicRegion outputGR;
-  if(!PQ.empty() && GenomicRegionOrderChecker::is_ready(PQ, inputGR)){
+  if(!PQ.empty() && GenomicRegionOrderChecker::is_ready(PQ, inputGR, max_width)){
     outputGR = PQ.top();
     PQ.pop();
   }
@@ -169,6 +170,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
   }
 }
 
+/*
 static size_t
 load_values_MR_pe(const string input_file_name, vector<double> &values) {
 
@@ -196,43 +198,56 @@ load_values_MR_pe(const string input_file_name, vector<double> &values) {
  }
  return n_reads;
 }
+*/
 
 static size_t
 load_values_MR_se(const string input_file_name, 
 		  const size_t bin_size,
+		  const size_t max_width,
 		  vector<double> &values) {
 
  std::ifstream in(input_file_name.c_str());
  if (!in)
    throw "problem opening file: " + input_file_name;
 
- MappedRead mr, prev_mr;
- if (!(in >> prev_mr))
+ MappedRead mr;
+ if (!(in >> mr))
    throw "problem reading from: " + input_file_name;
 
+ // initialize prioirty queue to reorder the split reads
+ std::priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> PQ;
+
+ // prev and current Genomic Regions to compare
  GenomicRegion curr_gr, prev_gr;
  size_t n_reads = 1;
  values.push_back(1.0);
- size_t n_copies = 1;
- const size_t read_length = mr.r.get_width();
- const size_t min_size = read_length/bin_size + 1;
- while (in >> mr) {
-    if (mr.r.same_chrom(prev.r) && mr.r.get_start() < prev.r.get_start() 
-	&& mr.r.get_end() < prev.r.get_end())
-      throw SMITHLABException("locations unsorted in: " + input_file_name);
-    
-    // if the reads are different
-    if (!mr.r.same_chrom(prev.r) || mr.r.get_start() != prev.r.get_start() 
-	|| mr.r.get_end() != prev.r.get_end()){
-      // I don't know what to do
-    }
-    //  if the reads are the same
-    else{
-      n_copies++;
-    }
-   ++n_reads;
-   prev.swap(r);
- }
+ do {
+   vector<GenomicRegion> splitGRs;
+   SplitGenomicRegion(mr.r,  bin_size, splitGRs);
+   // add split Genomic Regions to the priority queue
+   for(size_t i = 0; i < splitGRs.size(); i++)
+     PQ.push(splitGRs[i]);
+
+   // remove Genomic Regions from the priority queue
+   while(!PQ.empty() && GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back())){
+     curr_gr = PQ.top();
+     // only compare if the previous is not null (in the 1st iteration)
+     if(prev_gr.get_chrom() != "(NULL)"){
+       if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() > prev_gr.get_start()){
+	 cerr << "current:\t" << curr_gr << endl;
+	 cerr << "previous:\t" << prev_gr << endl;
+	 throw SMITHLABException("split reads unsorted");
+       }
+       if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev.get_start())
+	 values.push_back(1.0);
+       else 
+	 values.back()++;
+     }
+     prev_gr.swap(curr_gr);
+   }
+
+   n_reads++;
+ } while (in >> mr);
  return n_reads;
 }
 
@@ -316,9 +331,9 @@ void
 estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values, 
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
-		    const double max_extrapolation, 
+		    const double max_extrapolation, const double 
 		    const double tolerance, const size_t max_iter,
-		    vector<double> &Y50_estimates,
+		    vector<double> &Y_estimates,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -408,13 +423,13 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	yield_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
 	Y50_estimates.push_back(lower_cf.Y50(hist, vals_sum, max_val, tolerance, max_iter));
-	}
+      }
       else if (VERBOSE){
-	cerr << "Y";
+	cerr << "_";
       }
     }
     else if (VERBOSE){
-      cerr << "C";
+      cerr << "_";
     }
     
   }
@@ -489,6 +504,7 @@ median_and_ci(const vector<double> &estimates,
 static void
 write_predicted_curve(const string outfile, const double values_sum,
 		      const double c_level, const double step_size,
+		      const size_t bin_size,
 		      const vector<double> &median_yield_estimates,
 		      const vector<double> &yield_lower_ci_lognormal,
 		      const vector<double> &yield_upper_ci_lognormal) {
@@ -505,9 +521,10 @@ write_predicted_curve(const string outfile, const double values_sum,
   
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
   for (size_t i = 0; i < median_yield_estimates.size(); ++i)
-    out << (i + 1)*step_size << '\t' 
-	<< median_yield_estimates[i] << '\t'
-	<< yield_lower_ci_lognormal[i] << '\t' << yield_upper_ci_lognormal[i] << endl;
+    out << (i + 1)*step_size*bin_size << '\t' 
+	<< median_yield_estimates[i]*bin_size << '\t'
+	<< yield_lower_ci_lognormal[i]*bin_size << '\t' 
+	<< yield_upper_ci_lognormal[i]*bin_size << endl;
 }
 
 
@@ -522,14 +539,16 @@ main(const int argc, const char **argv) {
     /* FILES */
     string outfile;
     
-    size_t orig_max_terms = 100;
+    size_t orig_max_terms = 1000;
     double max_extrapolation = 1.0e10;
-    double step_size = 1e6;
+    double step_size = 1e7;
     size_t bootstraps = 100;
     int diagonal = -1;
     double c_level = 0.95;
     double tolerance = 1e-20;
+    size_t max_width = 1000;
     size_t max_iter = 100;
+    double tolerance = 1.0e-20;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -541,10 +560,13 @@ main(const int argc, const char **argv) {
 			   "", "<sorted-bed-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
+    opt_parse.add_opt("max_width", 'w', "max fragment length, "
+		      "set equal to read length for single end reads",
+		      false, max_width);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation "
 		      "(default: " + toa(max_extrapolation) + ")",
 		      false, max_extrapolation);
-    opt_parse.add_opt("step",'s',"step size in extrapolations "
+    opt_parse.add_opt("step",'s',"step size in bases between extrapolations "
 		      "(default: " + toa(step_size) + ")", 
 		      false, step_size);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps "
@@ -552,15 +574,15 @@ main(const int argc, const char **argv) {
 		      false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
-    	opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
-    	     orig_max_terms);
+    opt_parse.add_opt("terms",'x',"maximum number of terms", 
+		      false, orig_max_terms);
     //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
     //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
     //		      false, max_iter);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
-    opt_parse.add_opt("pe", 'P', "input is paired end read file",
-		      false, PAIRED_END);
+    //    opt_parse.add_opt("pe", 'P', "input is paired end read file",
+    //		      false, PAIRED_END);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -584,11 +606,12 @@ main(const int argc, const char **argv) {
     /******************************************************************/
     
     vector<double> values;
+    size_t n_reads = 0;
 
-    if(PAIRED_END)
+    /*    if(PAIRED_END)
       load_values_BED_pe(input_file_name, values);  
-    else
-      load_values_BED_se(input_file_name, values);
+      else */
+      n_reads = load_values_BED_se(input_file_name, values);
 
     
     // JUST A SANITY CHECK
@@ -617,12 +640,12 @@ main(const int argc, const char **argv) {
       static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
 					bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
-      cerr << "TOTAL READS     = " << total_reads << endl
-	   << "DISTINCT READS  = " << values.size() << endl
-	   << "DISTINCT COUNTS = " << distinct_counts << endl
-	   << "MAX COUNT       = " << max_observed_count << endl
-	   << "COUNTS OF 1     = " << counts_hist[1] << endl
-	   << "MAX TERMS       = " << orig_max_terms << endl;
+      cerr << "TOTAL READS         = " << n_reads << endl
+	   << "DISTINCT BINS       = " << total_reads << endl
+	   << "TOTAL BASES         = " << total_reads*bin_size << endl
+	   << "TOTAL COVERED BASES = " << values.size()*bin_size << endl
+	   << "MAX COUNT           = " << max_observed_count << endl
+	   << "COUNTS OF 1         = " << counts_hist[1] << endl;
     
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
@@ -654,7 +677,7 @@ main(const int argc, const char **argv) {
     vector<double> lower_libsize, upper_libsize;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
 			diagonal, step_size, max_extrapolation, tolerance,
-			max_iter, Y50_estimates, yield_estimates);
+			max_iter, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -670,12 +693,7 @@ main(const int argc, const char **argv) {
 			 median_yield_estimates, 
 			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
-    // Y50 median and ci
-    double Y50_median = 0.0;
-    double Y50_lower_ci = 0.0;
-    double Y50_upper_ci = 0.0;
-    median_and_ci(Y50_estimates, 1.0 - c_level, Y50_median,
-		  Y50_lower_ci, Y50_upper_ci);
+
 
     
     /////////////////////////////////////////////////////////////////////
@@ -688,11 +706,7 @@ main(const int argc, const char **argv) {
 			  median_yield_estimates,
 			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
-    if(VERBOSE){
-      cerr << "Y50 MEASURE OF LIBRARY QUALITY: EXPECTED # READS TO REACH 50% DUPLICATES" << endl;
-      cerr << "Y50 = " << Y50_median << endl;
-      cerr << 100*c_level << "%CI: (" << Y50_lower_ci << ", " << Y50_upper_ci << ")" << endl;
-    } 
+
       
   }
   catch (SMITHLABException &e) {

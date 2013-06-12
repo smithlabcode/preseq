@@ -343,9 +343,9 @@ void
 estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values, 
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
-		    const double max_extrapolation, 
+		    const double max_extrapolation, const double dupl_level,
 		    const double tolerance, const size_t max_iter,
-		    vector<double> &Y50_estimates,
+		    vector<double> &Ylevel_estimates,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -434,7 +434,8 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       if (check_yield_estimates(yield_vector)) {
 	yield_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
-	Y50_estimates.push_back(lower_cf.Y50(hist, vals_sum, max_val, tolerance, max_iter));
+	Ylevel_estimates.push_back(lower_cf.Ylevel(hist, dupl_level, vals_sum, 
+						   max_val, tolerance, max_iter));
 	}
       else if (VERBOSE){
 	cerr << "Y";
@@ -557,6 +558,7 @@ main(const int argc, const char **argv) {
     double c_level = 0.95;
     double tolerance = 1e-20;
     size_t max_iter = 100;
+    double dupl_level = 0.5;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -583,8 +585,11 @@ main(const int argc, const char **argv) {
 		      false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
 		      "(default: " + toa(c_level) + ")", false, c_level);
-    	opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
-    	     orig_max_terms);
+    opt_parse.add_opt("dupl_level",'d', "fraction of duplicate to predict "
+		      "(default: " + toa(dupl_level) + ")",
+		      false, dupl_level);
+    opt_parse.add_opt("terms",'x',"maximum number of terms", false, 
+		      orig_max_terms);
     //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
     //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
     //		      false, max_iter);
@@ -694,12 +699,10 @@ main(const int argc, const char **argv) {
       cerr << "[BOOTSTRAP ESTIMATES]" << endl;
       
     vector<vector <double> > yield_estimates;
-    //    vector< vector<double> > sat_estimates;
-    vector<double> Y50_estimates;
-    vector<double> lower_libsize, upper_libsize;
+    vector<double> Ylevel_estimates;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, tolerance,
-			max_iter, Y50_estimates, yield_estimates);
+			diagonal, step_size, max_extrapolation, dupl_level,
+			tolerance, max_iter, Ylevel_estimates, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -716,11 +719,11 @@ main(const int argc, const char **argv) {
 			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
     // Y50 median and ci
-    double Y50_median = 0.0;
-    double Y50_lower_ci = 0.0;
-    double Y50_upper_ci = 0.0;
-    median_and_ci(Y50_estimates, 1.0 - c_level, Y50_median,
-		  Y50_lower_ci, Y50_upper_ci);
+    double Ylevel_median = 0.0;
+    double Ylevel_lower_ci = 0.0;
+    double Ylevel_upper_ci = 0.0;
+    median_and_ci(Ylevel_estimates, 1.0 - c_level, Ylevel_median,
+		  Ylevel_lower_ci, Ylevel_upper_ci);
 
     
     /////////////////////////////////////////////////////////////////////
@@ -734,9 +737,11 @@ main(const int argc, const char **argv) {
 			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 
     if(VERBOSE){
-      cerr << "Y50 MEASURE OF LIBRARY QUALITY: EXPECTED # READS TO REACH 50% DUPLICATES" << endl;
-      cerr << "Y50 = " << Y50_median << endl;
-      cerr << 100*c_level << "%CI: (" << Y50_lower_ci << ", " << Y50_upper_ci << ")" << endl;
+      cerr << "Y" << 100*dupl_level << "MEASURE OF LIBRARY QUALITY: "
+	   << "EXPECTED # READS TO REACH 50% DUPLICATES" << endl;
+      cerr << "Y" << 100*dupl_level << " = " << Ylevel_median << endl;
+      cerr << 100*c_level << "%CI: (" << Ylevel_lower_ci << ", " 
+	   << Ylevel_upper_ci << ")" << endl;
     } 
       
   }
