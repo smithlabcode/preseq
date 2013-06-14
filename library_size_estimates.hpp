@@ -53,6 +53,14 @@ quadrature_unobserved(const bool VERBOSE,
 		      size_t &n_points);
 
 double
+quadrature_mean3term_unobserved(const bool VERBOSE,
+				const std::vector<double> &counts_hist,
+				const double tolerance,
+				const size_t max_iter,
+				const size_t bootstraps,
+				size_t &n_points);
+
+double
 NegBin_quadrature_unobserved(const bool VERBOSE,
 			     const std::vector<double> &counts_hist,
 			     const double tolerance,

@@ -23,6 +23,7 @@
 #include <gsl/gsl_multiroots.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_poly.h>
+#include <gsl/gsl_randist.h>
 
 #include "moment_sequence.hpp"
 
@@ -244,6 +245,7 @@ MomentSequence::unmodified_Chebyshev(const bool VERBOSE){
   beta = b;
 }
 
+// un-normalized 3 term recurrence
 void
 MomentSequence::full_3term_recurrence(const bool VERBOSE,
 				      vector<double> &full_alpha,
@@ -302,6 +304,114 @@ MomentSequence::MomentSequence(const vector<double> &obs_moms) :
   // calculate 3-term recurrence
   unmodified_Chebyshev(false);
 }
+
+//////////////////////////////////////////////////
+// mean 3 term recurrence by bootstrapping histogram
+
+static void
+resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
+	      const double total_sampled_reads,
+	      double expected_sample_size,
+	      vector<double> &sample_hist) {
+  
+  const size_t hist_size = vals_hist.size();
+  const double vals_mean = total_sampled_reads/expected_sample_size;
+  
+  sample_hist = vector<double>(hist_size, 0.0);
+  vector<unsigned int> curr_sample(hist_size);
+  double remaining = total_sampled_reads;
+  
+  while (remaining > 0) {
+    
+    // get a new sample
+    expected_sample_size = max(1.0, (remaining/vals_mean)/2.0);
+    gsl_ran_multinomial(rng, hist_size, 
+			static_cast<unsigned int>(expected_sample_size),
+			&vals_hist.front(), &curr_sample.front());
+    
+    // see how much we got
+    double inc = 0.0;
+    for (size_t i = 0; i < hist_size; ++i)
+      inc += i*curr_sample[i];
+    
+    // only add to histogram if sampled reads < remaining reads
+    if (inc <= remaining) {
+      for (size_t i = 0; i < hist_size; i++)
+	sample_hist[i] += static_cast<double>(curr_sample[i]);
+      // update the amount we still need to get
+      remaining -= inc;
+    }
+  }
+}
+
+void
+MomentSequence::set_mean_3term_recurrence(const bool VERBOSE, 
+					  const vector<double> &counts_hist,
+					  const size_t bootstraps,
+					  const size_t n_points){
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    vals_sum += i*counts_hist[i];
+
+  const double observed_distinct = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+
+  //setup rng
+  srand(time(0) + getpid());
+  gsl_rng_env_setup();
+  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+  gsl_rng_set(rng, rand()); 
+
+  vector<double> mean_alpha(n_points, 0.0);
+  vector<double> mean_beta(n_points - 1, 0.0);
+
+  for(size_t iter = 0; iter < bootstraps; iter++){
+
+    vector<double> sample_hist;
+    resample_hist(rng, counts_hist, vals_sum, observed_distinct, sample_hist);
+
+    // construct sample moments
+    vector<double> sample_moments;
+  // mu_r = (r + 1)! n_{r+1} / n_1
+    size_t indx = 1;
+    while(sample_hist[indx] > 0  && indx <= std::min(2*n_points, sample_hist.size())){
+      sample_moments.push_back(exp(gsl_sf_lnfact(indx)
+				   + log(sample_hist[indx])
+				   - log(sample_hist[1])));
+      if(!finite(sample_moments.back())){
+	sample_moments.pop_back();
+	break;
+      }
+      indx++;
+    }
+
+    // compute sample 3 term recurrences
+    MomentSequence sample_momseq(sample_moments);
+    vector<double> sample_alpha;
+    vector<double> sample_beta;
+    sample_momseq.full_3term_recurrence(false, sample_alpha, sample_beta);
+
+
+    // update average 3 term recurrences
+    for(size_t i = 0; i < sample_alpha.size(); i++)
+      mean_alpha[i] = mean_alpha[i]*iter/(1.0 + iter) + sample_alpha[i]/(1.0 + iter);
+
+    for(size_t i = 0; i < sample_beta.size(); i++)
+      mean_beta[i] = mean_beta[i]*iter/(1.0 + iter) + sample_beta[i]/(1.0 + iter);   
+
+  }
+
+  // check and remember the offdiagonals of the Jacobi matrix are the sqrt of beta 
+  check_three_term_relation(mean_alpha, mean_beta);
+  for(size_t i = 0; i < mean_beta.size(); i++)
+    mean_beta[i] = sqrt(mean_beta[i]);
+
+  alpha.swap(mean_alpha);
+  beta.swap(mean_beta);
+}
+
+
+
+
 
 
 /////////////////////////////////////////////////////
@@ -545,8 +655,8 @@ NegBin_3term_recurrence(const size_t n_points,
   for(size_t i = 0; i < n_points; i++)
     a.push_back((2.0*i + 1.0 + k)/phi);
 
-  for(size_t i = 0; i < n_points - 1; i++)
-    b.push_back((n_points + k)*n_points/(phi*phi));
+  for(size_t i = 1; i < n_points; i++)
+    b.push_back(sqrt((i + k)*i/(phi*phi)));
 }
 
 void
@@ -624,6 +734,7 @@ MomentSequence::NegBin_quadrature_rules(const bool VERBOSE,
   for(size_t i = 0; i < points.size(); i++)
     for(size_t j = 0; j < points.size(); j++)
       gsl_matrix_set(M, i, j, pow(points[j], i));
+ 
 
   int signum = 0;
 
@@ -635,12 +746,21 @@ MomentSequence::NegBin_quadrature_rules(const bool VERBOSE,
   for(size_t i = 0; i < points.size(); i++)
     gsl_vector_set(moms, i, moments[i]);
 
+  if(VERBOSE){
+    cerr << "equation matrix:" << endl;
+    for(size_t i = 0; i < points.size(); i++){
+      for(size_t j = 0; j < points.size(); j++)
+	cerr << gsl_matrix_get(M, i, j) << "\t";
+      cerr << " = " << gsl_vector_get(moms, i) << endl;
+    }
+  }
+
   gsl_linalg_LU_decomp(M, perm, &signum);
 
   gsl_linalg_LU_solve(M, perm, moms, w);
 
   weights.resize(points.size());
   for(size_t i = 0; i < weights.size(); i++)
-    weights[i] = gsl_vector_get(moms, i);
+    weights[i] = gsl_vector_get(w, i);
 }
 

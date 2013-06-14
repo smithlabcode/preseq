@@ -30,6 +30,7 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_multiroots.h>
 #include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_randist.h>
 
 #include "smithlab_utils.hpp"
 #include "newtons_method.hpp"
@@ -317,6 +318,76 @@ quadrature_unobserved(const bool VERBOSE,
 }
 
 
+double
+quadrature_mean3term_unobserved(const bool VERBOSE,
+				const vector<double> &counts_hist,
+				const double tol,
+				const size_t max_iter,
+				const size_t bootstraps,
+				size_t &n_points){
+  double values_sum = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    values_sum += i*counts_hist[i];
+
+  size_t counts_before_first_zero = 1;
+  while ((counts_before_first_zero < counts_hist.size()) &&
+	  (counts_hist[counts_before_first_zero] > 0))
+    ++counts_before_first_zero;
+  if(2*n_points > counts_before_first_zero - 2)
+    n_points = 
+      static_cast<size_t>(floor((counts_before_first_zero - 2)/2));
+  
+   
+  // initialize moments, 0th moment is 1
+  vector<double> measure_moments(1, 1.0);
+  // mu_r = (r + 1)! n_{r+1} / n_1
+  for(size_t i = 0; i < 2*n_points; i++)
+    measure_moments.push_back(exp(gsl_sf_lnfact(i + 2)
+				  + log(counts_hist[i + 2])
+				  - log(counts_hist[1])));
+
+  MomentSequence mom_seq(measure_moments);
+
+  mom_seq.set_mean_3term_recurrence(VERBOSE, counts_hist, 
+				    bootstraps, n_points);
+
+  vector<double> points, weights;
+  mom_seq.QR_quadrature_rules(VERBOSE, n_points,
+			      tol,  max_iter, points, weights);
+
+  n_points = points.size();
+
+  const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
+  if(weights_sum != 1){
+    cerr << "weights sum = " << weights_sum << endl;
+    for(size_t i = 0; i < weights.size(); i++)
+      weights[i] = weights[i]/weights_sum;
+  }
+
+
+  // En_1 * int_0^\infty 1/x d \nu (x)
+  double estimated_integral = 0.0;
+  for(size_t i = 0; i < points.size(); i++)
+    estimated_integral += counts_hist[1]*weights[i]/points[i];
+
+  if(VERBOSE){
+    cerr << "points = ";
+    for(size_t i = 0; i < points.size(); i++)
+      cerr << setprecision(16) << points[i] << ", ";
+    cerr << endl;
+
+    cerr << "weights = ";
+    for(size_t i = 0; i < weights.size(); i++)
+      cerr << setprecision(16) << weights[i] << ", ";
+    cerr << endl;
+
+    //    cerr << "estimated lib size = " << estimated_integral << endl;
+  }
+
+  return estimated_integral;
+}
+
+
 // need a better name
 // computes quadrature rules using points determined 
 // assuming NegBin count distribution 
@@ -352,6 +423,10 @@ NegBin_quadrature_unobserved(const bool VERBOSE,
   vector<double> NBhist(counts_hist);
   ZTNBD distro(1.0, 1.0);
   distro.EM_estim_params(tol, max_iter, NBhist);
+  if(VERBOSE){
+    cerr << "estimated mu    = " << distro.get_mu() << endl;
+    cerr << "estimated alpha = " << distro.get_alpha() << endl;
+  }
 
   vector<double> points, weights;
   mom_seq.NegBin_quadrature_rules(VERBOSE, n_points,

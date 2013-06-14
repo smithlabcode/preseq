@@ -524,7 +524,7 @@ write_predicted_curve(const string outfile, const double values_sum,
   if (!outfile.empty()) of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
   
-  out << "TOTAL_READS\tEXPECTED_COVERED_BASES\t"
+  out << "TOTAL_BASES\tEXPECTED_COVERED_BASES\t"
       << "LOWER_" << 100*c_level << "%CI\t"
       << "UPPER_" << 100*c_level << "%CI" << endl;
   
@@ -533,7 +533,7 @@ write_predicted_curve(const string outfile, const double values_sum,
   
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
   for (size_t i = 0; i < median_yield_estimates.size(); ++i)
-    out << (i + 1)*step_size*bin_size << '\t' 
+    out << (i + 1)*step_size << '\t' 
 	<< median_yield_estimates[i]*bin_size << '\t'
 	<< yield_lower_ci_lognormal[i]*bin_size << '\t' 
 	<< yield_upper_ci_lognormal[i]*bin_size << endl;
@@ -553,7 +553,7 @@ main(const int argc, const char **argv) {
     
     size_t orig_max_terms = 1000;
     double max_extrapolation = 1.0e10;
-    double step_size = 1e7;
+    double read_step_size = 1e7;
     size_t bootstraps = 100;
     int diagonal = -1;
     double c_level = 0.95;
@@ -579,12 +579,12 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("bin_size", 'n', "bin size "
 		      "(default: " + toa(bin_size) + ")",
 		      false, bin_size);
-    opt_parse.add_opt("extrap",'e',"maximum extrapolation "
+    opt_parse.add_opt("extrap",'e',"maximum extrapolation in base pairs"
 		      "(default: " + toa(max_extrapolation) + ")",
 		      false, max_extrapolation);
     opt_parse.add_opt("step",'s',"step size in bases between extrapolations "
-		      "(default: " + toa(step_size) + ")", 
-		      false, step_size);
+		      "(default: " + toa(read_step_size) + ")", 
+		      false, read_step_size);
     opt_parse.add_opt("bootstraps",'b',"number of bootstraps "
 		      "(default: " + toa(bootstraps) + "), ",
 		      false, bootstraps);
@@ -638,16 +638,19 @@ main(const int argc, const char **argv) {
 
     
     // JUST A SANITY CHECK
-    const double total_reads = accumulate(values.begin(), values.end(), 0.0);
+    const double total_bins = accumulate(values.begin(), values.end(), 0.0);
 
+    double bin_step_size = read_step_size/bin_size;
     // for large initial experiments need to adjust step size
     // otherwise small relative steps do not account for variance
     // in extrapolation
-    if(step_size < (total_reads/20)){
-       step_size = std::max(step_size, step_size*round(total_reads/(20*step_size)));
+    if(bin_step_size < (total_bins/20)){
+       bin_step_size = std::max(bin_step_size, bin_step_size*round(total_bins/(20*bin_step_size)));
        if(VERBOSE)
-	 cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
+	 cerr << "ADJUSTED_STEP_SIZE = " << bin_step_size << endl;
     }
+    // recorrect the read step size
+    read_step_size = bin_step_size*bin_size;
        
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
@@ -662,8 +665,10 @@ main(const int argc, const char **argv) {
 
     if (VERBOSE)
       cerr << "TOTAL READS         = " << n_reads << endl
-	   << "DISTINCT BINS       = " << total_reads << endl
-	   << "TOTAL BASES         = " << total_reads*bin_size << endl
+	   << "STEP SIZE           = " << read_step_size << endl
+	   << "TOTAL BINS          = " << total_bins << endl
+	   << "DISTINCT BINS       = " << values.size() << endl
+	   << "TOTAL BASES         = " << total_bins*bin_size << endl
 	   << "TOTAL COVERED BASES = " << values.size()*bin_size << endl
 	   << "MAX COUNT           = " << max_observed_count << endl
 	   << "COUNTS OF 1         = " << counts_hist[1] << endl;
@@ -695,7 +700,7 @@ main(const int argc, const char **argv) {
     vector<vector <double> > yield_estimates;
     vector<double> Ylevel_estimates;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, dupl_level,
+			diagonal, bin_step_size, max_extrapolation, dupl_level,
 			tolerance, max_iter, Ylevel_estimates, yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
@@ -721,7 +726,7 @@ main(const int argc, const char **argv) {
     if (VERBOSE) 
       cerr << "[WRITING OUTPUT]" << endl;
     
-    write_predicted_curve(outfile, total_reads, c_level, step_size,
+    write_predicted_curve(outfile, total_bins, c_level, read_step_size,
 			  bin_size, median_yield_estimates,
 			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
 

@@ -43,6 +43,10 @@ struct MomentSequence {
 			     std::vector<double> &full_alpha,
 			     std::vector<double> &full_beta);
 
+  void set_mean_3term_recurrence(const bool VERBOSE, 
+				 const std::vector<double> &counts_hist,
+				 const size_t bootstraps, const size_t n_points);
+
   // quadrature rules using polynomial solver
   void poly_solve_gauss_quad(const size_t n_points,
 			     std::vector<double> &weights,
