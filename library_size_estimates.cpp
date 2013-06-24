@@ -287,8 +287,9 @@ quadrature_unobserved(const bool VERBOSE,
   n_points = points.size();
 
   const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
-  if(weights_sum != 1){
-    cerr << "weights sum = " << weights_sum << endl;
+  if(weights_sum != 1.0){
+    if(VERBOSE)
+      cerr << "weights sum = " << weights_sum << endl;
     for(size_t i = 0; i < weights.size(); i++)
       weights[i] = weights[i]/weights_sum;
   }

@@ -24,6 +24,7 @@
 #include <vector>
 #include <iomanip>
 #include <queue>
+#include <string>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>
@@ -149,35 +150,123 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
   }
 }
 
-/*
+// split a mapped read into multiple genomic regions
+// based on the number of bases in each
+static void
+SplitMappedRead(const MappedRead &inputMR,
+		Runif &runif,
+		const size_t bin_size,
+		vector<GenomicRegion> &outputGRs){
+  outputGRs.clear();
+
+  size_t covered_bases = 0;
+  size_t read_iterator = inputMR.r.get_start();
+  //std::string::iterator seq_iterator = inputMR.seq.begin();
+  size_t seq_iterator = 0;
+  //  while(seq_iterator != inputMR.seq.end()){
+  //  if(*seq_iterator != 'N')
+  //  covered_bases++;
+  while(seq_iterator < inputMR.seq.size()){
+    if(inputMR.seq[seq_iterator] != 'N')
+      covered_bases++;
+
+    // if we reach the end of a bin, probabilistically create a binned read
+    // with probability proportional to the number of covered bases
+    if(read_iterator % bin_size == bin_size - 1){
+      double frac = static_cast<double>(covered_bases)/bin_size;
+      if(runif.runif(0.0, 1.0) <= frac){
+	const size_t curr_start = read_iterator - (read_iterator % bin_size);
+	const size_t curr_end = curr_start + bin_size;
+	GenomicRegion binned_gr(inputMR.r.get_chrom(), curr_start, curr_end,
+				inputMR.r.get_name(), inputMR.r.get_score(),
+				inputMR.r.get_strand());
+	outputGRs.push_back(binned_gr);
+      }
+      covered_bases = 0;
+    }
+    seq_iterator++;
+    read_iterator++;
+  }
+}
+
+
+
 static size_t
-load_values_MR_pe(const string input_file_name, vector<double> &values) {
+load_values_MR_pe(const string input_file_name, 
+		  const size_t bin_size,
+		  const size_t max_width,
+		  double &avg_bins_per_read,
+		  vector<double> &values) {
 
- std::ifstream in(input_file_name.c_str());
- if (!in)
-   throw "problem opening file: " + input_file_name;
+  srand(time(0) + getpid());
+  Runif runif(rand());
 
- MappedRead r, prev;
- if (!(in >> prev))
-   throw "problem reading from: " + input_file_name;
+  std::ifstream in(input_file_name.c_str());
+  if (!in)
+    throw "problem opening file: " + input_file_name;
 
- size_t n_reads = 1;
- values.push_back(1.0);
- while (in >> r) {
-    if (r.same_chrom(prev) && r.get_start() < prev.get_start() 
-	&& r.get_end() < prev.get_end())
-      throw SMITHLABException("locations unsorted in: " + input_file_name);
-    
-    if (!r.same_chrom(prev) || r.get_start() != prev.get_start() 
-	|| r.get_end() != prev.get_end())
-     values.push_back(1.0);
-   else values.back()++;
-   ++n_reads;
-   prev.swap(r);
- }
+  MappedRead mr;
+  if (!(in >> mr))
+    throw "problem reading from: " + input_file_name;
+
+ // initialize prioirty queue to reorder the split reads
+  std::priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> PQ;
+
+  size_t n_reads = 0;
+  GenomicRegion curr_gr, prev_gr;
+  values.push_back(1.0);
+  do {
+    vector<GenomicRegion> splitGRs;
+    SplitMappedRead(mr, runif, bin_size, splitGRs);
+   // update average bins per read
+    avg_bins_per_read = avg_bins_per_read*(n_reads - 1)/n_reads 
+      + static_cast<double>(splitGRs.size())/n_reads;
+   // remove Genomic Regions from the priority queue
+    while(!PQ.empty() && 
+	  GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width)){
+      curr_gr = PQ.top();
+      PQ.pop();
+
+     // only compare if the previous is not null (in the 1st iteration)
+      if(prev_gr.get_chrom() != "(NULL)"){
+	if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
+	  cerr << "current:\t" << curr_gr << endl;
+	  cerr << "previous:\t" << prev_gr << endl;
+	  throw SMITHLABException("split reads unsorted");
+	}
+	if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev_gr.get_start())
+	  values.push_back(1.0);
+	else 
+	  values.back()++;
+      }
+      prev_gr.swap(curr_gr);
+    }
+
+   n_reads++;
+
+  } while (in >> mr);
+
+ // done adding reads, now spit the rest out
+  while(!PQ.empty()){
+    curr_gr = PQ.top();
+    PQ.pop();
+     // only compare if the previous is not null (in the 1st iteration)
+    if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
+      cerr << "current:\t" << curr_gr << endl;
+      cerr << "previous:\t" << prev_gr << endl;
+      throw SMITHLABException("split reads unsorted");
+    }
+    if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev_gr.get_start())
+      values.push_back(1.0);
+    else 
+      values.back()++;
+   
+    prev_gr.swap(curr_gr);
+  }
+
  return n_reads;
 }
-*/
+
 
 static size_t
 load_values_MR_se(const string input_file_name, 
@@ -565,7 +654,7 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    //    bool PAIRED_END = false;
+    bool PAIRED_END = false;
     
     
     /**************** GET COMMAND LINE ARGUMENTS ***********************/
@@ -600,8 +689,8 @@ main(const int argc, const char **argv) {
     //		      false, max_iter);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
-    //    opt_parse.add_opt("pe", 'P', "input is paired end read file",
-    //		      false, PAIRED_END);
+    opt_parse.add_opt("pe", 'P', "input is paired end read file",
+    		      false, PAIRED_END);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -630,14 +719,14 @@ main(const int argc, const char **argv) {
     double avg_bins_per_read = 0.0;
     const double dupl_level = 1.0/reads_per_base;
 
-    /*    if(PAIRED_END)
-      load_values_BED_pe(input_file_name, values);  
-      else */
-    n_reads = load_values_MR_se(input_file_name, bin_size, max_width, 
-				 avg_bins_per_read, values);
+    if(PAIRED_END)
+      n_reads = load_values_MR_pe(input_file_name, bin_size, max_width,
+				  avg_bins_per_read, values);
+    else 
+      n_reads = load_values_MR_se(input_file_name, bin_size, max_width, 
+				  avg_bins_per_read, values);
 
     
-    // JUST A SANITY CHECK
     const double total_bins = accumulate(values.begin(), values.end(), 0.0);
 
     double bin_step_size = read_step_size/bin_size;
@@ -654,15 +743,12 @@ main(const int argc, const char **argv) {
        
     const size_t max_observed_count = 
       static_cast<size_t>(*std::max_element(values.begin(), values.end()));
-
-
     
     // BUILD THE HISTOGRAM
     vector<double> counts_hist(max_observed_count + 1, 0.0);
     for (size_t i = 0; i < values.size(); ++i)
       ++counts_hist[static_cast<size_t>(values[i])];
     
-
     if (VERBOSE)
       cerr << "TOTAL READS         = " << n_reads << endl
 	   << "STEP SIZE           = " << read_step_size << endl

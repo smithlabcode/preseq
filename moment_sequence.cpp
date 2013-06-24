@@ -385,6 +385,7 @@ MomentSequence::set_mean_3term_recurrence(const bool VERBOSE,
     }
 
     // compute sample 3 term recurrences
+    // do not check if 3term recurrence is positive
     MomentSequence sample_momseq(sample_moments);
     vector<double> sample_alpha;
     vector<double> sample_beta;

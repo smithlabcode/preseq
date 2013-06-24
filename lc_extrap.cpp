@@ -738,7 +738,8 @@ main(const int argc, const char **argv) {
 
     if(VERBOSE){
       cerr << "Y" << 100*dupl_level << "MEASURE OF LIBRARY QUALITY: "
-	   << "EXPECTED # READS TO REACH 50% DUPLICATES" << endl;
+	   << "EXPECTED # READS TO REACH "
+	   << 100*dupl_level << "% DUPLICATES" << endl;
       cerr << "Y" << 100*dupl_level << " = " << Ylevel_median << endl;
       cerr << 100*c_level << "%CI: (" << Ylevel_lower_ci << ", " 
 	   << Ylevel_upper_ci << ")" << endl;
