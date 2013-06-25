@@ -1,6 +1,6 @@
 /*    gc_extrap: extrapolate genomic complexity 
  *
- *    Copyright (C) 2012 University of Southern California and
+ *    Copyright (C) 2013 University of Southern California and
  *			 Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -51,6 +51,19 @@ using std::fixed;
 using std::setprecision;
 using std::tr1::unordered_map;
 
+/*
+ * This code is used to deal with read data in BAM format.
+ */
+#ifdef HAVE_BAMTOOLS
+#include "api/BamReader.h"
+#include "api/BamAlignment.h"
+
+using BamTools::BamAlignment;
+using BamTools::SamHeader;
+using BamTools::RefVector;
+using BamTools::BamReader;
+using BamTools::RefData;
+#endif
 
 /*
  * This code is used to deal with read data in BAM format.
@@ -153,7 +166,8 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
 // split a mapped read into multiple genomic regions
 // based on the number of bases in each
 static void
-SplitMappedRead(const MappedRead &inputMR,
+SplitMappedRead(const bool VERBOSE,
+		const MappedRead &inputMR,
 		Runif &runif,
 		const size_t bin_size,
 		vector<GenomicRegion> &outputGRs){
@@ -161,8 +175,11 @@ SplitMappedRead(const MappedRead &inputMR,
 
   size_t covered_bases = 0;
   size_t read_iterator = inputMR.r.get_start();
-  //std::string::iterator seq_iterator = inputMR.seq.begin();
   size_t seq_iterator = 0;
+  size_t total_covered_bases = 0;
+
+  // not sure why this doesn't work:
+  //std::string::iterator seq_iterator = inputMR.seq.begin();
   //  while(seq_iterator != inputMR.seq.end()){
   //  if(*seq_iterator != 'N')
   //  covered_bases++;
@@ -182,21 +199,27 @@ SplitMappedRead(const MappedRead &inputMR,
 				inputMR.r.get_strand());
 	outputGRs.push_back(binned_gr);
       }
+      total_covered_bases += covered_bases;
       covered_bases = 0;
     }
     seq_iterator++;
     read_iterator++;
   }
+  if(VERBOSE){
+    cerr << "total bases   = " << seq_iterator << endl;
+    cerr << "covered bases = " << total_covered_bases << endl;
+  } 
 }
 
 
 
 static size_t
-load_values_MR_pe(const string input_file_name, 
-		  const size_t bin_size,
-		  const size_t max_width,
-		  double &avg_bins_per_read,
-		  vector<double> &values) {
+load_values_MR(const bool VERBOSE,
+	       const string input_file_name, 
+	       const size_t bin_size,
+	       const size_t max_width,
+	       double &avg_bins_per_read,
+	       vector<double> &values) {
 
   srand(time(0) + getpid());
   Runif runif(rand());
@@ -217,7 +240,7 @@ load_values_MR_pe(const string input_file_name,
   values.push_back(1.0);
   do {
     vector<GenomicRegion> splitGRs;
-    SplitMappedRead(mr, runif, bin_size, splitGRs);
+    SplitMappedRead(VERBOSE, mr, runif, bin_size, splitGRs);
    // update average bins per read
     avg_bins_per_read = avg_bins_per_read*(n_reads - 1)/n_reads 
       + static_cast<double>(splitGRs.size())/n_reads;
@@ -269,11 +292,11 @@ load_values_MR_pe(const string input_file_name,
 
 
 static size_t
-load_values_MR_se(const string input_file_name, 
-		  const size_t bin_size,
-		  const size_t max_width,
-		  double &avg_bins_per_read,
-		  vector<double> &values) {
+load_values_GR(const string input_file_name, 
+	       const size_t bin_size,
+	       const size_t max_width,
+	       double &avg_bins_per_read,
+	       vector<double> &values) {
 
   srand(time(0) + getpid());
   Runif runif(rand());
@@ -351,7 +374,33 @@ load_values_MR_se(const string input_file_name,
  return n_reads;
 }
 
+/////////////////////////////////////////////////////////////////
+// bam input
+#ifdef HAVE_BAMTOOLS
+static void
+BamAlignmentToMappedRead(const unordered_map<size_t, string> &chrom_lookup,
+			 const BamAlignment &ba,
+			 MappedRead &mr){
+  const unordered_map<size_t, string>::const_iterator 
+    the_chrom(chrom_lookup.find(ba.RefID));
+  if (the_chrom == chrom_lookup.end())
+    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
+  const string chrom = the_chrom->second;
+  const size_t start = ba.Position;
+  const size_t end = start + ba.Length;
+  const string name(ba.Name);
+  const float score = ba.MapQuality;
+  const char strand = (ba.IsReverseStrand() ? '-' : '+');
+  const string seq = ba.AlignedBases;
+  const string scr = ba.Qualities;
+  mr.r = GenomicRegion(chrom, start, end, name, score, strand);
+  mr.seq = seq;
+  mr.scr = scr;
 
+
+}
+
+#endif
 
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
@@ -654,12 +703,12 @@ main(const int argc, const char **argv) {
     
     /* FLAGS */
     bool VERBOSE = false;
-    bool PAIRED_END = false;
+    bool NO_SEQUENCE = false;
     
     
     /**************** GET COMMAND LINE ARGUMENTS ***********************/
     OptionParser opt_parse(strip_path(argv[0]), 
-			   "", "<sorted-bed-file>");
+			   "", "<sorted-mapped-read-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
 		      false , outfile);
     opt_parse.add_opt("max_width", 'w', "max fragment length, "
@@ -689,8 +738,8 @@ main(const int argc, const char **argv) {
     //		      false, max_iter);
     opt_parse.add_opt("verbose", 'v', "print more information", 
 		      false, VERBOSE);
-    opt_parse.add_opt("pe", 'P', "input is paired end read file",
-    		      false, PAIRED_END);
+    opt_parse.add_opt("bed", 'B', "input is in bed format without sequence information",
+    		      false, NO_SEQUENCE);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -719,11 +768,11 @@ main(const int argc, const char **argv) {
     double avg_bins_per_read = 0.0;
     const double dupl_level = 1.0/reads_per_base;
 
-    if(PAIRED_END)
-      n_reads = load_values_MR_pe(input_file_name, bin_size, max_width,
+    if(NO_SEQUENCE)
+      n_reads = load_values_GR(input_file_name, bin_size, max_width,
 				  avg_bins_per_read, values);
     else 
-      n_reads = load_values_MR_se(input_file_name, bin_size, max_width, 
+      n_reads = load_values_MR(VERBOSE, input_file_name, bin_size, max_width, 
 				  avg_bins_per_read, values);
 
     
