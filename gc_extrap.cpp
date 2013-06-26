@@ -51,36 +51,6 @@ using std::fixed;
 using std::setprecision;
 using std::tr1::unordered_map;
 
-/*
- * This code is used to deal with read data in BAM format.
- */
-#ifdef HAVE_BAMTOOLS
-#include "api/BamReader.h"
-#include "api/BamAlignment.h"
-
-using BamTools::BamAlignment;
-using BamTools::SamHeader;
-using BamTools::RefVector;
-using BamTools::BamReader;
-using BamTools::RefData;
-#endif
-
-/*
- * This code is used to deal with read data in BAM format.
- */
-/* dealing with bam version later
-#ifdef HAVE_BAMTOOLS
-#include "api/BamReader.h"
-#include "api/BamAlignment.h"
-
-using BamTools::BamAlignment;
-using BamTools::SamHeader;
-using BamTools::RefVector;
-using BamTools::BamReader;
-using BamTools::RefData;
-#endif
-*/
-
 
 /**************** FOR CLARITY BELOW WHEN COMPARING READS **************/
 
@@ -178,7 +148,7 @@ SplitMappedRead(const bool VERBOSE,
   size_t seq_iterator = 0;
   size_t total_covered_bases = 0;
 
-  // not sure why this doesn't work:
+  // not sure why this didn't work:
   //std::string::iterator seq_iterator = inputMR.seq.begin();
   //  while(seq_iterator != inputMR.seq.end()){
   //  if(*seq_iterator != 'N')
@@ -205,19 +175,23 @@ SplitMappedRead(const bool VERBOSE,
     seq_iterator++;
     read_iterator++;
   }
-  if(VERBOSE){
-    cerr << "total bases   = " << seq_iterator << endl;
-    cerr << "covered bases = " << total_covered_bases << endl;
-  } 
+
 }
 
+static inline bool
+GenomicRegionIsNull(const GenomicRegion &gr){
+  GenomicRegion null_gr;
+  if(gr == null_gr)
+    return true;
 
+  return false;
+}
 
 static size_t
 load_values_MR(const bool VERBOSE,
 	       const string input_file_name, 
 	       const size_t bin_size,
-	       const size_t max_width,
+	       size_t max_width,
 	       double &avg_bins_per_read,
 	       vector<double> &values) {
 
@@ -226,46 +200,64 @@ load_values_MR(const bool VERBOSE,
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
-    throw "problem opening file: " + input_file_name;
+    throw SMITHLABException("problem opening file: " + input_file_name);
 
   MappedRead mr;
   if (!(in >> mr))
-    throw "problem reading from: " + input_file_name;
+    throw SMITHLABException("problem reading from: " + input_file_name);
 
  // initialize prioirty queue to reorder the split reads
   std::priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> PQ;
 
   size_t n_reads = 0;
+  size_t n_bins = 0;
   GenomicRegion curr_gr, prev_gr;
   values.push_back(1.0);
   do {
+
+    if(mr.r.get_width() > max_width){
+      cerr << "Encountered read of width " << mr.r.get_width() << endl;
+      throw SMITHLABException("max_width set too small.");
+    }
+
     vector<GenomicRegion> splitGRs;
-    SplitMappedRead(VERBOSE, mr, runif, bin_size, splitGRs);
-   // update average bins per read
+    SplitMappedRead(VERBOSE, mr, runif, bin_size, splitGRs);  
+    
+    n_reads++;
+    n_bins += splitGRs.size();
+
+
+   // add split Genomic Regions to the priority queue
+      for(size_t i = 0; i < splitGRs.size(); i++){
+	PQ.push(splitGRs[i]);
+      }
+
+
     avg_bins_per_read = avg_bins_per_read*(n_reads - 1)/n_reads 
       + static_cast<double>(splitGRs.size())/n_reads;
    // remove Genomic Regions from the priority queue
-    while(!PQ.empty() && 
-	  GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width)){
-      curr_gr = PQ.top();
-      PQ.pop();
+    if(splitGRs.size() > 0){
+      while(!PQ.empty() && 
+	    GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width)){
+	curr_gr = PQ.top();
+	PQ.pop();
 
      // only compare if the previous is not null (in the 1st iteration)
-      if(prev_gr.get_chrom() != "(NULL)"){
-	if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
-	  cerr << "current:\t" << curr_gr << endl;
-	  cerr << "previous:\t" << prev_gr << endl;
-	  throw SMITHLABException("split reads unsorted");
+	if(!GenomicRegionIsNull(prev_gr)){
+	  if(curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start()){
+	    cerr << "current:\t" << curr_gr << endl;
+	    cerr << "previous:\t" << prev_gr << endl;
+	    throw SMITHLABException("split reads unsorted");
+	  }
+	  if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev_gr.get_start())
+	    values.push_back(1.0);
+	  else 
+	    values.back()++;
 	}
-	if(!curr_gr.same_chrom(prev_gr) || curr_gr.get_start() != prev_gr.get_start())
-	  values.push_back(1.0);
-	else 
-	  values.back()++;
+	prev_gr.swap(curr_gr);
       }
-      prev_gr.swap(curr_gr);
     }
 
-   n_reads++;
 
   } while (in >> mr);
 
@@ -374,33 +366,6 @@ load_values_GR(const string input_file_name,
  return n_reads;
 }
 
-/////////////////////////////////////////////////////////////////
-// bam input
-#ifdef HAVE_BAMTOOLS
-static void
-BamAlignmentToMappedRead(const unordered_map<size_t, string> &chrom_lookup,
-			 const BamAlignment &ba,
-			 MappedRead &mr){
-  const unordered_map<size_t, string>::const_iterator 
-    the_chrom(chrom_lookup.find(ba.RefID));
-  if (the_chrom == chrom_lookup.end())
-    throw SMITHLABException("no chrom with id: " + toa(ba.RefID));
-  const string chrom = the_chrom->second;
-  const size_t start = ba.Position;
-  const size_t end = start + ba.Length;
-  const string name(ba.Name);
-  const float score = ba.MapQuality;
-  const char strand = (ba.IsReverseStrand() ? '-' : '+');
-  const string seq = ba.AlignedBases;
-  const string scr = ba.Qualities;
-  mr.r = GenomicRegion(chrom, start, end, name, score, strand);
-  mr.seq = seq;
-  mr.scr = scr;
-
-
-}
-
-#endif
 
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
@@ -767,6 +732,9 @@ main(const int argc, const char **argv) {
 
     double avg_bins_per_read = 0.0;
     const double dupl_level = 1.0/reads_per_base;
+
+    if(VERBOSE)
+      cerr << "LOADING READS" << endl;
 
     if(NO_SEQUENCE)
       n_reads = load_values_GR(input_file_name, bin_size, max_width,
