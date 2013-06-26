@@ -29,7 +29,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS =  gc_extrap lc_extrap c_curve mincount_c_curve count_extrap count_c_curve mincount_extrap saturation_extrap test_quad_replace
+PROGS =  gc_extrap lc_extrap c_curve mincount_c_curve count_extrap count_c_curve mincount_extrap saturation_extrap test_quad_replace bam2mr
 INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
