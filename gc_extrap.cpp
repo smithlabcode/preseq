@@ -446,8 +446,8 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, const double dupl_level, 
-		    const double tolerance, const size_t max_iter,
-		    vector<double> &Ylevel_estimates,
+		    const double tolerance, const size_t max_iter, const double fixed_fold,
+		    vector<double> &Ylevel_estimates, vector<double> &fixed_fold_extrap,
 		    vector< vector<double> > &yield_estimates) {
   // clear returning vectors
   yield_estimates.clear();
@@ -538,6 +538,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
 	if (VERBOSE) cerr << '.';
 	Ylevel_estimates.push_back(lower_cf.Ylevel(hist, dupl_level, vals_sum, max_val, 
 						   tolerance, max_iter));
+	fixed_fold_extrap.push_back(initial_distinct + (fixed_fold - 1.0)*lower_cf(fixed_fold - 1.0));
       }
       else if (VERBOSE){
 	cerr << "_";
@@ -665,6 +666,7 @@ main(const int argc, const char **argv) {
     size_t max_iter = 100;
     double tolerance = 1.0e-20;
     double reads_per_base = 2.0;
+    double fixed_fold = 20;
     
     /* FLAGS */
     bool VERBOSE = false;
@@ -698,6 +700,8 @@ main(const int argc, const char **argv) {
 		      false, reads_per_base);
     opt_parse.add_opt("terms",'x',"maximum number of terms", 
 		      false, orig_max_terms);
+    opt_parse.add_opt("fixed_fold",'f',"fixed fold extrapolation to predict",
+		      false, fixed_fold);
     //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
     //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
     //		      false, max_iter);
@@ -801,10 +805,11 @@ main(const int argc, const char **argv) {
       cerr << "[BOOTSTRAP ESTIMATES]" << endl;
       
     vector<vector <double> > yield_estimates;
-    vector<double> Ylevel_estimates;
+    vector<double> Ylevel_estimates, fixed_fold_extrap;
     estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
 			diagonal, bin_step_size, max_extrapolation, dupl_level,
-			tolerance, max_iter, Ylevel_estimates, yield_estimates);
+			tolerance, max_iter, fixed_fold, Ylevel_estimates, fixed_fold_extrap,
+			yield_estimates);
       
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -850,6 +855,19 @@ main(const int argc, const char **argv) {
 	   << Ylevel_upper_ci << ")" << endl;
     } 
 
+    double median_fixed_fold_extrap = 0.0;
+    double fixed_fold_extrap_lower_ci = 0.0;
+    double fixed_fold_extrap_upper_ci = 0.0;
+    median_and_ci(fixed_fold_extrap, 1.0 - c_level, median_fixed_fold_extrap,
+		  fixed_fold_extrap_lower_ci, fixed_fold_extrap_upper_ci);
+    if(VERBOSE){
+      cerr << "MEDIAN_FIXED " << fixed_fold << "-FOLD_EXTRAP" 
+	   << '\t' << "LOWER" << 100*c_level << "%CI" 
+	   << '\t' << "UPPER" << 100*c_level << "%CI" << endl;
+      cerr << median_fixed_fold_extrap*bin_size << '\t' 
+	   << fixed_fold_extrap_lower_ci*bin_size << '\t'
+	   << fixed_fold_extrap_upper_ci*bin_size << endl;
+    }
 
       
   }

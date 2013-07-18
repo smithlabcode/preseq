@@ -89,8 +89,8 @@ fill_overlap(const bool pos_str, const MappedRead &mr, const size_t start,
 
 
 
-static void
-merge_mates(const size_t range, const MappedRead &one, 
+static bool
+merge_mates(const bool VERBOSE, const size_t range, const MappedRead &one, 
 	    const MappedRead &two, MappedRead &merged) {
   
   const bool pos_str = one.r.pos_strand();
@@ -109,7 +109,14 @@ merge_mates(const size_t range, const MappedRead &one,
   
   const int len = pos_str ? (two_right - one_left) : (one_right - two_left);
   
-  assert(len > 0);
+  if(len <= 0){
+    if(VERBOSE){
+      cerr << one << endl;
+      cerr << two << endl;
+      cerr << "len = " << len << endl;
+    } 
+    return false;
+  }
   assert(one_left <= one_right && two_left <= two_right);
   assert(overlap_start >= overlap_end || static_cast<size_t>(len) == 
 	 ((one_right - one_left) + (two_right - two_left) + (overlap_end - overlap_start)));
@@ -150,10 +157,13 @@ merge_mates(const size_t range, const MappedRead &one,
   merged.scr = scr;  
   const string name(one.r.get_name());
   merged.r.set_name("FRAG:" + name.substr(0, name.size()));
+
+  return true;
 }
 
-static void
-BamAlignmentPeToMappedRead(const unordered_map<size_t, string> &chrom_lookup,
+static bool
+BamAlignmentPeToMappedRead(const bool VERBOSE,
+			   const unordered_map<size_t, string> &chrom_lookup,
 			   const BamAlignment &ba_1,
 			   const BamAlignment &ba_2, 
 			   const size_t max_frag_len,
@@ -163,7 +173,7 @@ BamAlignmentPeToMappedRead(const unordered_map<size_t, string> &chrom_lookup,
   BamAlignmentToMappedRead(chrom_lookup, ba_1, mr_1);
   BamAlignmentToMappedRead(chrom_lookup, ba_2, mr_2);
 
-  merge_mates(max_frag_len, mr_1, mr_2, mr);
+  return merge_mates(VERBOSE, max_frag_len, mr_1, mr_2, mr);
 
 }
 
@@ -235,18 +245,43 @@ main(int argc, const char **argv)  {
       if(bam_1.IsPaired() && bam_1.IsMapped() && 
 	 bam_1.IsProperPair() && bam_1.IsPrimaryAlignment()){
 	reader.GetNextAlignment(bam_2);
+	if(bam_2.IsMapped()){
 	// if the next read is not the mate, they will not have the same name
-	if(!same_read(bam_1, bam_2))
-	  throw SMITHLABException("Reads not sorted by name");
-	BamAlignmentPeToMappedRead(chrom_lookup, bam_1, bam_2, max_frag_len, mr);
+	  if(!same_read(bam_1, bam_2)){
+	    MappedRead mr_1, mr_2;
+	    BamAlignmentToMappedRead(chrom_lookup, bam_1, mr_1);
+	    BamAlignmentToMappedRead(chrom_lookup, bam_2, mr_2);
+	    const string sa(bam_1.Name);
+	    const string sb(bam_2.Name);
+	    cerr << sa << '\t' << mr_1 << endl;
+	    cerr << sb << '\t' << mr_2 << endl;
+	    throw SMITHLABException("Reads not sorted by name");
+	  }
+	  bool merge_success = BamAlignmentPeToMappedRead(VERBOSE, chrom_lookup, bam_1, bam_2, max_frag_len, mr);
+	  if(merge_success)
+	    out << mr << endl;
+	  else{
+	    MappedRead mr_1, mr_2;
+	    BamAlignmentToMappedRead(chrom_lookup, bam_1, mr_1);
+	    BamAlignmentToMappedRead(chrom_lookup, bam_1, mr_2);
+	    cerr << mr_1 << endl;
+	    cerr << mr_2 << endl;
+	    throw SMITHLABException("Problem merging mates");
+	  }
+	}
+	else{
+	  BamAlignmentToMappedRead(chrom_lookup, bam_1, mr);
+	  out << mr << endl;
+	}
       }
       // if the read is not a proper pair, convert it mapped reads
-      else if(bam_1.IsMapped() && bam_1.IsPrimaryAlignment())
+      else if(bam_1.IsMapped() && bam_1.IsPrimaryAlignment()){
 	BamAlignmentToMappedRead(chrom_lookup, bam_1, mr);
-      
+	out << mr << endl;
+      }
+
       // if the read is not mapped or is not primary alignment, do nothing
 
-      out << mr << endl;
     }
     reader.Close();
   }

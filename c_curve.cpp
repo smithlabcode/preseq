@@ -274,7 +274,7 @@ int main(int argc, const char **argv) {
   try {
     /* FILES */
     string outfile;
-    size_t lower_limit = 1000000;
+    //    size_t lower_limit = 1000000;
     size_t upper_limit = 0;
     size_t step_size = 1000000;
 
@@ -293,10 +293,10 @@ int main(int argc, const char **argv) {
 			   "<bed-file|bam-file>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false , outfile);
-        opt_parse.add_opt("lower", 'l', "lower limit for samples", 
-    		      false , lower_limit);
-	      opt_parse.add_opt("upper", 'u', "upper limit for samples", 
-    		      false , upper_limit);
+    //        opt_parse.add_opt("lower", 'l', "lower limit for samples", 
+    //		      false , lower_limit);
+    //	      opt_parse.add_opt("upper", 'u', "upper limit for samples", 
+    //		      false , upper_limit);
         opt_parse.add_opt("step", 's', "step size for samples", 
     		      false , step_size);
     opt_parse.add_opt("verbose", 'v', "print more run information", 
@@ -387,7 +387,8 @@ int main(int argc, const char **argv) {
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
     
     out << "total_reads" << "\t" << "distinct_reads" << endl;
-    for (size_t i = lower_limit; i <= upper_limit; i += step_size) {
+    out << 0 << '\t' << 0 << endl;
+    for (size_t i = step_size; i <= upper_limit; i += step_size) {
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;
       out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl;
