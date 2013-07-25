@@ -265,6 +265,33 @@ load_values(const string input_file_name, vector<double> &values) {
   return n_reads;
 }
 
+static void
+load_histogram(const string &filename, vector<double> &hist) {
+
+  std::ifstream in(filename.c_str());
+  if (!in)
+    throw SMITHLABException("could not open histogram: " + filename);
+
+  size_t line_count = 0ul, prev_read_count = 0ul;
+  string buffer;
+  while (getline(in, buffer)) {
+    ++line_count;
+    size_t read_count = 0ul;
+    double frequency = 0.0;
+    std::istringstream is(buffer);
+    if (!(is >> read_count >> frequency))
+      throw SMITHLABException("bad histogram line format:\n" +
+                              buffer + "\n(line " + toa(line_count) + ")");
+    if (read_count < prev_read_count)
+      throw SMITHLABException("bad line order in file " +
+                              filename + "\n(line " +
+                              toa(line_count) + ")");
+    hist.resize(read_count, 0ul);
+    hist.push_back(frequency);
+    prev_read_count = read_count;
+  }
+}
+
 void
 resample_hist(const gsl_rng *rng, const vector<double> &vals_hist,
 	      const double total_sampled_reads,
@@ -340,40 +367,34 @@ check_yield_estimates(const vector<double> &estimates) {
 }
 
 void
-estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values, 
+variance_bootstraps(const bool VERBOSE, const vector<double> &orig_hist,
 		    const size_t bootstraps, const size_t orig_max_terms, 
 		    const int diagonal, const double step_size, 
 		    const double max_extrapolation, const double dupl_level,
 		    const double tolerance, const size_t max_iter,
 		    vector<double> &Ylevel_estimates,
-		    vector< vector<double> > &yield_estimates) {
+		    vector< vector<double> > &yield_bootstrap_estimates) {
   // clear returning vectors
-  yield_estimates.clear();
+  yield_bootstrap_estimates.clear();
   
   //setup rng
   srand(time(0) + getpid());
   gsl_rng_env_setup();
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(rng, rand()); 
-
-  const size_t max_observed_count = 
-    static_cast<size_t>(*std::max_element(orig_values.begin(), 
-					  orig_values.end()));
-    
-  vector<double> orig_hist(max_observed_count + 1, 0.0);
-  for (size_t i = 0; i < orig_values.size(); ++i)
-    ++orig_hist[static_cast<size_t>(orig_values[i])];
   
-  const double vals_sum = accumulate(orig_values.begin(), orig_values.end(), 0.0);
+  const double vals_size = accumulate(orig_hist.begin(), orig_hist.end(), 0.0);
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < orig_hist.size(); i++)
+    vals_sum += i*orig_hist[i];
   const double max_val = max_extrapolation/vals_sum;
   
   for (size_t iter = 0; 
-       (iter < 4*bootstraps && yield_estimates.size() < bootstraps); ++iter) {
+       (iter < max_iter && yield_bootstrap_estimates.size() < bootstraps); ++iter) {
     
     vector<double> yield_vector;
     vector<double> hist;
-    resample_hist(rng, orig_hist, vals_sum,
-		  static_cast<double>(orig_values.size()), hist);
+    resample_hist(rng, orig_hist, vals_sum, vals_size, hist);
 
     const double initial_distinct = accumulate(hist.begin(), hist.end(), 0.0);
     
@@ -393,7 +414,7 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     }
     assert(umis.size() == static_cast<size_t>(vals_sum));
 
-    // compute complexity curve by random sampling w/out replacement
+    // interpolate complexity curve by random sampling w/out replacement
     size_t upper_limit = static_cast<size_t>(vals_sum);
     size_t step = static_cast<size_t>(step_size);
     size_t sample = step;
@@ -409,14 +430,12 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
       ++counts_before_first_zero;
     
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);
-    // refit curve for lower bound (degree of approx is 1 less than
-    // max_terms)
+    // degree of approx is 1 less than max_terms
     max_terms = max_terms - (max_terms % 2 == 0);
     
-    //refit curve for lower bound
     const ContinuedFractionApproximation 
       lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
-    
+    //refit curve for lower bound
     const ContinuedFraction 
       lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
     
@@ -432,24 +451,119 @@ estimates_bootstrap(const bool VERBOSE, const vector<double> &orig_values,
     
     // SANITY CHECK    
       if (check_yield_estimates(yield_vector)) {
-	yield_estimates.push_back(yield_vector);
+	yield_bootstrap_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
 	Ylevel_estimates.push_back(lower_cf.Ylevel(hist, dupl_level, vals_sum, 
-						   max_val, tolerance, max_iter));
+						   max_val, tolerance, 100));
 	}
       else if (VERBOSE){
-	cerr << "Y";
+	cerr << "_";
       }
     }
     else if (VERBOSE){
-      cerr << "C";
+      cerr << "_";
     }
     
   }
   if (VERBOSE)
     cerr << endl;
-  if (yield_estimates.size() < bootstraps)
+  if (yield_bootstrap_estimates.size() < bootstraps)
     throw SMITHLABException("too many iterations, poor sample");
+}
+
+static bool
+single_estimates(const bool VERBOSE, vector<double> &hist,
+		 size_t max_terms, const int diagonal, 
+		 const double step_size, const double max_extrapolation, 
+		 vector<double> &yield_estimate) {
+
+  //setup rng
+  srand(time(0) + getpid());
+  gsl_rng_env_setup();
+  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+  gsl_rng_set(rng, rand()); 
+  
+
+  yield_estimate.clear();
+  double vals_sum = 0.0;
+  for(size_t i = 0; i < hist.size(); i++)
+    vals_sum += i*hist[i];
+  const double initial_distinct = accumulate(hist.begin(), hist.end(), 0.0);
+
+  // const double max_val = max_extrapolation/vals_sum;
+  // const double val_step = step_size/vals_sum;
+
+    //construct umi vector to sample from
+  vector<size_t> umis;
+  size_t umi = 1;
+  for(size_t i = 1; i < hist.size(); i++){
+    for(size_t j = 0; j < hist[i]; j++){
+      for(size_t k = 0; k < i; k++)
+	umis.push_back(umi);
+      umi++;
+    }
+  }
+  assert(umis.size() == static_cast<size_t>(vals_sum));
+
+    // compute complexity curve by random sampling w/out replacement
+  size_t upper_limit = static_cast<size_t>(vals_sum);
+  size_t step = static_cast<size_t>(step_size);
+  size_t sample = step;
+  while(sample < upper_limit){
+    yield_estimate.push_back(sample_count_distinct(rng, umis, sample));
+    sample += step;
+  }
+  
+  // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+  size_t counts_before_first_zero = 1;
+  while (counts_before_first_zero < hist.size() && 
+	 hist[counts_before_first_zero] > 0)
+    ++counts_before_first_zero;
+
+
+  
+  // Ensure we are not using a zero term
+  max_terms = std::min(max_terms, counts_before_first_zero - 1);
+  
+  // refit curve for lower bound (degree of approx is 1 less than
+  // max_terms)
+  max_terms = max_terms - (max_terms % 2 == 0);
+  
+  //refit curve for lower bound
+  const ContinuedFractionApproximation 
+    lower_cfa(diagonal, max_terms, step_size, max_extrapolation);
+    
+  const ContinuedFraction 
+    lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
+       
+    //extrapolate the curve start
+  if (lower_cf.is_valid()){
+    double sample_size = static_cast<double>(sample);
+    while(sample_size < max_extrapolation){
+      double t = (sample_size - vals_sum)/vals_sum;
+      assert(t >= 0.0);
+      yield_estimate.push_back(initial_distinct + t*lower_cf(t));
+      sample_size += step_size;
+    }
+  }
+  else{
+    // FAIL!
+    // lower_cf unacceptable, need to bootstrap to obtain estimates
+    return false;
+  }
+
+  if (VERBOSE) {
+    cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
+    copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
+	 std::ostream_iterator<double>(cerr, "\n"));
+    
+    cerr << "CF_COEFF_ESTIMATES" << endl;
+    copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
+	 std::ostream_iterator<double>(cerr, "\n"));
+  }
+
+  // SUCCESS!!  
+  return true;
 }
 
 
@@ -463,43 +577,72 @@ alpha_log_confint_multiplier(const double estimate,
 
 
 static void
-vector_median_and_ci(const vector<vector<double> > &estimates,
-		     const double alpha, 
-		     vector<double> &median_estimates,
-		     vector<double> &lower_ci_lognormal, 
-		     vector<double> &upper_ci_lognormal) {
+vector_ci(const vector<vector<double> > &bootstrap_estimates,
+	  const double ci_level, const vector<double> &yield_estimates,
+	  vector<double> &lower_ci_lognormal, 
+	  vector<double> &upper_ci_lognormal) {
   
-  assert(!estimates.empty());
+  const double alpha = 1.0 - ci_level;
+  assert(!bootstrap_estimates.empty());
   
-  const size_t n_est = estimates.size();
-  vector<double> estimates_row(estimates.size(), 0.0);
-  for (size_t i = 0; i < estimates[0].size(); i++) {
+  const size_t n_est = bootstrap_estimates.size();
+  vector<double> estimates_row(bootstrap_estimates.size(), 0.0);
+  for (size_t i = 0; i < bootstrap_estimates[0].size(); i++) {
     
     // estimates is in wrong order, work locally on const val
     for (size_t k = 0; k < n_est; ++k)
-      estimates_row[k] = estimates[k][i];
+      estimates_row[k] = bootstrap_estimates[k][i];
     
     // sort to get confidence interval
-    sort(estimates_row.begin(), estimates_row.end());
-    const double curr_median = 
-      gsl_stats_median_from_sorted_data(&estimates_row[0], 1, n_est);
-    
-    median_estimates.push_back(curr_median);
     const double variance = gsl_stats_variance(&estimates_row[0], 1, n_est);
     const double confint_mltr = 
-      alpha_log_confint_multiplier(curr_median, variance, alpha);
-    lower_ci_lognormal.push_back(curr_median/confint_mltr);
-    upper_ci_lognormal.push_back(curr_median*confint_mltr);
+      alpha_log_confint_multiplier(yield_estimates[i], variance, alpha);
+    lower_ci_lognormal.push_back(yield_estimates[i]/confint_mltr);
+    upper_ci_lognormal.push_back(yield_estimates[i]*confint_mltr);
   }
 }
 
 static void
+vector_median_ci(const vector<vector<double> > &bootstrap_estimates,
+		 const double ci_level, vector<double> &yield_estimates,
+		 vector<double> &lower_ci_lognormal, 
+		 vector<double> &upper_ci_lognormal) {
+  
+  yield_estimates.clear();
+  const double alpha = 1.0 - ci_level;
+  assert(!bootstrap_estimates.empty());
+  
+  const size_t n_est = bootstrap_estimates.size();
+  vector<double> estimates_row(bootstrap_estimates.size(), 0.0);
+  for (size_t i = 0; i < bootstrap_estimates[0].size(); i++) {
+    
+    // estimates is in wrong order, work locally on const val
+    for (size_t k = 0; k < n_est; ++k)
+      estimates_row[k] = bootstrap_estimates[k][i];
+
+    sort(estimates_row.begin(), estimates_row.end());
+    const double median_estimate = 
+      gsl_stats_median_from_sorted_data(&estimates_row[0], 1, n_est);
+    
+    // sort to get confidence interval
+    const double variance = gsl_stats_variance(&estimates_row[0], 1, n_est);
+    const double confint_mltr = 
+      alpha_log_confint_multiplier(median_estimate, variance, alpha);
+    yield_estimates.push_back(median_estimate);
+    lower_ci_lognormal.push_back(median_estimate/confint_mltr);
+    upper_ci_lognormal.push_back(median_estimate*confint_mltr);
+  }
+}
+
+
+static void
 median_and_ci(const vector<double> &estimates,
-	      const double alpha,
+	      const double ci_level,
 	      double &median_estimate,
 	      double &lower_ci_estimate,
 	      double &upper_ci_estimate){
   assert(!estimates.empty());
+  const double alpha = 1.0 - ci_level;
   const size_t n_est = estimates.size();
   vector<double> sorted_estimates(estimates);
   sort(sorted_estimates.begin(), sorted_estimates.end());
@@ -517,7 +660,7 @@ median_and_ci(const vector<double> &estimates,
 static void
 write_predicted_curve(const string outfile, const double values_sum,
 		      const double c_level, const double step_size,
-		      const vector<double> &median_yield_estimates,
+		      const vector<double> &yield_estimates,
 		      const vector<double> &yield_lower_ci_lognormal,
 		      const vector<double> &yield_upper_ci_lognormal) {
   std::ofstream of;
@@ -532,9 +675,9 @@ write_predicted_curve(const string outfile, const double values_sum,
   out.precision(1);
   
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
-  for (size_t i = 0; i < median_yield_estimates.size(); ++i)
+  for (size_t i = 0; i < yield_estimates.size(); ++i)
     out << (i + 1)*step_size << '\t' 
-	<< median_yield_estimates[i] << '\t'
+	<< yield_estimates[i] << '\t'
 	<< yield_lower_ci_lognormal[i] << '\t' << yield_upper_ci_lognormal[i] << endl;
 }
 
@@ -545,12 +688,12 @@ main(const int argc, const char **argv) {
 
   try {
     
-    const size_t MIN_REQUIRED_COUNTS = 8;
+    const size_t MIN_REQUIRED_COUNTS = 5;
 
     /* FILES */
     string outfile;
     
-    size_t orig_max_terms = 100;
+    size_t orig_max_terms = 1000;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
     size_t bootstraps = 100;
@@ -564,6 +707,8 @@ main(const int argc, const char **argv) {
     bool VERBOSE = false;
     bool VALS_INPUT = false;
     bool PAIRED_END = false;
+    bool HIST_INPUT = false;
+    bool SINGLE_ESTIMATE = false;
     
 #ifdef HAVE_BAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -604,6 +749,12 @@ main(const int argc, const char **argv) {
     opt_parse.add_opt("vals", 'V', 
 		      "input is a text file containing only the observed counts",
 		      false, VALS_INPUT);
+    opt_parse.add_opt("hist", 'H', 
+		      "input is a text file containing the observed histogram",
+		      false, HIST_INPUT);
+    opt_parse.add_opt("quick",'Q',
+		      "quick mode, estimate yield without bootstrapping for confidence intervals",
+		      false, SINGLE_ESTIMATE);
     
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -626,49 +777,83 @@ main(const int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     /******************************************************************/
     
-    vector<double> values;
-    if(VALS_INPUT)
-      load_values(input_file_name, values);
+    vector<double> counts_hist;
+    double total_reads = 0.0;
+    size_t max_observed_count = 0;
+    double distinct_reads = 0.0;
+    
+    // LOAD VALUES
+    if(HIST_INPUT){
+      if(VERBOSE) 
+	cerr << "INPUT_HIST" << endl;
+      load_histogram(input_file_name, counts_hist);
+      for(size_t i = 0; i < counts_hist.size(); i++){
+	total_reads += i*counts_hist[i];
+      }
+      max_observed_count = counts_hist.size() - 1;
+      distinct_reads = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+    }
+    else{
+      vector<double> values;
+      if(VALS_INPUT){
+	if(VERBOSE)
+	  cerr << "VALS_INPUT" << endl;
+	load_values(input_file_name, values);
+      }
 #ifdef HAVE_BAMTOOLS
-    else if (BAM_FORMAT_INPUT && PAIRED_END)
-      load_values_BAM_pe(input_file_name, values);
-    else if(BAM_FORMAT_INPUT)
-      load_values_BAM_se(input_file_name, values);
+      else if (BAM_FORMAT_INPUT && PAIRED_END){
+	if(VERBOSE)
+	  cerr << "PAIRED_END_BAM_INPUT" << endl;
+	load_values_BAM_pe(input_file_name, values);
+      }
+      else if(BAM_FORMAT_INPUT){
+	if(VERBOSE)
+	  cerr << "BAM_INPUT" << endl;
+	load_values_BAM_se(input_file_name, values);
+      }
 #endif
-    else if(PAIRED_END)
-      load_values_BED_pe(input_file_name, values);  
-    else
-      load_values_BED_se(input_file_name, values);
-
+      else if(PAIRED_END){
+	cerr << "PAIRED_END_BED_INPUT" << endl;
+	load_values_BED_pe(input_file_name, values);
+      }  
+      else{
+	if(VERBOSE)
+	  cerr << "BED_INPUT" << endl;
+	load_values_BED_se(input_file_name, values);
+      }
     
     // JUST A SANITY CHECK
-    const double total_reads = accumulate(values.begin(), values.end(), 0.0);
+      total_reads = accumulate(values.begin(), values.end(), 0.0);
+
+
+      max_observed_count = 
+	static_cast<size_t>(*std::max_element(values.begin(), values.end()));
+
+      distinct_reads = static_cast<double>(values.size());
+
+    // BUILD THE HISTOGRAM
+      counts_hist.clear();
+      counts_hist.resize(max_observed_count + 1, 0.0);
+      for (size_t i = 0; i < values.size(); ++i)
+	++counts_hist[static_cast<size_t>(values[i])];
+    }
 
     // for large initial experiments need to adjust step size
     // otherwise small relative steps do not account for variance
     // in extrapolation
     if(step_size < (total_reads/20)){
-       step_size = std::max(step_size, step_size*round(total_reads/(20*step_size)));
-       if(VERBOSE)
-	 cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
+      step_size = std::max(step_size, step_size*round(total_reads/(20*step_size)));
+      if(VERBOSE)
+	cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
     }
        
-    const size_t max_observed_count = 
-      static_cast<size_t>(*std::max_element(values.begin(), values.end()));
-
-
-    
-    // BUILD THE HISTOGRAM
-    vector<double> counts_hist(max_observed_count + 1, 0.0);
-    for (size_t i = 0; i < values.size(); ++i)
-      ++counts_hist[static_cast<size_t>(values[i])];
     
     const size_t distinct_counts = 
       static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
 					bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
       cerr << "TOTAL READS     = " << total_reads << endl
-	   << "DISTINCT READS  = " << values.size() << endl
+	   << "DISTINCT READS  = " << distinct_reads << endl
 	   << "DISTINCT COUNTS = " << distinct_counts << endl
 	   << "MAX COUNT       = " << max_observed_count << endl
 	   << "COUNTS OF 1     = " << counts_hist[1] << endl
@@ -683,67 +868,106 @@ main(const int argc, const char **argv) {
       cerr << endl;
     }
 
-    // catch if all reads are distinct
+    // catch if all reads are distinct or sample sufficiently deep
     if (max_observed_count < MIN_REQUIRED_COUNTS)
       throw SMITHLABException("sample not sufficiently deep or duplicates removed");
     
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
-    // BOOTSTRAPS
+    // ESTIMATE COMPLEXITY CURVE
 
-    if(bootstraps < 10)
-      throw SMITHLABException("too few bootstraps, must be at least 10");
+    if(VERBOSE)
+      cerr << "[ESTIMATING YIELD CURVE]" << endl;
+    vector<double> yield_estimates;
+    bool SINGLE_ESTIMATE_SUCCESS = 
+      single_estimates(VERBOSE, counts_hist, orig_max_terms, diagonal,
+		       step_size, max_extrapolation, yield_estimates);
 
-    if (VERBOSE) 
-      cerr << "[BOOTSTRAP ESTIMATES]" << endl;
+    if(SINGLE_ESTIMATE){
+      // IF FAILURE, EXIT
+      if(!SINGLE_ESTIMATE_SUCCESS)
+	throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN FULL MODE FOR ESTIMATES");
+
+      std::ofstream of;
+      if (!outfile.empty()) of.open(outfile.c_str());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+  
+      out << "TOTAL_READS\tEXPECTED_DISTINCT" << endl;
+
+      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
+      out.precision(1);
+  
+      out << 0 << '\t' << 0 << endl;
+      for (size_t i = 0; i < yield_estimates.size(); ++i)
+	out << (i + 1)*step_size << '\t' 
+	    << yield_estimates[i] << endl;
+
+    }
+    else{
+      if (VERBOSE) 
+	cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
+  
+
+      if(VERBOSE && !SINGLE_ESTIMATE_SUCCESS)
+	cerr << "SINGLE ESTIMATE FAILED, NEED TO ESTIMATE MEDIAN FROM BOOTSTRAPS" << endl;
+      if(max_iter == 0)
+	max_iter = 4*bootstraps;
+    
+      vector<vector <double> > bootstrap_estimates;
+      vector<double> Ylevel_estimates;
+      variance_bootstraps(VERBOSE, counts_hist,  bootstraps, orig_max_terms,
+			  diagonal, step_size, max_extrapolation, dupl_level,
+			  tolerance, max_iter, Ylevel_estimates, bootstrap_estimates);
       
-    vector<vector <double> > yield_estimates;
-    vector<double> Ylevel_estimates;
-    estimates_bootstrap(VERBOSE, values,  bootstraps, orig_max_terms,
-			diagonal, step_size, max_extrapolation, dupl_level,
-			tolerance, max_iter, Ylevel_estimates, yield_estimates);
-      
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
-    if (VERBOSE)
-      cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
- 
-    // yield vector median and ci    
-    vector<double> median_yield_estimates;
-    vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal,
-      yield_upper_ci_quantile, yield_lower_ci_quantile;
-    vector_median_and_ci(yield_estimates, 1.0 - c_level, 
-			 median_yield_estimates, 
+      if (VERBOSE)
+	cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
+
+    // yield ci    
+      vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal,
+	yield_upper_ci_quantile, yield_lower_ci_quantile;
+
+      if(!SINGLE_ESTIMATE_SUCCESS){
+	// use bootstrap estimates to obtain median estimates
+	vector_median_ci(bootstrap_estimates, c_level, yield_estimates, 
 			 yield_lower_ci_lognormal, yield_upper_ci_lognormal);
-
+      }
+      else{
+	// use single estimates as the expected complexity curve
+	vector_ci(bootstrap_estimates, c_level, yield_estimates, 
+		  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
+      }
+      
     // Y50 median and ci
-    double Ylevel_median = 0.0;
-    double Ylevel_lower_ci = 0.0;
-    double Ylevel_upper_ci = 0.0;
-    median_and_ci(Ylevel_estimates, 1.0 - c_level, Ylevel_median,
-		  Ylevel_lower_ci, Ylevel_upper_ci);
+      double Ylevel_median = 0.0;
+      double Ylevel_lower_ci = 0.0;
+      double Ylevel_upper_ci = 0.0;
+      median_and_ci(Ylevel_estimates, c_level, Ylevel_median,
+		    Ylevel_lower_ci, Ylevel_upper_ci);
 
     
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
-    if (VERBOSE) 
-      cerr << "[WRITING OUTPUT]" << endl;
+      if (VERBOSE) 
+	cerr << "[WRITING OUTPUT]" << endl;
     
-    write_predicted_curve(outfile, total_reads, c_level, step_size,
-			  median_yield_estimates,
-			  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
+      write_predicted_curve(outfile, total_reads, c_level, step_size,
+			    yield_estimates, yield_lower_ci_lognormal, 
+			    yield_upper_ci_lognormal);
 
-    if(VERBOSE){
-      cerr << "Y" << 100*dupl_level << "MEASURE OF LIBRARY QUALITY: "
+      if(VERBOSE){
+	cerr << "Y" << 100*dupl_level << "MEASURE OF LIBRARY QUALITY: "
 	   << "EXPECTED # READS TO REACH "
-	   << 100*dupl_level << "% DUPLICATES" << endl;
-      cerr << "Y" << 100*dupl_level << " = " << Ylevel_median << endl;
-      cerr << 100*c_level << "%CI: (" << Ylevel_lower_ci << ", " 
-	   << Ylevel_upper_ci << ")" << endl;
-    } 
+	     << 100*dupl_level << "% DUPLICATES" << endl;
+	cerr << "Y" << 100*dupl_level << " = " << Ylevel_median << endl;
+	cerr << 100*c_level << "%CI: (" << Ylevel_lower_ci << ", " 
+	     << Ylevel_upper_ci << ")" << endl;
+      } 
+    }
       
   }
   catch (SMITHLABException &e) {
