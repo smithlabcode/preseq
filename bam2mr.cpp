@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <numeric>
 #include <cassert>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <tr1/unordered_map>
 

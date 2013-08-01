@@ -29,6 +29,7 @@
 #include <cassert>
 #include <complex>
 #include <limits>
+#include <sys/types.h>
 #include <unistd.h>
 
 using std::vector;

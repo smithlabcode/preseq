@@ -26,6 +26,9 @@
 #include <vector>
 #include <complex>
 #include <cassert>
+#include <unistd.h>
+
+
 
 struct ContinuedFraction {
   // Constructors

@@ -25,6 +25,8 @@
 #include <iomanip>
 #include <queue>
 #include <string>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>

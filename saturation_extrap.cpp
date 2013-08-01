@@ -23,6 +23,8 @@
 #include <numeric>
 #include <vector>
 #include <iomanip>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>

@@ -23,6 +23,8 @@
 #include <numeric>
 #include <vector>
 #include <iomanip>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>
@@ -700,7 +702,7 @@ main(const int argc, const char **argv) {
     int diagonal = -1;
     double c_level = 0.95;
     double tolerance = 1e-20;
-    size_t max_iter = 100;
+    size_t max_iter = 0;
     double dupl_level = 0.5;
     
     /* FLAGS */
