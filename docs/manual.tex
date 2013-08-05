@@ -22,7 +22,7 @@
 
 
 
-\section{Quick Start}
+\section*{Quick Start}
 \label{chap:quickstart}
 \newcommand{\fn}[1]{\texttt{#1}}
 
@@ -48,6 +48,8 @@ of future experiments, in essence looking into the future
 for hypothetical experiments.  \fn{lc\_extrap} is used to predict 
 the yield and then \fn{c\_curve} can be used to check the yield
 from the larger experiment.
+
+\newpage
 
 \section{Installation}
 \label{sec:install}
@@ -96,6 +98,8 @@ in \textbf{preseq/}.
 
 If a BAM file is used as input without first having run \begingroup \fontsize{9pt}{11pt}\selectfont  \fn{\$ make all BAMTOOLS\_ROOT=/loc/of/bamtools}\endgroup, then the following error will occur: \begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup. 
 
+\newpage
+
 \section{Using preseq}
 \label{sec:usage}
 
@@ -124,6 +128,8 @@ options are available and are detailed below.
 \begin{alltt}
 $ ./lc_extrap -o future_yield.txt input.txt 
 \end{alltt}\endgroup
+
+\newpage
 
 \section{File Format}
 \label{sec:format}
@@ -176,6 +182,7 @@ More complicated unique molecular identifiers
 can be used, such as mapping position plus a random barcode,
 but are too complicated to detail in this manual. For questions with such usage, please contact us at \href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
 
+\newpage
 
 \section{Detailed usage}
 \label{chap:detail}
@@ -235,6 +242,7 @@ of the input file.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q\endgroup] Computes the expected yield without confidence intervals and avoids bootstrapping for significantly faster computations 
 \end{description}
 
+\newpage
 
 \section{lc\_extrap Examples}
 \label{sec:examples}
@@ -248,16 +256,16 @@ $ ./lc_extrap -o future_yield.txt input.bed
 
 
 TOTAL_READS    EXPECTED_DISTINCT  LOGNORMAL_LOWER_95%CI  LOGNORMAL_UPPER_95%CI
-0       		      0       				          0       						              0
-1000000.0		     955978.6		          953946.4		              958015.1
-2000000.0		     1897632.0	         1892888.4	             1902387.5
-3000000.0		     2829410.5	         2819146.4	             2839712.0
-4000000.0		     3751924.0	         3732334.5	             3771616.2
+0                             0                                           0                                                                   0
+1000000.0                    955978.6                     953946.4                            958015.1
+2000000.0                    1897632.0           1892888.4                   1902387.5
+3000000.0                    2829410.5           2819146.4                   2839712.0
+4000000.0                    3751924.0           3732334.5                   3771616.2
 ....
 
 
 
-9999000000.0	  185394069.4     		  76262245.8             450694319.0
+9999000000.0      185394069.4                     76262245.8             450694319.0
 
 \end{alltt}\endgroup
 
@@ -280,29 +288,29 @@ MAX COUNT       = 269
 COUNTS OF 1     = 511413
 MAX TERMS       = 100
 OBSERVED COUNTS (270)
-1	511413
-2	2202
-3	597
+1       511413
+2       2202
+3       597
 \end{alltt}\endgroup
 
 
 
 \paragraph{Using a sorted read file in BED format as input, with options}~\\
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+\begingroup \fontsize{8pt}{10pt}\selectfont \begin{alltt}
 $ ./lc_extrap -e 15000000 -s 500000 -b 90 -c .90 -o future_yield.txt input.bed 
 
 
 TOTAL_READS    EXPECTED_DISTINCT  LOGNORMAL_LOWER_90%CI  LOGNORMAL_UPPER_90%CI
-0       		      0       				          0       						              0
-500000.0	      481098.5        				  480329.1        					      481869.1
-1000000.0      956070.6        				  954493.7        					      957650.2
-1500000.0      1428183.4       				  1425461.7       					      1430910.2
-2000000.0      1897886.0       				  1892501.7       					      1903285.7
+0                             0                                           0                                                                   0
+500000.0              481098.5                                    480329.1                                                    481869.1
+1000000.0      956070.6                                   954493.7                                                    957650.2
+1500000.0      1428183.4                                  1425461.7                                                   1430910.2
+2000000.0      1897886.0                                  1892501.7                                                   1903285.7
 ....
 
 
 
-14500000.0     12932529.0      				  12056525.8      				     	13872180.9
+14500000.0     12932529.0                                 12056525.8                                            13872180.9
 \end{alltt}\endgroup
 
 Notice the slight changes, with the step sizes of the extrapolation now at 500,000 as specified, and the maximum extrapolations ending at 15,000,000. The confidence intervals are now at a level of 90\%. 
@@ -313,16 +321,16 @@ Notice the slight changes, with the step sizes of the extrapolation now at 500,0
 
 \fn{lc\_extrap} allows the input file to be an observed histogram. An example of the format of this histogram is as followed:
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-1	1.68166e+07
-2	4.55019e+06
-3	1.93787e+06
-4	1.07257e+06
-5	708034
-6	513134
-7	384077
-8	282560
-9	206108
-10	146334
+1       1.68166e+07
+2       4.55019e+06
+3       1.93787e+06
+4       1.07257e+06
+5       708034
+6       513134
+7       384077
+8       282560
+9       206108
+10      146334
 \end{alltt}\endgroup
 
 The following command will give output of the same format as the above examples.\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./lc_extrap -o future_yield.txt -H histogram.txt \end{alltt}\endgroup
@@ -331,7 +339,9 @@ Similarly, both \fn{lc\_extrap} and \fn{c\_curve} allow the option to input read
 
 \newpage
 
-\section{Screening multiple libraries}
+\section{preseq application examples}
+
+\subsection*{Screening multiple libraries}
 \label{sec:multlib}
 This section provides a more detailed example using data from different experiments to illustrate how preseq might be applied. Because it is important to avoid spending time on low complexity samples, it is important to decide after observing an initial experiment whether or not it is beneficial to continue with sequencing. The data in this example comes from a study (accession number SRA061610) using single cell sperm cells amplified by Multiple Annealing and Looping Based Amplification Cycles (MALBAC)~\cite{lu2012probing} and focuses on three libraries coming from different experiments from the study (SRX205369, SRX205370, SRX205372). 
 
@@ -340,7 +350,8 @@ These libraries help show what would be considered a relatively poor library and
 \newline
 \begin{figure}[h!]
 \centering
-\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 0cm 0cm 2cm, clip = true]{/Users/Vicky/Desktop/WORK/InitialExperimentComplexityCurves_copy.pdf}}
+\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 0cm 0cm 2cm, clip = true]{InitialExperimentComplexityCurves_copy.pdf}}
+\caption{Initial observed complexities}
 \end{figure}
 
 With such a relatively small amount of reads sequenced, it is hard in the first stages of a study to guess at whether it is not worth sequencing a library further, as all three libraries seem to be relatively good. 
@@ -350,14 +361,55 @@ This is a comparison of the full experiment complexity curves and the extrapolat
 \newline
 \begin{figure}[h!]
 \centering
-\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 0cm 0cm 2cm, clip = true]{/Users/Vicky/Desktop/WORK/FullExperiment_copy.pdf}}
+\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 0cm 0cm 2cm, clip = true]{FullExperiment_copy.pdf}}
+\caption{Estimated versus observed library complexities.}
 \end{figure}
+
 
 \newpage
 
 
+\subsection*{Saturation of reads and junctions for RNA sequencing experiments}
 
+A recent paper from the Rinn lab~\cite{mercer2011targeted}
+developed a targeted capture RNA sequencing
+protocol to deeply investigate chosen portions of the transcriptome.  
+A comparison of the results from a standard RNA sequencing
+experiment (RNA-seq; SRA accession SRX061769) and a targeted capture RNA sequencing
+experiment (Capture-seq; SRA accession SRX061768) reveals
+a startling amount of transcriptional complexity missed by standard
+RNA sequencing in the targeted regions.  A large number of
+rare transcriptional events such as alternative splices, alternative isoforms,
+and long non-coding RNAs were newly identified with the targeted sequencing.
 
+A current vigorous debate exists on whether these rare events are truly transcriptional
+events or are merely due to sequencing or transcriptional noise 
+(see~\cite{van2010most} and~\cite{clark2011reality}).  We do not seek to address
+these issues, but merely to comment on the true complexity
+of rare transcriptional events in sequencing libraries identified by current
+protocols.
+
+We took the two Illumina sequencing libraries from~\cite{mercer2011targeted} and
+mapped them according to the protocol given.  We downsampled $10 \%$ of the library
+and compared the estimated library complexities (single end) with the observed library
+complexity for both libraries.  We also took the junction information contained in the file
+junctions.bed in the Tophat output folder to estimate the junction complexity.  To
+obtain a value text file suitable for preseq, we simply cut out the 5th column of the 
+junctions.bed file.  
+
+\begin{figure}[h!]
+\centering{\includegraphics[width=15cm]{compare_RNA_Capture_junction_complexity.pdf}}
+\caption{A comparison of complexities of standard RNA-seq and 
+targeted capture RNA-seq.}
+\end{figure}
+
+We see from the estimated library that the RNA-seq library is far
+from saturated, while it appears that the Capture-seq library
+may be close.  On the other hand, the junction complexity of
+both libraries indicates that the full scope of juctions identified
+by Tophat is far from saturated in both libraries.  This indicates
+that large number of rare junctions still remain to be identified
+in the libraries.
 
 
 
@@ -367,7 +419,7 @@ This is a comparison of the full experiment complexity curves and the extrapolat
 
 
 \bibliographystyle{plain}
-\bibliography{biblio}{}
+\bibliography{biblio}
 
 
 
@@ -385,12 +437,12 @@ Here are three different examples that help show what would be considered a rela
 
 Notice how closely the red and blue curves follow each other. A deviation will come in the full experiment, as seen in the next figure. 
 \newpage
-This is a comparison of the full experiment complexity curves and the extrapolated complexity curves created using information from the initial experiments above as input. The dashed lines indicate the complexity curves predicted by \fn{lc\_extrap}, and the solid lines are the expected complexity curves of the full experiments, obtained using \fn{c\_curve}.  Using this, it is clear that the green lines represent a poor library, while the red and blue lines are relatively good. Note that the dashed curves follow the solid curves very closely, only differing slightly towards the end. 
+This is a comparison of the full experiment complexity curves and the extrapolated complexity curves created using information from the initial experiments above as input. The dashed lines indicate the complexity curves predicted by \fn{lc\_extrap}, and the solid lines are the expected complexity curves of the full experiments, obtained using \fn{c\_curve}.  Using this, it is clear that the green lines represent a poor library, while the red and blue lines are relatively good. Note that the dashed curves follow the solid curves very closely, only differing slightly towards the end.
 \newline
 \newline
 \begin{figure}[h!]
 \centering
-\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 2.8cm 0cm 2cm, clip = true]{/Users/Vicky/Desktop/WORK/FullExperiment_copy.pdf}}
+\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 2.8cm 0cm 2cm, clip = true]{FullExperiment_copy.pdf}}
 \end{figure}
 \end{comment}
 
