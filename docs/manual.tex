@@ -1,6 +1,6 @@
 \documentclass[11pt, titlepage]{article}
 
-\usepackage{times,fullpage,graphicx,amsmath, cite, alltt, enumitem, titlesec, verbatim}
+\usepackage{times,fullpage,graphicx,amsmath, cite, alltt, enumitem, titlesec, verbatim, array}
 \usepackage[pdfborder={0 0 0}]{hyperref}
 
 \usepackage{subfigure}
@@ -253,21 +253,27 @@ Usage and output of \fn{c\_curve} is similar, so the following examples are of \
 \paragraph{Using a sorted read file in BED (or BAM with the \fn{-B} flag) format as input}~\\
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
 $ ./lc_extrap -o future_yield.txt input.bed
-
-
-TOTAL_READS    EXPECTED_DISTINCT  LOGNORMAL_LOWER_95%CI  LOGNORMAL_UPPER_95%CI
-0                             0                                           0                                                                   0
-1000000.0                    955978.6                     953946.4                            958015.1
-2000000.0                    1897632.0           1892888.4                   1902387.5
-3000000.0                    2829410.5           2819146.4                   2839712.0
-4000000.0                    3751924.0           3732334.5                   3771616.2
-....
-
-
-
-9999000000.0      185394069.4                     76262245.8             450694319.0
-
 \end{alltt}\endgroup
+
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{llll}
+
+TOTAL\_READS &  EXPECTED\_DISTINCT  & LOGNORMAL\_LOWER\_95\%CI  & LOGNORMAL\_UPPER\_95\%CI \\ \hline
+0 & 0 & 0 & 0\\
+1000000.0 & 955978.6 & 953946.4 & 958015.1\\
+2000000.0 & 1897632.0 & 1892888.4 & 1902387.5\\
+3000000.0 & 2829410.5 & 2819146.4 & 2839712.0\\
+4000000.0 & 3751924.0 & 3732334.5 & 3771616.2\\
+. & . & . & .\\
+. & . & . & .\\
+. & . & . & .\\
+. & . & . & .\\
+9999000000.0 & 185394069.4 & 76262245.8 & 450694319.0\\
+\end{tabular}
+\end{table}
+
+
 
 This example uses a sorted read file in BED format from an initial experiment generated from single sperm cells. 
 As noted above, the default step size between yield estimates is 1 million, the default confidence interval level is 95\%, and the default extrapolation length is 10 billion. 
@@ -296,26 +302,29 @@ OBSERVED COUNTS (270)
 
 
 \paragraph{Using a sorted read file in BED format as input, with options}~\\
-\begingroup \fontsize{8pt}{10pt}\selectfont \begin{alltt}
+\begingroup \fontsize{9pt}{10pt}\selectfont \begin{alltt}
 $ ./lc_extrap -e 15000000 -s 500000 -b 90 -c .90 -o future_yield.txt input.bed 
-
-
-TOTAL_READS    EXPECTED_DISTINCT  LOGNORMAL_LOWER_90%CI  LOGNORMAL_UPPER_90%CI
-0                             0                                           0                                                                   0
-500000.0              481098.5                                    480329.1                                                    481869.1
-1000000.0      956070.6                                   954493.7                                                    957650.2
-1500000.0      1428183.4                                  1425461.7                                                   1430910.2
-2000000.0      1897886.0                                  1892501.7                                                   1903285.7
-....
-
-
-
-14500000.0     12932529.0                                 12056525.8                                            13872180.9
 \end{alltt}\endgroup
+\newpage
+
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{llll}
+TOTAL\_READS & EXPECTED\_DISTINCT & LOGNORMAL\_LOWER\_90\%CI & LOGNORMAL\_UPPER\_90\%CI \\ \hline
+0 & 0 & 0 & 0 \\
+500000.0 & 481098.5 & 480329.1 & 481869.1 \\
+1000000.0 & 956070.6 & 954493.7 & 957650.2 \\
+1500000.0 & 1428183.4 & 1425461.7 & 1430910.2 \\
+2000000.0 & 1897886.0 & 1892501.7 & 1903285.7 \\
+. & . & . & .\\
+. & . & . & .\\
+. & . & . & .\\
+. & . & . & .\\
+14500000.0 & 12932529.0 & 12056525.8 & 13872180.9\\
+\end{tabular}
+\end{table}
 
 Notice the slight changes, with the step sizes of the extrapolation now at 500,000 as specified, and the maximum extrapolations ending at 15,000,000. The confidence intervals are now at a level of 90\%. 
-
-
 
 \paragraph{Using a histogram or read counts as input}~\\~\\[-.2cm]
 
@@ -424,26 +433,5 @@ in the libraries.
 
 
 
-
-
-\begin{comment}
-Here are three different examples that help show what would be considered a relatively poor library and a relatively good library, as well as compare the complexity curves obtained from running \fn{c\_curve} and \fn{lc\_extrap}. The black diagonal line represents an ideal library, in which every read is a distinct read. A full experiment is down sampled at 5\% to obtain a mock initial experiment, as shown here, where we have the complexity curves obtained by \fn{c\_curve} of the initial experiments:
-~\newline
-\newline
-\begin{figure}[h!]
-\centering
-\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 2cm 0cm 2cm, clip = true]{/Users/Vicky/Desktop/WORK/InitialExperimentComplexityCurves_copy.pdf}}
-\end{figure}
-
-Notice how closely the red and blue curves follow each other. A deviation will come in the full experiment, as seen in the next figure. 
-\newpage
-This is a comparison of the full experiment complexity curves and the extrapolated complexity curves created using information from the initial experiments above as input. The dashed lines indicate the complexity curves predicted by \fn{lc\_extrap}, and the solid lines are the expected complexity curves of the full experiments, obtained using \fn{c\_curve}.  Using this, it is clear that the green lines represent a poor library, while the red and blue lines are relatively good. Note that the dashed curves follow the solid curves very closely, only differing slightly towards the end.
-\newline
-\newline
-\begin{figure}[h!]
-\centering
-\centering{\includegraphics[totalheight = 0.5\textheight, trim=0cm 2.8cm 0cm 2cm, clip = true]{FullExperiment_copy.pdf}}
-\end{figure}
-\end{comment}
 
 \end{document}
