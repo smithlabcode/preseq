@@ -1,0 +1,23 @@
+preseq beta release 0.0.3 (Aug 5, 2013)
+
+------------------------------------------------------------------
+
+Notable changes in preseq software:
+
+  * Prediction of the complexity curve is done using the observed data
+    when possible.  Previous versions bootstrapped the histogram and
+    used the median estimate.  Bootstrapping is only done to compute
+    confidence intervals.
+
+  * Addition of quick mode option with flag -Q.  The complexity is 
+    predicted with the observed data and bootstrapping is not done,
+    speeding up the computation time tremendously.
+
+  * Fixed a bug associated with the unistd.h header for GCC versions
+    4.7+.  
+
+  * Extensively updated the manual with examples and FAQ
+
+If you have any questions, comments or bugs, please contact us at 
+tdaley@usc.edu.  Thank you for using preseq.
+

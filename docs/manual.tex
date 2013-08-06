@@ -2,10 +2,22 @@
 
 \usepackage{times,fullpage,graphicx,amsmath, cite, alltt, enumitem, titlesec, verbatim, array}
 \usepackage[pdfborder={0 0 0}]{hyperref}
+\usepackage{lipsum}
+\newcounter{question}
+\setcounter{question}{0}
 
 \usepackage{subfigure}
 
+\newcommand\Que[1]{%
+   \leavevmode\par
+   \stepcounter{question}
+   \noindent
+   \thequestion. Q --- #1\par}
 
+\newcommand\Ans[1]{%
+    \leavevmode\par\noindent
+   {\leftskip37pt
+    A. --- #1 \par }}
 
 
 \newcommand{\supth}{{\mathrm{th}}}
@@ -14,15 +26,17 @@
 \titleformat*{\paragraph}{\large\bfseries}
 
 
-\title{preseq Manual}
+\title{The Preseq Manual}
 \author{Timothy Daley \and Victoria Helus \and Andrew Smith }
 
 \begin{document}
 \maketitle
 
+\tableofcontents
 
+\newpage
 
-\section*{Quick Start}
+\section{Quick Start}
 \label{chap:quickstart}
 \newcommand{\fn}[1]{\texttt{#1}}
 
@@ -364,7 +378,7 @@ These libraries help show what would be considered a relatively poor library and
 \end{figure}
 
 With such a relatively small amount of reads sequenced, it is hard in the first stages of a study to guess at whether it is not worth sequencing a library further, as all three libraries seem to be relatively good. 
-\newpage
+
 This is a comparison of the full experiment complexity curves and the extrapolated complexity curves created using information from the initial experiments above as input. The dashed lines indicate the complexity curves predicted by \fn{lc\_extrap}, and the solid lines are the expected complexity curves of the full experiments, obtained using \fn{c\_curve}. Note that the dashed curves follow the solid curves very closely, only differing slightly towards the end, meaning \fn{lc\_extrap} gives a good predicted yield curve.  Using this, it is clear that if the initial experiments were the only available data and \fn{lc\_extrap} was run, SRX205372 would likely be discarded, as it is a poor library, and SRX205369 and SRX205370 would probably be used for further sequencing, as their complexity curves indicate that sequencing more would yield enough information to justify the costs.  If the researcher were to only want to sequence one library deep, then SRX205370 would be an obvious choice. 
 \newline
 \newline
@@ -402,14 +416,25 @@ We took the two Illumina sequencing libraries from~\cite{mercer2011targeted} and
 mapped them according to the protocol given.  We downsampled $10 \%$ of the library
 and compared the estimated library complexities (single end) with the observed library
 complexity for both libraries.  We also took the junction information contained in the file
-junctions.bed in the Tophat output folder to estimate the junction complexity.  To
-obtain a value text file suitable for preseq, we simply cut out the 5th column of the 
-junctions.bed file.  
+junctions.bed in the Tophat output folder to estimate the junction complexity.  Since
+the 5th column (excluding the first line) is the number of times each
+distinct junction is observed, we can simply cut out these values as input for
+\fn{lc\_extrap} or \fn{c\_curve} with the flag \fn{-V}.  A simple command line example follows.
+
+\begin{verbatim}
+sed '1d' tophat/junctions.bed | cut -f 5  > junction_vals.txt
+~/preseq/lc_extrap -V -o junction_vals_extrap.txt junction_vals.txt
+\end{verbatim}
+
+The output \fn{TOTAL\_READS} column will be in terms of the number of 
+total junctions (not reads), so scaling by the average number of junctions per 
+read will give the appropriate scale for plotting on the x-axis.  
 
 \begin{figure}[h!]
-\centering{\includegraphics[width=15cm]{compare_RNA_Capture_junction_complexity.pdf}}
+\centering{\includegraphics[width=14cm]{compare_RNA_Capture_junction_complexity.pdf}}
 \caption{A comparison of complexities of standard RNA-seq and 
-targeted capture RNA-seq.}
+targeted capture RNA-seq.  Estimated complexities for both cases were 
+estimated using 10\% of the data.}
 \end{figure}
 
 We see from the estimated library that the RNA-seq library is far
@@ -421,11 +446,61 @@ that large number of rare junctions still remain to be identified
 in the libraries.
 
 
+\newpage
 
 
+\section{FAQ}
+
+\Que{I compile the preseq binaries but receive the error 
+
+\fn{terminate called after throwing an instance of 'std::string'}
+}
+
+\Ans{This error is typically called because either the flag -B was not included to 
+specify bam input or because the linking to bamtools was not included when
+compiling preseq.  To ensure that the linking was done properly, check for the flag
+\fn{-DHAVE\_BAMTOOLS}.}
+
+\Que{I receive the error 
+
+\fn{ERROR:  too many iterations, poor sample}
+
+when running \fn{lc\_extrap}
+}
+
+\Ans{
+There are a number of causes for this.  Most commonly this is due to the presence of
+defects in the approximation which cause the estimates to be unstable.  Setting the step
+size larger (with the flag \fn{-s}) will help to avoid the defects.  The default step size is 1M reads or
+0.05\% of the input sample size rounded up to the nearest million, whichever is larger.  
+A consequence of this action will be a reduction in the observed smoothness of the curve.
+}
 
 
+\Que{When running \fn{lc\_extrap}, I receive the error 
 
+\fn{sample not sufficiently deep or duplicates removed}
+}
+
+\Ans{There may be two causes for this, either duplicates have been removed and 
+every observed read is distinct or there is not sufficient variation in the library for 
+\fn{lc\_extrap} to run.
+
+The information required by \fn{lc\_extrap} is essentially the number of times each
+distinct read was observed, which we call the duplicate counts.  
+Without sufficient variation in the duplicate counts we cannot extrapolate the 
+complexity of the library.  We have set the minimum require max duplicate count
+(the largest number of times any read has been observed) to 5.  
+If the input library does not satisfy this, then either a parametric model such
+as a Poisson or Negative Binomial may be appropriate or deeper
+sequencing may be required.}
+
+\vspace{5mm}
+Any other questions can be sent to \href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}.
+The preseq software is still under development so we would appreciate any 
+advice or comments. Thanks!
+
+\newpage
 
 \bibliographystyle{plain}
 \bibliography{biblio}

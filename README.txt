@@ -1,4 +1,4 @@
-This is the README file for the first release of preseq.  The 
+This is the README file for the third release of preseq.  The 
 preseq package is aimed at predicting the yield of distinct 
 reads from a genomic library from an initial sequencing 
 experiment. The estimates can then be used to examine the utility 
@@ -10,7 +10,7 @@ CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
 tdaley@usc.edu
-http://smithlab.usc.edu
+http://smithlab.cmb.usc.edu
 
 SYSTEM REQUIREMENTS:
 ========================================================================
@@ -80,7 +80,7 @@ at the University of Southern California.
 LICENSE
 ========================================================================
 The preseq software for estimating complexity
-Copyright (C) 2012 Timothy Daley and Andrew D Smith and 
+Copyright (C) 2013 Timothy Daley and Andrew D Smith and 
 the University of Southern California
 
 This program is free software: you can redistribute it and/or modify
