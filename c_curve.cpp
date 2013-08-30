@@ -92,7 +92,7 @@ BamToGenomicRegion(const unordered_map<size_t, string> &chrom_lookup,
 
 
 
-// loads single end BAM file that returns the number of reads in type size_t (bytes)
+// loads single end BAM file that returns the number of reads 
 static size_t
 load_values_BAM_se(const string &input_file_name, vector<double> &values) { //pass in parameters: input file name, vector to hold the counts (unordered)
 
@@ -104,10 +104,10 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) { //pa
   RefVector refs = reader.GetReferenceData(); //vector "refs" to hold reference sequence entries
 
   unordered_map<size_t, string> chrom_lookup; //create unordered map "chrom_lookup"
-  for (size_t i = 0; i < refs.size(); ++i) //create variable "i" of type size_t, set to zero. when i < size of "refs" vector, 
+  for (size_t i = 0; i < refs.size(); ++i) //create variable "i", set to zero. when i < size of "refs" vector, 
     chrom_lookup[i] = refs[i].RefName; //set element in position "i" of chrom_lookup equal to the Name of the reference sequence in position "i" of "refs" vector
 
-  size_t n_reads = 0; //create variable "n_reads" of type size_t, set equal to 0. 
+  size_t n_reads = 0; //create variable "n_reads" , set equal to 0. 
   values.push_back(1.0); //take the vector holding the unordered counts, and add the value of 1.0 to the end of the vector
 
   SimpleGenomicRegion prev; // create object "prev" of class SimpleGenomicRegion (used for single end)
@@ -141,7 +141,7 @@ load_values_BAM_se(const string &input_file_name, vector<double> &values) { //pa
 
 
 
-//loads paired end BAM file and returns the number of reads in type size_t (bytes)
+//loads paired end BAM file and returns the number of reads 
 static size_t
 load_values_BAM_pe(const string &input_file_name, vector<double> &values) { //pass in parameters: input file name, vector to hold the counts (unordered)
 
@@ -156,7 +156,7 @@ load_values_BAM_pe(const string &input_file_name, vector<double> &values) { //pa
   for (size_t i = 0; i < refs.size(); ++i)//create variable "i" of type size_t, set to zero. when i < size of "refs" vector, 
     chrom_lookup[i] = refs[i].RefName;//set element in position "i" of chrom_lookup equal to the Name of the reference sequence in position "i" of "refs" vector
 
-  size_t n_reads = 0; //create variable "n_reads" of type size_t, set equal to 0. 
+  size_t n_reads = 0; //create variable "n_reads" , set equal to 0. 
   values.push_back(1.0); //take the vector holding the unordered counts, and add the value of 1.0 to the end of the vector
 
   GenomicRegion prev; // create object "prev" of class GenomicRegion (used for paired end)
@@ -187,7 +187,7 @@ load_values_BAM_pe(const string &input_file_name, vector<double> &values) { //pa
 
 
 
-//loads single end BED file and returns number of reads in type size_t 
+//loads single end BED file and returns number of reads 
 static size_t
 load_values_BED_se(const string input_file_name, vector<double> &values) { //pass in parameters: input file name, vector to hold counts (unordered)
 
@@ -199,7 +199,7 @@ load_values_BED_se(const string input_file_name, vector<double> &values) { //pas
  if (!(in >> prev)) //read in file to object "prev", but if object "prev" cannot read in file
    throw "problem reading from: " + input_file_name; //error message 
 
- size_t n_reads = 1; //create variable "n_reads" of type size_t, set equal to 1. 
+ size_t n_reads = 1; //create variable "n_reads", set equal to 1. 
  values.push_back(1.0); //take the vector holding the unordered counts, and add the value of 1.0 to the end of the vector
  while (in >> r) { //while "r" is reading in the next line of BED file
     if (r.same_chrom(prev) && r.get_start() < prev.get_start())  // if sequence in "r" is on the same chromosome as sequence in "prev" AND the start position of sequence in "r" is before the start position of that in "prev"
@@ -308,12 +308,12 @@ load_histogram(const string &filename, vector<double> &hist) { //pass in paramet
   }
 }
 
-//return how many distinct counts there are 
+//return how many distinct counts there are in a sample from a full set of UMIs (this is used to predict complexity for a library of a given size)
 static double
 sample_count_distinct(const gsl_rng *rng,
 		      const vector<size_t> &full_umis,
 		      const size_t sample_size) { //pass in parameters, a random number generator, a vector for UMIs, and the sample size
-  vector<size_t> sample_umis(sample_size); //create vector "sample_umis" of size passed in through parameters 
+  vector<size_t> sample_umis(sample_size); //create vector "sample_umis" with a size passed in through parameters 
   gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
 		 (size_t *)&full_umis.front(), full_umis.size(), 
 		 sizeof(size_t)); //fills sample_umis vector with however many elements indicated in sample_size, which are each of size "sizeof(size_t)", taken randomly from the elements in full_umis
@@ -398,60 +398,63 @@ int main(int argc, const char **argv) {
     
     // Setup the random number generator
     gsl_rng_env_setup();
-    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-    srand(time(0) + getpid());
-    gsl_rng_set(rng, rand());
+    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type 
+    srand(time(0) + getpid()); //give the random fxn a new seed
+    gsl_rng_set(rng, rand()); //initialize random number generator with the seed 
     
     if (VERBOSE)
       cerr << "loading mapped locations" << endl;
 
-    vector<double> values;
-    if(HIST_INPUT){
-      vector<double> counts_hist;
-      load_histogram(input_file_name, counts_hist);
+    vector<double> values; //create vector to hold counts 
+    if(HIST_INPUT){ //if the user chooses the option HIST_INPUT 
+      vector<double> counts_hist; // create vector to hold counts histogram
+      load_histogram(input_file_name, counts_hist); //use function to load file and fill counts histogram vector
 
-      double total_reads = 0.0;
-      for(size_t i = 0; i < counts_hist.size(); i++)
-	total_reads += i*counts_hist[i];
+      double total_reads = 0.0; 
+      for(size_t i = 0; i < counts_hist.size(); i++) 
+	total_reads += i*counts_hist[i]; //count the number of total reads using counts histogram. (for 1-counts, the number of counts = number of reads. for 2-counts, there are 2 reads corresponding to each 2-count, and so on) 
 
-      if(VERBOSE){
+      if(VERBOSE){ //if VERBOSE option is selected with HIST_INPUT, print the following to screen: 
 	cerr << "TOTAL READS     = " << total_reads << endl
 	     << "DISTINCT READS  = " << accumulate(counts_hist.begin(), 
-						   counts_hist.end(), 0.0) << endl
-	     << "MAX COUNT       = " << counts_hist.size() - 1 << endl
-	     << "COUNTS OF 1     = " << counts_hist[1] << endl;
+						   counts_hist.end(), 0.0) << endl //"accumulate" returns an accumulation of all the elements in the range from the beginning to the end of the counts hist
+	     << "MAX COUNT       = " << counts_hist.size() - 1 << endl 
+	     << "COUNTS OF 1     = " << counts_hist[1] << endl; 
 
 	cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
 	for (size_t i = 0; i < counts_hist.size(); i++)
 	  if (counts_hist[i] > 0)
-	    cerr << i << '\t' << counts_hist[i] << endl;
+	    cerr << i << '\t' << counts_hist[i] << endl; // in constructing the counts histogram to be printed to the screen, only show the bins that are nonempty 
 	cerr << endl;
       }
 
       for(size_t i = 1; i < counts_hist.size(); i++)
 	for(size_t j = 0; j < counts_hist[i]; j++)
-	  values.push_back(static_cast<double>(i));
+	  values.push_back(static_cast<double>(i)); //using the counts histogram, fill the "values" vector with the counts 
     }
     else{
-      if(VALS_INPUT)
-	load_values(input_file_name, values);
+      if(VALS_INPUT)// if user chooses option VALS_INPUT (to input file containing observed counts)
+	load_values(input_file_name, values); //use function to load file and fill the values vector 
 #ifdef HAVE_BAMTOOLS
-      else if (BAM_FORMAT_INPUT && PAIRED_END)
+	//if user decides to input BAM files 
+      else if (BAM_FORMAT_INPUT && PAIRED_END) //and paired end
 	load_values_BAM_pe(input_file_name, values);
-      else if(BAM_FORMAT_INPUT)
+      else if(BAM_FORMAT_INPUT) //or single end
 	load_values_BAM_se(input_file_name, values);
 #endif
-      else if(PAIRED_END)
+      else if(PAIRED_END) //if user chooses to input PAIRED END read files (but using default BED file format)
 	load_values_BED_pe(input_file_name, values);  
       else
-	load_values_BED_se(input_file_name, values);
+	load_values_BED_se(input_file_name, values); //single end BED files
 
-      if(VERBOSE){
+      if(VERBOSE){ //if VERBOSE is selected with any of the above inputs (VALS_INPUT, BAM/PE, BAM/SE, BED/PE, BED/SE) 
 	const size_t max_observed_count = 
-	  static_cast<size_t>(*std::max_element(values.begin(), values.end()));
-	vector<double> counts_hist(max_observed_count + 1, 0.0);
+	  static_cast<size_t>(*std::max_element(values.begin(), values.end())); //set the max observed count equal to the greatest count in the values vector)
+	vector<double> counts_hist(max_observed_count + 1, 0.0); // construct a vector for the counts histogram and fill it with 0's as placeholders
 	for (size_t i = 0; i < values.size(); ++i)
-	  ++counts_hist[static_cast<size_t>(values[i])];
+	  ++counts_hist[static_cast<size_t>(values[i])]; // construct the counts histogram based on the values vector (if in position "1", there is a value of "3", then in the "3" position in the histogram vector which would represent the "3" bin, we increase the frequency by 1)
+		  
+		  //same as above for VERBOSE option
     
 	cerr << "TOTAL READS     = " << accumulate(values.begin(), values.end(), 0.0) << endl
 	     << "DISTINCT READS  = " << values.size() << endl
@@ -466,24 +469,28 @@ int main(int argc, const char **argv) {
       }
     }
 
-    vector<size_t> full_umis;
-    for (size_t i = 0; i < values.size(); i++)
+    vector<size_t> full_umis; //make a vector to hold the UMIs
+    for (size_t i = 0; i < values.size(); i++) 
       for (size_t j = 0; j < values[i]; j++)
-	full_umis.push_back(i+1);
+	full_umis.push_back(i+1); //using consecutive numbers starting from 1 as identifiers, each unique molecule in "values" is represented by these UMIs and fills "full_umis" 
     
     if (upper_limit == 0)
-      upper_limit = full_umis.size();
+      upper_limit = full_umis.size(); //set upper limit to equal the number of molecules
     
+	  
+	//handles output of c_curve 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-    
+	  
+	  
+	//prints the complexity curve 
     out << "total_reads" << "\t" << "distinct_reads" << endl;
     out << 0 << '\t' << 0 << endl;
-    for (size_t i = step_size; i <= upper_limit; i += step_size) {
+    for (size_t i = step_size; i <= upper_limit; i += step_size) { //begin curve with set step size, and as long as the total reads are less than the upper limit, then 
       if (VERBOSE)
 	cerr << "sample size: " << i << endl;
-      out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl;
+      out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl; // two columns, one with the total reads, and the other with the predicted distinct reads, obtained from the function sample_count_distinct which randomly samples from the full_umi vector to get complexity information
     }
     
   }
