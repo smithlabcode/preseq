@@ -45,6 +45,7 @@ const double DERIV_DELTA = 1e-8;
 
 
 
+
 static double
 get_rescale_value(const double numerator, const double denominator) {
   const double rescale_val = fabs(numerator) + fabs(denominator);
@@ -75,18 +76,20 @@ get_rescale_value(const complex<double> numerator, const complex<double> denomin
    coefficients
 */ 
 static void
-quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
+quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) { //vector for power series coefficients & vector for continued fraction coefficients
   
-  const size_t depth = ps_coeffs.size();
-  vector< vector<double> > q_table(depth, vector<double>(depth+1, 0.0));
+  const size_t depth = ps_coeffs.size(); //degree of power series
+  vector< vector<double> > q_table(depth, vector<double>(depth+1, 0.0)); //an array that is depth x depth+1
   vector< vector<double> > e_table(depth, vector<double>(depth+1, 0.0));
 
-  for (size_t i = 0; i < depth-1; i++)
-    q_table[1][i] = ps_coeffs[i + 1]/ps_coeffs[i];
+  for (size_t j = 0; i < depth-1; j++) //fill first position in the q_table with a vector that holds the ratio of power series coeff Cn to Cn-1
+    q_table[1][j] = ps_coeffs[j + 1]/ps_coeffs[j];
   
-  for (size_t j = 0; j < depth-1; j++)
+  for (size_t j = 0; j < depth-1; j++) //fill first position in e_table with the quotient difference algorithm relation 
     e_table[1][j] = q_table[1][j + 1] - q_table[1][j] + e_table[0][j + 1];
-  
+    
+
+  //using intial values of E(i)(j)'s and Q(i)(j)'s, fill rest of the q table and e table
   for (size_t i = 2; i < depth; i++) {
     for (size_t j = 0; j < depth; j++)
       q_table[i][j] = q_table[i - 1][j + 1]*e_table[i - 1][j + 1]/e_table[i - 1][j];
@@ -94,10 +97,16 @@ quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
     for (size_t j = 0; j < depth; j++)
       e_table[i][j] = q_table[i][j + 1] - q_table[i][j] + e_table[i - 1][j + 1];
   }
+    
+    
   
-  cf_coeffs.push_back(ps_coeffs[0]);
+  cf_coeffs.push_back(ps_coeffs[0]); //add first power series coefficient to end of vector for continued fraction coefficients
+    
+
+  //setting coefficients for continued fraction 
   for (size_t i = 1; i < depth; ++i) {
-    if (i % 2 == 0)
+      //alternate appending the value in e[i][0] and value in q[i][0] (change signs) to the vector for cont. frac. coeffs
+    if (i % 2 == 0) 
       cf_coeffs.push_back(-e_table[i/2][0]);
     else
       cf_coeffs.push_back(-q_table[(i + 1)/2][0]);
@@ -106,11 +115,12 @@ quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
 
 
 // compute CF coeffs when upper_offset > 0
+//above the diagonal referring to degree of polynomial in numerator of Pade approximant is greater than degree of polynomial in the denominator 
 static void
 quotdiff_above_diagonal(const vector<double> &coeffs, const size_t offset,
-                        vector<double> &cf_coeffs, vector<double> &offset_coeffs) { 
+                        vector<double> &cf_coeffs, vector<double> &offset_coeffs) {  
   //first offset coefficients set to first offset coeffs
-  vector<double> holding_coeffs;
+  vector<double> holding_coeffs; 
   for (size_t i = offset; i < coeffs.size(); i++)
     holding_coeffs.push_back(coeffs[i]);
   
