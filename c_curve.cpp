@@ -30,9 +30,10 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
-#include "OptionParser.hpp"
-#include "smithlab_utils.hpp"
-#include "GenomicRegion.hpp"
+#include <OptionParser.hpp>
+#include <smithlab_utils.hpp>
+#include <GenomicRegion.hpp>
+#include <smithlab_os.hpp>
 
 using std::string;
 using std::vector;
@@ -226,7 +227,6 @@ load_values_BED_pe(const string input_file_name, vector<double> &values) {
    throw "problem opening file: " + input_file_name;
 
  GenomicRegion r, prev;
-	in.operator>>(prev);
  if (!(in >> prev))
    throw "problem reading from: " + input_file_name;
 

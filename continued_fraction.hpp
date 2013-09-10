@@ -49,42 +49,6 @@ struct ContinuedFraction {
                        const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
   
-  // Evaluate the continued fraction estimating read count 
-  // along a curve from 0 to max_value
-  void
-  extrapolate_count(const std::vector<double> &counts_hist,
-                    const double max_value,
-                    const double step_size,
-                    const size_t count,
-                    std::vector<double> &estimates) const;
- 
-
-  // Evaluate the continued fraction estimating # reads with mincount
-  // along curve from 0 to max_value
-  void
-  extrapolate_mincount(const std::vector<double> &counts_hist,
-                       const double max_value,
-                       const double step_size,
-                       const size_t mincount,
-                       std::vector<double> &estimates) const;
-  
-  // Evalute the continued fraction estimating saturation 
-  // along curve from 0 to max_value
-  void 
-  extrapolate_saturation(const std::vector<double> &counts_hist,
-                         const double vals_sum,
-                         const double max_value, 
-                         const double step_size,
-                         std::vector<double> &saturation) const;
-
-  // Evaluate the saturation along a curve from 0 to max_value
-  // by taking numerical derivative of the distinct continued fraction approx
-  void 
-  extrapolate_yield_deriv(const std::vector<double> &counts_hist,
-                          const double vals_sum,
-                          const double max_value, 
-                          const double step_size,
-                          std::vector<double> &saturation) const;
 
   // expected number of reads to reach 50% duplication
   double Ylevel(const std::vector<double> &counts_hist, const double dupl_level,
@@ -122,24 +86,6 @@ public:
   ContinuedFraction
   optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
 
-  // find best cont frac approx for estimating count
-  ContinuedFraction
-  optimal_cont_frac_count(const std::vector<double> &counts_hist,
-			  const size_t count) const;
-
-  // find best cont frac approx for estimating # reads w/ mincount
-  ContinuedFraction
-  optimal_cont_frac_mincount(const std::vector<double> &counts_hist,
-                             const size_t mincount, const int order) const;
-
-  ContinuedFraction
-  optimal_cont_frac_satur(const std::vector<double> &counts_hist) const;
-
-  // find a local maximum located btwn 0 & deriv_upper_bound
-  double
-  local_max(const ContinuedFraction &cf,
-            const double deriv_upper_bound) const;
-
 private:
   
   int diagonal_idx; // the diagonal to work with for estimates
@@ -147,8 +93,6 @@ private:
   double step_size; // the step size to use when training
   double max_value; // the largest value to check when training
 
-  double locate_zero_cf_deriv(const ContinuedFraction &cf, 
-                              const double val, const double prev_val) const;
   static const size_t MIN_ALLOWED_DEGREE = 5;
   
   // largest value to search for lowerbound and stability
