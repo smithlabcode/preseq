@@ -710,6 +710,9 @@ vector_median_ci(const vector<vector<double> > &bootstrap_estimates,
     double median_estimate, lower_ci_estimate, upper_ci_estimate;
     median_and_ci(estimates_row, ci_level, median_estimate,
 		  lower_ci_estimate, upper_ci_estimate);
+    yield_estimates.push_back(median_estimate);
+    lower_ci_lognormal.push_back(lower_ci_estimate);
+    upper_ci_lognormal.push_back(upper_ci_estimate);
   }
 }
 
