@@ -841,7 +841,7 @@ main(const int argc, const char **argv) {
     
     if(HIST_INPUT) 
       load_histogram(input_file_name, counts_hist); 
-    if(VALS_INPUT)
+    else if(VALS_INPUT)
 	load_values(input_file_name, counts_hist); 
 #ifdef HAVE_BAMTOOLS
 	//if user decides to input BAM files 
