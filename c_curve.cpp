@@ -463,7 +463,7 @@ int main(int argc, const char **argv) {
     vector<double> counts_hist;
     if(HIST_INPUT) 
       load_histogram(input_file_name, counts_hist); 
-    if(VALS_INPUT)
+    else if(VALS_INPUT)
 	load_values(input_file_name, counts_hist); 
 #ifdef HAVE_BAMTOOLS
 	//if user decides to input BAM files 

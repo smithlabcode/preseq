@@ -1,6 +1,6 @@
 /*    lc_extrap: extrapolate complexity curve
  *
- *    Copyright (C) 2012 University of Southern California and
+ *    Copyright (C) 2013 University of Southern California and
  *			 Andrew D. Smith and Timothy Daley
  *
  *    Authors: Andrew D. Smith and Timothy Daley
@@ -587,8 +587,6 @@ single_estimates(const bool VERBOSE, vector<double> &hist,
 	 hist[counts_before_first_zero] > 0)
     ++counts_before_first_zero;
 
-
-  
   // Ensure we are not using a zero term
   max_terms = std::min(max_terms, counts_before_first_zero - 1);
   
