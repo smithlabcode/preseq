@@ -49,21 +49,13 @@ struct ContinuedFraction {
                        const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
   
-
-  // expected number of reads to reach 50% duplication
-  double Ylevel(const std::vector<double> &counts_hist, const double dupl_level,
-		const double vals_sum, const double max_value,
-		const double tol, const size_t max_iter) const;
-
-  // Evaluate derivative by complex #s
-  double complex_deriv(const double val) const;
-
+  
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
 
-  // Return new ContinuedFraction with degree decrement less than CF
-  static ContinuedFraction decrease_degree(const ContinuedFraction &CF,
-                                           const size_t decrement);
+
+  static ContinuedFraction truncate_degree(const ContinuedFraction &fullCF,
+					   const size_t truncated_degree);
   
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -93,7 +85,7 @@ private:
   double step_size; // the step size to use when training
   double max_value; // the largest value to check when training
 
-  static const size_t MIN_ALLOWED_DEGREE = 5;
+  static const size_t MIN_ALLOWED_DEGREE = 4;
   
   // largest value to search for lowerbound and stability
   static const double SEARCH_MAX_VAL = 200; 

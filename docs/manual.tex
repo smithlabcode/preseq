@@ -1,6 +1,6 @@
 \documentclass[11pt, titlepage]{article}
 
-\usepackage{times,fullpage,graphicx,amsmath, cite, alltt, enumitem, titlesec, verbatim, array}
+\usepackage{times,fullpage,graphicx,amsmath, cite, alltt, enumitem, titlesec, verbatim, siunitx}
 \usepackage[pdfborder={0 0 0}]{hyperref}
 \usepackage{lipsum}
 \newcounter{question}
@@ -26,7 +26,7 @@
 \titleformat*{\paragraph}{\large\bfseries}
 
 
-\title{The Preseq Manual}
+\title{The preseq Manual}
 \author{Timothy Daley \and Victoria Helus \and Andrew Smith }
 
 \begin{document}
@@ -80,12 +80,12 @@ from the larger experiment.
 \textbf{preseq} runs on Unix-type system
 with GNU Scientific Library (GSL), available
 at ~\url{http://www.gnu.org/software/gsl/}.  
-If the input file is in BAM format, BamTools is
-required, available at ~\url{https://github.com/pezmaster31/bamtools}.
+If the input file is in BAM format, SAMTools is
+required, available at ~\url{http://samtools.sourceforge.net/}.
 If the input is 
 a text file of counts in a single column or is 
 in BED format, 
-BamTools is not required.
+SAMTools is not required.
 It has been tested on Linux and 
 Mac OS-X.  
 
@@ -103,14 +103,14 @@ $ make all
 \end{alltt}\endgroup
 
 The input file may possibly be in BAM format. If the root directory 
-of BamTools is \$bamtools, instead run
+of SAMTools is \$SAMTools, instead run
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ make all BAMTOOLS_ROOT=$bamtools
+$ make all SAMTOOLS_DIR=$SAMTools
 \end{alltt}\endgroup
-Output after typing this command should include the flag \fn{-DHAVE\_BAMTOOLS} if the linking is successful. If compiled successfully, the executable files are available
+Output after typing this command should include the flag \fn{-DHAVE\_SAMTOOLS} if the linking is successful. If compiled successfully, the executable file is available
 in \textbf{preseq/}. 
 
-If a BAM file is used as input without first having run \begingroup \fontsize{9pt}{11pt}\selectfont  \fn{\$ make all BAMTOOLS\_ROOT=/loc/of/bamtools}\endgroup, then the following error will occur: \begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup. 
+If a BAM file is used as input without first having run \begingroup \fontsize{9pt}{11pt}\selectfont  \fn{\$ make all SAMTOOLS\_DIR=/loc/of/SAMTools}\endgroup, then the following error will occur: \begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup. 
 
 \newpage
 
@@ -121,26 +121,26 @@ If a BAM file is used as input without first having run \begingroup \fontsize{9p
 \label{sub:basic}
 To generate the complexity plot of a genomic
 library from a read file in BED or BAM format or a duplicate count file,
-use the program \fn{c\_curve}.  Use
+use the function \fn{c\_curve}.  Use
 \fn{-o} to specify the output name.
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ ./c_curve -o complexity_output.txt input.bed
+$ ./preseq c_curve -o complexity_output.txt input.bed
 \end{alltt}\endgroup
 
 To estimate the future yield 
 of a genomic library
 using an initial experiment in BED  format,
-use the program \fn{lc\_extrap}.
+use the function \fn{lc\_extrap}.
 The required options are \fn{-o} to specify
 the output of the yield estimates and 
 the input file, which is either a BED
 file sorted by chromosome, end position, start
 position, and strand or a BAM file
-sorted with BamTools or SAMTools sort function. Additional 
+sorted with the SAMTools sort function. Additional 
 options are available and are detailed below. 
 \begingroup \fontsize{9pt}{12pt}\selectfont 
 \begin{alltt}
-$ ./lc_extrap -o future_yield.txt input.txt 
+$ ./preseq lc_extrap -o future_yield.txt input.txt 
 \end{alltt}\endgroup
 
 \newpage
@@ -159,16 +159,15 @@ by using the command line function sort as follows:
 sort -k 1,1 -k 2,2n -k 3,3n -k 6,6 input.bed > input.sort.bed
 \end{alltt}\endgroup
 BAM format read files should be sorted by chromosome and
-start position.  This can be done with either SAMTools (available at
-~\url{http://samtools.sourceforge.net/} ) or BamTools
-sort functions. If the input is in BAM format, then the flag
+start position.  This can be done with the SAMTools 
+sort function. If the input is in BAM format, then the flag
 \fn{-B} must be included.  
 
 If the input is paired end, the option \fn{-P} can be set.
-In this case only concordantly mapped reads are counted.
-This means that if either end does not map or if
-the mapping locations of the two ends are not compatible, the read
-is not counted.  If a large number of reads are disconcordant, then
+In this case concordantly mapped reads and disconcordantly
+mapped fragments are counted.  This means that both ends
+of a disconcordantly mapped read will each be counted separately.
+If a large number of reads are disconcordant, then
 the default single end should be used.  In this case only the mapping 
 location of the first mate
 is used as the unique molecular identifier~\cite{kivioja2011counting}.
@@ -188,9 +187,9 @@ For instance, a unique molecular identifier used may be the first
 20 bases in the observed sequence.  A command line argument
 to construct the counts would then be
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-awk '{if (NR%4==2) print substr($0,1,20);}' input.fastq | sort | uniq -c 
+awk '{\{ if (NR\%4==2) print substr($0,1,20); \}}' input.fastq | sort | uniq -c 
 \end{alltt}\endgroup
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}| awk '{print $1}' > counts.txt
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}| awk '{\{ print $1 \}}' > counts.txt
 \end{alltt}\endgroup
 More complicated unique molecular identifiers
 can be used, such as mapping position plus a random barcode,
@@ -215,8 +214,8 @@ of distinct reads.
 
 \begin{description}[style=multiline,leftmargin=6cm,font=\ttfamily]
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-o, -output\endgroup] Name of output file. Default prints to screen
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-s, -step\endgroup] The step size for samples. Default is 1 million reads
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-B, -bam\endgroup] Input file is in BAM format
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-P, -pe\endgroup] Input is a paired end read file
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-H, -hist\endgroup] Input is a text file of the observed histogram
@@ -230,7 +229,7 @@ of distinct reads.
 the expected yield for theoretical larger
 experiments and bounds on the number of distinct 
 reads in the library and the associated confidence
-intervals, which is computed by bootstrapping the observed duplicate count histogram.
+intervals, which is computed by bootstrapping the observed duplicate counts histogram.
 Output is a text file with four columns.  The
 first is the total number of reads, second
 gives the corresponding average
@@ -238,22 +237,24 @@ expected number of distinct reads, and the
 third and fourth give the lower and
 upper
 limits of the confidence interval.
-Specifying verbose will print out the histogram
+Specifying verbose will print out the counts histogram
 of the input file.  
 
 
 \begin{description}[style=multiline,leftmargin=6cm,font=\ttfamily]
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-o, -output\endgroup] Name of output file. Default prints to screen
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-e, -extrapolation\_length \endgroup]The maximum number of total reads to compute yield estimates for.  The default is 10 billion reads.
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-v, -verbose\endgroup] Prints more information
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-s, -step\endgroup] The step size between yield estimates. Default is 1 million reads
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-b, -bootstraps\endgroup] The number of bootstraps used to compute the confidence intervals. Default is 100
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-c, -cval\endgroup] Level for confidence intervals.  Default is 0.95
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-e, -extrap\endgroup] Max extrapolation. Default is \num{1e10}
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-s, -step\endgroup] The step size for samples. Default is 1 million reads
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-b, -bootstraps\endgroup] The number of bootstraps. Default is 100
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-c, -cval\endgroup] Level for confidence intervals. Default is 0.95
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-d, -dupl\_level\endgroup] Fraction of duplicates to predict. Default is 0.5
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-x, -terms\endgroup] Max number of terms for extrapolation. Default is 100
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-B, -bam\endgroup] Input file is in BAM format
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-P, -pe\endgroup] Input is a paired end read file
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-H, -hist\endgroup] Input is a text file of the observed histogram
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-V, -vals\endgroup] Input is a text file of read counts
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q\endgroup] Computes the expected yield without confidence intervals and avoids bootstrapping for significantly faster computations 
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q, -quick\endgroup] Quick mode, option to estimate yield without bootstrapping for confidence intervals
 \end{description}
 
 \newpage
@@ -266,7 +267,7 @@ Usage and output of \fn{c\_curve} is similar, so the following examples are of \
 
 \paragraph{Using a sorted read file in BED (or BAM with the \fn{-B} flag) format as input}~\\
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ ./lc_extrap -o future_yield.txt input.bed
+$ ./preseq lc_extrap -o future_yield.txt input.bed
 \end{alltt}\endgroup
 
 \begin{table}[ht!]
@@ -294,7 +295,7 @@ As noted above, the default step size between yield estimates is 1 million, the 
 
 \paragraph{Using a sorted read file in BED format as input, including the verbose option}~\\
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ ./lc_extrap -o future_yield.txt input.bed -v
+$ ./preseq lc_extrap -o future_yield.txt input.bed -v
 \end{alltt}\endgroup
 
 As \fn{lc\_extrap} is running, information will print to screen that gives a read counts histogram of the input file which truncates after the first bin value that has zero observations. Included here is the first 10 lines of what would be observed: 
@@ -311,15 +312,15 @@ OBSERVED COUNTS (270)
 1       511413
 2       2202
 3       597
+.
+.
 \end{alltt}\endgroup
 
-
-
+\newpage
 \paragraph{Using a sorted read file in BED format as input, with options}~\\
 \begingroup \fontsize{9pt}{10pt}\selectfont \begin{alltt}
-$ ./lc_extrap -e 15000000 -s 500000 -b 90 -c .90 -o future_yield.txt input.bed 
+$ ./preseq lc_extrap -e 15000000 -s 500000 -b 90 -c .90 -o future_yield.txt input.bed 
 \end{alltt}\endgroup
-\newpage
 
 \begin{table}[ht!]
  \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
@@ -356,13 +357,33 @@ Notice the slight changes, with the step sizes of the extrapolation now at 500,0
 10      146334
 \end{alltt}\endgroup
 
-The following command will give output of the same format as the above examples.\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./lc_extrap -o future_yield.txt -H histogram.txt \end{alltt}\endgroup
+The following command will give output of the same format as the above examples.\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./preseq lc_extrap -o future_yield.txt -H histogram.txt \end{alltt}\endgroup
 
-Similarly, both \fn{lc\_extrap} and \fn{c\_curve} allow the option to input read counts, which is just the histogram but with the bin values excluded (text file should contain ONLY the observed counts in a single column). Command should be run with the \fn{-V} flag: \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./lc_extrap -o future_yield.txt -V counts.txt \end{alltt}\endgroup
+Similarly, both \fn{lc\_extrap} and \fn{c\_curve} allow the option to input read counts (text file should contain ONLY the observed counts in a single column). For example, if a dataset had the following counts histogram:
+
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+1      4
+2      3
+3      1
+\end{alltt}\endgroup
+\newpage
+Then, the corresponding input file of just read counts could be as such:
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+1
+2
+1
+1
+3
+2
+2
+1
+\end{alltt}\endgroup
+
+Command should be run with the \fn{-V} flag (not to be confused with \fn{-v} for verbose mode): \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./preseq lc_extrap -o future_yield.txt -V counts.txt \end{alltt}\endgroup
 
 \newpage
 
-\section{preseq application examples}
+\section{preseq Application Examples}
 
 \subsection*{Screening multiple libraries}
 \label{sec:multlib}
@@ -423,7 +444,7 @@ distinct junction is observed, we can simply cut out these values as input for
 
 \begin{verbatim}
 sed '1d' tophat/junctions.bed | cut -f 5  > junction_vals.txt
-~/preseq/lc_extrap -V -o junction_vals_extrap.txt junction_vals.txt
+./preseq lc_extrap -V junction_vals.txt -o junction_vals_extrap.txt 
 \end{verbatim}
 
 The output \fn{TOTAL\_READS} column will be in terms of the number of 
@@ -451,25 +472,24 @@ in the libraries.
 
 \section{FAQ}
 
-\Que{I compile the preseq binaries but receive the error 
+\Que{I compile the preseq binary but receive the error 
 
 \fn{terminate called after throwing an instance of 'std::string'}
 }
 
 \Ans{This error is typically called because either the flag -B was not included to 
-specify bam input or because the linking to bamtools was not included when
+specify bam input or because the linking to samtools was not included when
 compiling preseq.  To ensure that the linking was done properly, check for the flag
-\fn{-DHAVE\_BAMTOOLS}.}
+\fn{-DHAVE\_SAMTOOLS}.}
 
-\Que{I receive the error 
+\Que{When running \fn{lc\_extrap}, I receive the error 
 
 \fn{ERROR:  too many iterations, poor sample}
 
-when running \fn{lc\_extrap}
 }
 
 \Ans{
-There are a number of causes for this.  Most commonly this is due to the presence of
+Most commonly this is due to the presence of
 defects in the approximation which cause the estimates to be unstable.  Setting the step
 size larger (with the flag \fn{-s}) will help to avoid the defects.  The default step size is 1M reads or
 0.05\% of the input sample size rounded up to the nearest million, whichever is larger.  
@@ -489,16 +509,43 @@ every observed read is distinct or there is not sufficient variation in the libr
 The information required by \fn{lc\_extrap} is essentially the number of times each
 distinct read was observed, which we call the duplicate counts.  
 Without sufficient variation in the duplicate counts we cannot extrapolate the 
-complexity of the library.  We have set the minimum require max duplicate count
-(the largest number of times any read has been observed) to 5.  
+complexity of the library.  We have set the minimum required max duplicate count
+(the largest number of times any read has been observed) to 4.  
 If the input library does not satisfy this, then either a parametric model such
 as a Poisson or Negative Binomial may be appropriate or deeper
 sequencing may be required.}
 
+\Que{When running \fn{lc\_extrap}, I receive the error 
+
+\fn{Library expected to saturate in doubling of size, unable to extrapolate}
+}
+
+\Ans{
+A simple two-fold extrapolation using the Good-Toulmin
+power series, which is within the radius of convergence and
+therefore rational function approximation is not needed,
+is performed to ensure that the sample is not overly saturated.
+If the Good-Toulmin formula is negative, this indicates that the
+library will likely completely saturate by doubling the experiment
+size and so extrapolation is not needed.  Often this will occur
+if the number of reads observed twice ($n_{2}$) is greater than the number 
+of reads observed once ($n_{1}$).  In this case one can use 
+simple estimators like Chao's~\cite{chao1987estimating} ($n_{1}^2 / 2 n_{2}$)
+or Zelterman's~\cite{zelterman1988robust} 
+($1 / (exp(2 n_{2}/ n_{1}) - 1)$) can be used to estimate
+the number of remaining in the library.
+}
+
 \vspace{5mm}
-Any other questions can be sent to \href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}.
+If none of these solutions worked, please email us at 
+\href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
+and please include the standard output from running preseq in
+verbose mode (specifically the duplicate counts histogram) so 
+that we can look into the problem and rectify problems in future
+versions.  Also, feel free to email us with any other questions or
+concerns.
 The preseq software is still under development so we would appreciate any 
-advice, comments, or possible bugs. Thanks!
+advice, comments, or notification of any possible bugs. Thanks!
 
 \newpage
 
