@@ -592,7 +592,7 @@ load_counts(const string input_file_name, vector<double> &counts_hist) {
                 ++counts_hist[count];
                 n_reads += count;
             }
-            else
+            else if(val !=0)
                 throw SMITHLABException("problem reading file at line " + (n_reads + 1));
         }
         in.peek();
