@@ -185,13 +185,16 @@ merge_mates(const size_t suffix_len, const size_t range,
     
 }
 
+// check if reads have same name & chrom
 inline static bool
-same_read(const size_t suffix_len,
-          const MappedRead &a, const MappedRead &b) {
-    const string sa(a.r.get_name());
-    const string sb(b.r.get_name());
-    return std::equal(sa.begin(), sa.end() - suffix_len, sb.begin());
+same_read(const size_t suffix_len, 
+	  const MappedRead &a, const MappedRead &b) {
+  const string sa(a.r.get_name());
+  const string sb(b.r.get_name());
+  return (std::equal(sa.begin(), sa.end() - suffix_len, sb.begin())
+	  && a.r.same_chrom(b.r));
 }
+
 
 static bool
 update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
@@ -324,44 +327,52 @@ load_counts_BAM_pe(const bool VERBOSE,
                 
 	  if (dangling_mates.find(read_name) != dangling_mates.end()){
 	    // other end is in dangling mates, merge the two mates
-	    assert(same_read(suffix_len, samr.mr, dangling_mates[read_name].mr));
-	    if (samr.is_Trich) std::swap(samr, dangling_mates[read_name]);
+	    if(same_read(suffix_len, samr.mr, dangling_mates[read_name].mr)){
+	      if (samr.is_Trich) std::swap(samr, dangling_mates[read_name]);
                     
-	    GenomicRegion merged;
-	    int len = 0;
-	    merge_mates(suffix_len, MAX_SEGMENT_LENGTH,
-			dangling_mates[read_name].mr.r, samr.mr.r, merged, len);
+	      GenomicRegion merged;
+	      int len = 0;
+	      merge_mates(suffix_len, MAX_SEGMENT_LENGTH,
+			  dangling_mates[read_name].mr.r, samr.mr.r, merged, len);
 	    // merge success!
-	    if (len >= 0 && len <= static_cast<int>(MAX_SEGMENT_LENGTH)){
+	      if (len >= 0 && len <= static_cast<int>(MAX_SEGMENT_LENGTH)){
 	      // first iteration
-	      if(n_reads == 0){
-		prev_gr = merged;
-		++n_reads;
-		++n_merged;
-	      }
-	      else{
-		++n_reads;
-		++n_merged;
-		read_pq.push(merged);
+		if(n_reads == 0){
+		  prev_gr = merged;
+		  ++n_reads;
+		  ++n_merged;
+		}
+		else{
+		  ++n_reads;
+		  ++n_merged;
+		  read_pq.push(merged);
                             
-		if(!(read_pq.empty()) &&
-		   GenomicRegionOrderChecker::is_ready(read_pq, merged, MAX_SEGMENT_LENGTH)) {
+		  if(!(read_pq.empty()) &&
+		     GenomicRegionOrderChecker::is_ready(read_pq, merged, MAX_SEGMENT_LENGTH)) {
 		  //begin emptying priority queue
-		  while(!(read_pq.empty()) &&
-			GenomicRegionOrderChecker::is_ready(read_pq, merged,
-							    MAX_SEGMENT_LENGTH) ){
-		    empty_pq(curr_gr, prev_gr, current_count,
-			     counts_hist, read_pq, input_file_name);
-		  }//end while loop
-		}//end statement for emptying priority queue
+		    while(!(read_pq.empty()) &&
+			  GenomicRegionOrderChecker::is_ready(read_pq, merged,
+							      MAX_SEGMENT_LENGTH) ){
+		      empty_pq(curr_gr, prev_gr, current_count,
+			       counts_hist, read_pq, input_file_name);
+		    }//end while loop
+		  }//end statement for emptying priority queue
+		}
+		dangling_mates.erase(read_name);
+	     
+
+	      }//end if statement for if merge is successful
+	      else{
+		cerr << "problem with read " << read_name << endl;
+
+		throw SMITHLABException("merge unsuccessful");
 	      }
-	      dangling_mates.erase(read_name);
-
-        }//end if statement for if merge is successful
+	    }
 	    else{
-	      cerr << "problem with read " << read_name << endl;
-
-	      throw SMITHLABException("merge unsuccessful");
+	      // problem mergin reads from "different" chrom like chr1 & chr1_gl000191_random
+	      // flagged as proper pair, but not
+	      read_pq.push(samr.mr.r);
+	      read_pq.push(dangling_mates[read_name].mr.r);
 	    }
 	  }//end if statement for if read is in dangling mates
 	  else{	// other end not in dangling mates, add this read to dangling mates.
