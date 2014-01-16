@@ -1,9 +1,21 @@
-This is the README file for the third release of preseq.  The 
+This is the README file for the preseq package.  The 
 preseq package is aimed at predicting the yield of distinct 
 reads from a genomic library from an initial sequencing 
 experiment. The estimates can then be used to examine the utility 
 of further sequencing, optimize the sequencing depth, or to 
 screen multiple libraries to avoid low complexity samples.
+
+UPDATES FROM PREVIOUS RELEASE
+========================================================================
+We have switched the dependency on the BamTools API to SAMTools, which 
+we believe will be more convenient for most users of preseq. Minor bugs 
+have been fixed, and algorithms have been refined to more accurately 
+construct counts histograms and extrapolate the complexity curve. More 
+options have been added to lc_extrap. c_curve and lc_extrap are now both 
+under a single binary for easier use, and commands will now be written 
+as "preseq lc_extrap [OPTIONS]." Furthermore, there are updates to the
+manual for any minor issues encountered when compiling the preseq
+binary.
 
 
 CONTACT INFORMATION:
@@ -26,16 +38,15 @@ This should be easy: unpack the archive and change into the archive
 directory. Then type 'make all'. The programs will be in the archive
 directory. These can be moved around, and also do not depend on any
 dynamic libraries, so they should simply work when executed. If the 
-desired input is in .bam format, bamtools is required and is located
-at '/bamtools_loc/.  Type 'make all BAMTOOLS_ROOT=/bamtools_loc/'
-to make the programs.
+desired input is in .bam format, SAMTools is required. Type 'make all
+SAMTOOLS_DIR=/samtools_loc/' to make the programs.
 
 INPUT FILE FORMAT:
 ========================================================================
-Input files can be either in bed or bam file format.  The file should
+Input files can be either in BED or BAM file format.  The file should
 be sorted by chromosome, start position, strand position, and finally 
-strand if in bed format. If the file is in bam format, then the file
-should be sorted using bamtools or samtools sort.
+strand if in BED format. If the file is in BAM format, then the file
+should be sorted using BamTools or SAMTools sort.
 
 USAGE EXAMPLES:
 ========================================================================
@@ -46,11 +57,11 @@ with '-o'). To predict the yield of a future experiment, use lc_extrap.
 For the most basic usage of lc_extrap to compute the expected yield,
 use the command:
 
-  lc_extrap -o yield_estimates.txt input.bed
+  preseq lc_extrap -o yield_estimates.txt input.bed
 
 If the input file is in .bam format, use the command:
 
-  lc_extrap -B -o yield_estimates.txt input.bam
+  preseq lc_extrap -B -o yield_estimates.txt input.bam
 
 The yield estimates will appear in yield_estimates.txt, and will be a 
 column of future experiment sizes in TOTAL_READS, a column of the 
@@ -60,11 +71,11 @@ two columns giving the corresponding confidence intervals.
 To investigate the past yield of an experiment, use c_curve.  For the
 most basic usage, use the command:
 
-  c_curve -o estimates.txt input.bed
+  preseq c_curve -o estimates.txt input.bed
 
 If the input file is in .bam format, use the command:
 
-  c_curve -B -o estimates.txt input.bam
+  preseq c_curve -B -o estimates.txt input.bam
 
 The estimates will appear in estimates.txt with two columns.  The
 first column gives the total number of reads in a theoretically
