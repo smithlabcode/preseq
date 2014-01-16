@@ -56,15 +56,7 @@ get_rescale_value(const double numerator, const double denominator) {
   return 1.0;
 }
 
-static double
-get_rescale_value(const complex<double> numerator, const complex<double> denominator) {
-  const double rescale_val = norm(numerator) + norm(denominator);
-  if (rescale_val > 1.0/TOLERANCE)
-    return 1.0/rescale_val;
-  if (rescale_val < TOLERANCE)
-    return 1.0/rescale_val;
-  return 1.0;
-}
+
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
