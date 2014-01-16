@@ -21,7 +21,7 @@
 
 
 \newcommand{\supth}{{\mathrm{th}}}
-
+ \newcommand{\tab}{\hspace*{2em}}
 
 \titleformat*{\paragraph}{\large\bfseries}
 
@@ -471,6 +471,36 @@ in the libraries.
 
 
 \section{FAQ}
+
+\Que{When compiling the preseq binary, I receive the error
+
+\fn{fatal error: gsl/gsl\_cdf.h: No such file or directory
+}
+}
+
+\Ans{The default location of the GSL library will be in '\fn{/usr/local/include/gsl}'. Open the Makefile and append "\fn{-I /usr/local/include}" after \fn{CXX = g++}.  You may be receiving this error because the GSL library is not installed on the default search paths of your compiler, and you will need to specify the location.  }
+
+
+
+
+\Que{When compiling the preseq binary, I receive the error
+
+\fn{Undefined symbols for architecture x86\_64: ~\\
+\tab"\_packInt16", referenced from:~\\
+\tab\tab\_deflate\_block in bgzf.o~\\
+ \tab"\_packInt32", referenced from:~\\
+ \tab\tab\_deflate\_block in bgzf.o~\\
+ \tab "\_unpackInt16", referenced from:~\\
+   \tab\tab   \_bgzf\_read\_block in bgzf.o~\\
+    \tab\tab  \_check\_header in bgzf.o~\\
+}
+}
+
+\Ans{
+Go to the SAMTools directory and open the file bgzf.c. Find the functions \fn{packInt16}, \fn{unpackInt16}, and \fn{packInt32}. Comment out the "inline" before each function name. 
+}
+
+
 
 \Que{I compile the preseq binary but receive the error 
 
