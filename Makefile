@@ -39,8 +39,19 @@ INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 LIBS += -lgsl -lgslcblas -lz
 
-CXX = g++
+CXX = g++ 
 CXXFLAGS = -Wall -fPIC -fmessage-length=50
+
+KER = $(shell sysctl -n kern.osrelease | cut -d. -f1)
+
+ifeq ($(shell uname),Darwin)
+CXXFLAGS+= -arch x86_64
+ifeq ($(KER), 13)
+CXXFLAGS+= -stdlib=libstdc++
+endif
+endif
+
+
 OPTFLAGS = -O2
 DEBUGFLAGS = -g -lefence -lpthread -L/usr/local/lib/
 
