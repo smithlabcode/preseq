@@ -47,8 +47,6 @@
 
 #define PRESEQ_VERSION "0.1.0"
 
-// AS: might not be good to depend on mapped read here
-// TD: if we're including gc_extrap, we need the dependence
 #include <MappedRead.hpp>
 
 #include "continued_fraction.hpp"
