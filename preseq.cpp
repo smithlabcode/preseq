@@ -47,6 +47,8 @@
 
 #define PRESEQ_VERSION "0.1.0"
 
+// AS: might not be good to depend on mapped read here
+// TD: if we're including gc_extrap, we need the dependence
 #include <MappedRead.hpp>
 
 #include "continued_fraction.hpp"
@@ -270,7 +272,7 @@ static void empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
                      const string &input_file_name ){
     
     curr_gr = read_pq.top();
-
+    //	       cerr << "outputting from queue : " << read_pq.top() << endl;
     read_pq.pop();
     
     //update counts hist
@@ -278,7 +280,13 @@ static void empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
     = update_pe_duplicate_counts_hist(curr_gr, prev_gr, counts_hist,
                                       current_count);
     if(!UPDATE_SUCCESS){
-
+        //cerr << "prev = " << prev_gr << endl;
+        //cerr << "curr = " << curr_gr << endl;
+        //cerr << "priority queue : " << endl;
+        //while(	 !(read_pq.empty()) ){
+          //  cerr << read_pq.top() << endl;
+          //  read_pq.pop();
+        //}
         throw SMITHLABException("reads unsorted in " + input_file_name);
     }
     prev_gr = curr_gr;
@@ -456,6 +464,7 @@ load_counts_BAM_pe(const bool VERBOSE,
 
 #endif
 
+
 /*
  this code is for BED file input
  */
@@ -543,6 +552,8 @@ load_counts_BED_pe(const string input_file_name, vector<double> &counts_hist) {
         update_pe_duplicate_counts_hist(curr_gr, prev_gr,
                                         counts_hist, current_count);
         if(!UPDATE_SUCCESS){
+           // cerr << "prev = " << prev_gr << endl;
+           // cerr << "curr = " << curr_gr << endl;
             throw SMITHLABException("reads unsorted in " + input_file_name);
         }
         
@@ -590,7 +601,7 @@ load_counts(const string input_file_name, vector<double> &counts_hist) {
                 ++counts_hist[count];
                 n_reads += count;
             }
-            else if(val !=0)
+            else if(val != 0)
                 throw SMITHLABException("problem reading file at line " + (n_reads + 1));
         }
         in.peek();
@@ -646,6 +657,36 @@ alpha_log_confint_multiplier(const double estimate,
     return exp(inv_norm_alpha*
                sqrt(log(1.0 + variance/pow(estimate, 2))));
 }
+
+
+/*static void
+ci_given_estimates(const vector<vector<double> > &bootstrap_estimates,
+                   const double ci_level, const vector<double> &yield_estimates,
+                   vector<double> &lower_ci_lognormal,
+                   vector<double> &upper_ci_lognormal) {
+    
+    lower_ci_lognormal.clear();
+    upper_ci_lognormal.clear();
+    
+    const double alpha = 1.0 - ci_level;
+    assert(!bootstrap_estimates.empty());
+    
+    const size_t n_est = bootstrap_estimates.size();
+    vector<double> estimates_row(bootstrap_estimates.size(), 0.0);
+    for (size_t i = 0; i < bootstrap_estimates[0].size(); i++) {
+        
+        // estimates is in wrong order, work locally
+        for (size_t k = 0; k < n_est; ++k)
+            estimates_row[k] = bootstrap_estimates[k][i];
+        
+        // sort to get confidence interval
+        const double variance = gsl_stats_variance(&estimates_row[0], 1, n_est);
+        const double confint_mltr =
+        alpha_log_confint_multiplier(yield_estimates[i], variance, alpha);
+        lower_ci_lognormal.push_back(yield_estimates[i]/confint_mltr);
+        upper_ci_lognormal.push_back(yield_estimates[i]*confint_mltr);
+    }
+}*/
 
 static void
 median_and_ci(const vector<double> &estimates,
@@ -709,6 +750,11 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
 
 
 
+// vals_hist[j] = n_{j} = # (counts = j)
+// vals_hist_distinct_counts[k] = kth index j s.t. vals_hist[j] > 0
+// stores kth index of vals_hist that is positive
+// distinct_counts_hist[k] = vals_hist[vals_hist_distinct_counts[k]]
+// stores the kth positive value of vals_hist
 void
 resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_counts,
               const vector<double> &distinct_counts_hist,
@@ -815,6 +861,9 @@ lc_extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
         for(size_t i = 0; i < hist.size(); i++)
             sample_vals_sum += i*hist[i];
         
+        // const double sample_max_val = max_extrapolation/sample_vals_sum;
+        //   const double sample_val_step = step_size/sample_vals_sum;
+        
         //resize boot_hist to remove excess zeros
         while (hist.back() == 0)
             hist.pop_back();
@@ -908,6 +957,9 @@ lc_extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
     for(size_t i = 0; i < hist.size(); i++)
         vals_sum += i*hist[i];
     const double initial_distinct = accumulate(hist.begin(), hist.end(), 0.0);
+    
+    // const double max_val = max_extrapolation/vals_sum;
+    // const double val_step = step_size/vals_sum;
     
     //construct umi vector to sample from
     vector<size_t> umis;
@@ -1190,11 +1242,19 @@ lc_extrap(const bool VERBOSE,
         
         // yield ci
         vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal;
-
+	     
+        //if(!SINGLE_ESTIMATE_SUCCESS){
             // use bootstrap estimates to obtain median estimates
             vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                                  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
-
+	    /*    }
+        else{
+	
+            // use single estimates as the expected complexity curve
+            ci_given_estimates(bootstrap_estimates, c_level, yield_estimates,
+                               yield_lower_ci_lognormal, yield_upper_ci_lognormal);
+			       }*/
+        
         /////////////////////////////////////////////////////////////////////
         if (VERBOSE)
             cerr << "[WRITING OUTPUT]" << endl;
@@ -1306,6 +1366,13 @@ static void c_curve (const bool VERBOSE,
         cerr << endl;
     }
     
+    //if(total_reads != n_reads){
+    //    cerr << "total reads = " << total_reads << endl;
+    //    cerr << "n_reads     = " << n_reads << endl;
+    //}
+    
+    //assert(total_reads == n_reads);
+    
     
     //construct umi vector to sample from
     vector<size_t> full_umis;
@@ -1352,8 +1419,10 @@ static int usage()
     cerr << "Usage: preseq <command> [OPTIONS]\n\n";
     cerr << "Command: c_curve          generate complexity curve for a library\n";
     cerr << "         lc_extrap        predict the yield for future experiments\n";
+    // cerr << "         gc_extrap        extrapolate genomic complexity";
     cerr << "\n\n";
     return 0;
+    //   string input_file_name2 = "SRR726645.sort.mr";
     
 }
 size_t upper_limit = 0;
@@ -1373,15 +1442,26 @@ main(const int argc, const char **argv) {
         size_t orig_max_terms = 100;
         double max_extrapolation = 1.0e10;
         size_t upper_limit = 0;
+        
+        // AS: this step size issue needs to be addressed
         double step_size = 1e6;
-
+        // double read_step_size = 1e7;
         
         size_t MAX_SEGMENT_LENGTH = 10000;
+        //size_t max_width = 1000;
         size_t bootstraps = 100;
         int diagonal = -1;
+        //size_t bin_size = 20;
         double c_level = 0.95;
+        //double tolerance = 1e-20;
+        //size_t max_iter = 0;
         double dupl_level = 0.5;
-
+        //double reads_per_base = 2.0;
+        //double fixed_fold = 20;
+        
+        /* FLAGS */
+        //size_t MODE = 0;
+        //bool NO_SEQUENCE = false;
         bool VERBOSE = false;
         bool VALS_INPUT = false;
         bool PAIRED_END = false;
@@ -1416,11 +1496,18 @@ main(const int argc, const char **argv) {
                               false, dupl_level);
             opt_parse.add_opt("terms",'x',"maximum number of terms", false,
                               orig_max_terms);
+            //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
+            //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
+            //		      false, max_iter);
             opt_parse.add_opt("verbose", 'v', "print more information",
                               false, VERBOSE);
 #ifdef HAVE_SAMTOOLS
             opt_parse.add_opt("bam", 'B', "input is in BAM format",
                               false, BAM_FORMAT_INPUT);
+	    opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
+			      "paired end bam reads (default: " 
+			      + toa(MAX_SEGMENT_LENGTH) + ")", 
+			      false, MAX_SEGMENT_LENGTH);
 #endif
             opt_parse.add_opt("pe", 'P', "input is paired end read file",
                               false, PAIRED_END);
@@ -1456,7 +1543,7 @@ main(const int argc, const char **argv) {
             /******************************************************************/
             
             if (argc > 2) {
-  
+                //    cerr << leftover_args.front();
                 lc_extrap(VERBOSE,
                           VALS_INPUT,
                           PAIRED_END,
@@ -1495,6 +1582,10 @@ main(const int argc, const char **argv) {
 #ifdef HAVE_SAMTOOLS
             opt_parse.add_opt("bam", 'B', "input is in BAM format",
                               false, BAM_FORMAT_INPUT);
+	    opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
+			      "paired end bam reads (default: " 
+			      + toa(MAX_SEGMENT_LENGTH) + ")", 
+			      false, MAX_SEGMENT_LENGTH);
 #endif
             opt_parse.add_opt("pe", 'P', "input is paired end read file",
                               false, PAIRED_END);
@@ -1528,7 +1619,7 @@ main(const int argc, const char **argv) {
             /******************************************************************/
             
             if (argc > 2){
-  
+                // cerr << leftover_args.front();
                 c_curve (VERBOSE,
                          VALS_INPUT,
                          PAIRED_END,
@@ -1544,6 +1635,97 @@ main(const int argc, const char **argv) {
             }
         }
         
+        
+        
+        
+        /*
+         else if (strcmp(argv[1], "gc_extrap") == 0) {
+         
+         // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
+         OptionParser opt_parse(strip_path(argv[1]),
+         "", "<sorted-mapped-read-file>");
+         opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
+         false , outfile);
+         opt_parse.add_opt("max_width", 'w', "max fragment length, "
+         "set equal to read length for single end reads",
+         false, max_width);
+         opt_parse.add_opt("bin_size", 'n', "bin size "
+         "(default: " + toa(bin_size) + ")",
+         false, bin_size);
+         opt_parse.add_opt("extrap",'e',"maximum extrapolation in base pairs"
+         "(default: " + toa(max_extrapolation) + ")",
+         false, max_extrapolation);
+         //changed this to step size, originally was read step size. 
+         opt_parse.add_opt("step",'s',"step size in bases between extrapolations "
+         "(default: " + toa(step_size) + ")",
+         false, step_size);
+         opt_parse.add_opt("bootstraps",'b',"number of bootstraps "
+         "(default: " + toa(bootstraps) + "), ",
+         false, bootstraps);
+         opt_parse.add_opt("cval", 'c', "level for confidence intervals "
+         "(default: " + toa(c_level) + ")", false, c_level);
+         opt_parse.add_opt("reads_per_base", 'r', "average reads per base "
+         "(including duplicates) to predict sequencing level",
+         false, reads_per_base);
+         opt_parse.add_opt("terms",'x',"maximum number of terms",
+         false, orig_max_terms);
+         opt_parse.add_opt("fixed_fold",'f',"fixed fold extrapolation to predict",
+         false, fixed_fold);
+         //    opt_parse.add_opt("tol",'t', "numerical tolerance", false, tolerance);
+         //    opt_parse.add_opt("max_iter",'i', "maximum number of iteration",
+         //		      false, max_iter);
+         opt_parse.add_opt("verbose", 'v', "print more information", 
+         false, VERBOSE);
+         opt_parse.add_opt("bed", 'B', "input is in bed format without sequence information",
+         false, NO_SEQUENCE);
+         opt_parse.add_opt("quick",'Q', 
+         "quick mode: run gc_extrap without bootstrapping for confidence intervals",
+         false, SINGLE_ESTIMATE);
+         
+         vector<string> leftover_args;
+         opt_parse.parse(argc-1, argv+1, leftover_args);
+         if (argc == 2 || opt_parse.help_requested()) {
+         cerr << opt_parse.help_message() << endl;
+         return EXIT_SUCCESS;
+         }
+         if (opt_parse.about_requested()) {
+         cerr << opt_parse.about_message() << endl;
+         return EXIT_SUCCESS;
+         }
+         if (opt_parse.option_missing()) {
+         cerr << opt_parse.option_missing_message() << endl;
+         return EXIT_SUCCESS;
+         }
+         if (leftover_args.empty()) {
+         cerr << opt_parse.help_message() << endl;
+         return EXIT_SUCCESS;
+         }
+         const string input_file_name = leftover_args.front();
+         // ****************************************************************
+         
+         if (argc > 2){
+         gc_extrap(VERBOSE,
+         NO_SEQUENCE,
+         SINGLE_ESTIMATE,
+         MIN_REQUIRED_COUNTS,
+         orig_max_terms,
+         max_extrapolation,
+         step_size,
+         bootstraps,
+         diagonal,
+         c_level,
+         max_width,
+         bin_size,
+         max_iter,
+         tolerance,
+         reads_per_base,
+         fixed_fold,
+         input_file_name,
+         outfile);
+         }
+         
+         }
+         */
         
         else {
             cerr << "unrecognized command " << argv[1] << endl;
