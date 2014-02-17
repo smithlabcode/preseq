@@ -72,6 +72,36 @@ using std::tr1::unordered_map;
 // Data imputation
 /////////////////////////////////////////////////////////////////////
 
+
+static bool
+update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
+                                const GenomicRegion &prev_gr,
+                                vector<double> &counts_hist,
+                                size_t &current_count){
+    // check if reads are sorted
+    if (curr_gr.same_chrom(prev_gr) &&
+        curr_gr.get_start() < prev_gr.get_start()
+        && curr_gr.get_end() < prev_gr.get_end()){
+        return false;
+    }
+    if (!curr_gr.same_chrom(prev_gr) ||
+        curr_gr.get_start() != prev_gr.get_start() ||
+        curr_gr.get_end() != prev_gr.get_end())
+        // next read is new, update counts_hist to include current_count
+    {
+        // histogram is too small, resize
+        if(counts_hist.size() < current_count + 1)
+            counts_hist.resize(current_count + 1, 0.0);
+        ++counts_hist[current_count];
+        current_count = 1;
+    }
+    else // next read is same, update current_count
+        ++current_count;
+    
+    return true;
+}
+
+
 /*
  * This code is used to deal with read data in BAM format.
  */
@@ -196,33 +226,6 @@ same_read(const size_t suffix_len,
 }
 
 
-static bool
-update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
-                                const GenomicRegion &prev_gr,
-                                vector<double> &counts_hist,
-                                size_t &current_count){
-    // check if reads are sorted
-    if (curr_gr.same_chrom(prev_gr) &&
-        curr_gr.get_start() < prev_gr.get_start()
-        && curr_gr.get_end() < prev_gr.get_end()){
-        return false;
-    }
-    if (!curr_gr.same_chrom(prev_gr) ||
-        curr_gr.get_start() != prev_gr.get_start() ||
-        curr_gr.get_end() != prev_gr.get_end())
-        // next read is new, update counts_hist to include current_count
-    {
-        // histogram is too small, resize
-        if(counts_hist.size() < current_count + 1)
-            counts_hist.resize(current_count + 1, 0.0);
-        ++counts_hist[current_count];
-        current_count = 1;
-    }
-    else // next read is same, update current_count
-        ++current_count;
-    
-    return true;
-}
 
 /////comparison function for priority queue/////////////////
 
