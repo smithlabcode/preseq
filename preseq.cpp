@@ -101,7 +101,6 @@ update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
     return true;
 }
 
-
 /*
  * This code is used to deal with read data in BAM format.
  */
@@ -372,9 +371,13 @@ load_counts_BAM_pe(const bool VERBOSE,
 
 	      }//end if statement for if merge is successful
 	      else{
-		cerr << "problem with read " << read_name << endl;
+		// informative error message!
+		cerr << "problem merging read " << read_name << ", splitting read" << endl;
+		cerr << "To merge, set max segement length (seg_len) higher." << endl;
 
-		throw SMITHLABException("merge unsuccessful");
+		// don't throw error for problems merging
+		read_pq.push(samr.mr.r);
+		read_pq.push(dangling_mates[read_name].mr.r);
 	      }
 	    }
 	    else{
@@ -419,8 +422,10 @@ load_counts_BAM_pe(const bool VERBOSE,
 	// dangling mates is too large, flush dangling_mates of reads
 	// on different chroms and too far away
 	if (dangling_mates.size() > MAX_READS_TO_HOLD){
-	  if(VERBOSE)
-	    cerr << "dangling mates too large, emptying" << endl;
+	  
+	  // This message is really annoying
+	  //if(VERBOSE)
+	  //  cerr << "dangling mates too large, emptying" << endl;
                 
 	  unordered_map<string, SAMRecord> tmp;
 	  for (unordered_map<string, SAMRecord>::iterator
@@ -1099,7 +1104,7 @@ lc_extrap(const bool VERBOSE,
     // LOAD VALUES
     if(HIST_INPUT){
         if(VERBOSE)
-            cerr << "INPUT_HIST" << endl;
+            cerr << "HIST_INPUT" << endl;
         n_reads = load_histogram(input_file_name, counts_hist);
     }
     else if(VALS_INPUT){
