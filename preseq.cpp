@@ -282,13 +282,9 @@ static void empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
     = update_pe_duplicate_counts_hist(curr_gr, prev_gr, counts_hist,
                                       current_count);
     if(!UPDATE_SUCCESS){
-        //cerr << "prev = " << prev_gr << endl;
-        //cerr << "curr = " << curr_gr << endl;
-        //cerr << "priority queue : " << endl;
-        //while(	 !(read_pq.empty()) ){
-          //  cerr << read_pq.top() << endl;
-          //  read_pq.pop();
-        //}
+        cerr << "prev = \t" << prev_gr << endl;
+        cerr << "curr = \t" << curr_gr << endl;
+	cerr << "Increase seg_len if in paired end mode" << endl;
         throw SMITHLABException("reads unsorted in " + input_file_name);
     }
     prev_gr = curr_gr;
