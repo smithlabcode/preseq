@@ -1,3 +1,17 @@
+preseq beta release 1.0.0 (Mar 21, 2014)
+
+------------------------------------------------------------------
+
+Notable changes in preseq software:
+
+  * Included gc_extrap option to predict genomic coverage for
+    single cell sequencing experiments.
+
+  * Changed the method of finding optimal continued fraction
+    to improve performance for high variable (e.g. RNAseq)
+    libraries.
+
+
 preseq beta release 0.0.3 (Aug 5, 2013)
 
 ------------------------------------------------------------------
