@@ -27,13 +27,16 @@ SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
 endif
 
 
-ifndef SAMTOOLS_DIR
-SAMTOOLS_DIR=$(ROOT)/samtools/
-endif
+#ifndef SAMTOOLS_DIR
+#SAMTOOLS_DIR=$(ROOT)/samtools/
+#endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS = preseq gc_extrap bam2mr
+PROGS = preseq 
+ifdef SAMTOOLS_DIR
+PROGS += bam2mr
+endif
 INCLUDEDIRS = $(SMITHLAB_CPP) $(SAMTOOLS_DIR)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
@@ -75,8 +78,6 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
           smithlab_os.o smithlab_utils.o GenomicRegion.o OptionParser.o RNG.o MappedRead.o)
 
 preseq: continued_fraction.o
-
-gc_extrap: continued_fraction.o
 
 ifdef SAMTOOLS_DIR
 bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
