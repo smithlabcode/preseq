@@ -22,7 +22,7 @@ CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
 tdaley@usc.edu
-http://smithlab.cmb.usc.edu
+http://smithlabresearch.org
 
 SYSTEM REQUIREMENTS:
 ========================================================================
