@@ -60,6 +60,7 @@ using std::endl;
 using std::cerr;
 using std::max;
 using std::ifstream;
+using std::isfinite;
 
 using std::setw;
 using std::fixed;
@@ -838,6 +839,7 @@ SplitMappedRead(const bool VERBOSE,
 
 }
 
+/*
 // return true if the genomic region is null
 static inline bool
 GenomicRegionIsNull(const GenomicRegion &gr){
@@ -847,6 +849,7 @@ GenomicRegionIsNull(const GenomicRegion &gr){
 
   return false;
 }
+*/
 
 /*
 // extend the read by increasing the end pos by n_bases
@@ -1460,7 +1463,7 @@ check_yield_estimates(const vector<double> &estimates) {
     
     // make sure that the estimate is increasing in the time_step and is
     // below the initial distinct per step_size
-    if (!finite(accumulate(estimates.begin(), estimates.end(), 0.0)))
+    if (!isfinite(accumulate(estimates.begin(), estimates.end(), 0.0)))
         return false;
     
     for (size_t i = 1; i < estimates.size(); ++i)

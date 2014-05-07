@@ -39,6 +39,7 @@ using std::imag;
 using std::cerr;
 using std::endl;
 using std::min;
+using std::isfinite;
 
 const double TOLERANCE = 1e-20;
 const double DERIV_DELTA = 1e-8;
@@ -813,6 +814,12 @@ ContinuedFraction::Ylevel(const vector<double> &counts_hist, const double dupl_l
 /////////////
 ////////////
 
+const size_t ContinuedFractionApproximation::MIN_ALLOWED_DEGREE = 4;
+
+const double ContinuedFractionApproximation::SEARCH_MAX_VAL = 100;
+
+const double ContinuedFractionApproximation::SEARCH_STEP_SIZE = 0.05;
+
 
 // calculate cf_coeffs depending on offset
 ContinuedFractionApproximation::ContinuedFractionApproximation(const int di, const size_t mt, 
@@ -1025,7 +1032,7 @@ check_count_estimates_stability(const vector<double> &estimates,
   size_t number_modes = 0;
   for(size_t i = 1; i < estimates.size(); ++i){
     // make sure estimates are in bounds
-    if(estimates[i] < 0.0 || estimates[i] > 3.2e9/count || !finite(estimates[i]))
+    if(estimates[i] < 0.0 || estimates[i] > 3.2e9/count || !isfinite(estimates[i]))
       return false;
     // count modes by detecting change in sign of derivative
     if(i < estimates.size() - 1 &&
@@ -1233,7 +1240,7 @@ check_mincount_estimates_stability(const vector<double> &estimates,
   // make sure that the estimate is increasing in the time_step and
   // is below the initial distinct per step_size
   for (size_t i = 1; i < estimates.size(); ++i){
-    if(!finite(estimates[i])){
+    if(!isfinite(estimates[i])){
       //    cerr << "not finite at " << i << "\t" << estimates[i] << endl;
       return false;
     }

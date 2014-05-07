@@ -154,13 +154,13 @@ private:
 
   double locate_zero_cf_deriv(const ContinuedFraction &cf, 
                               const double val, const double prev_val) const;
-  static const size_t MIN_ALLOWED_DEGREE = 4;
+  static const size_t MIN_ALLOWED_DEGREE;
   
   // largest value to search for lowerbound and stability
-  static const double SEARCH_MAX_VAL = 100; 
+  static const double SEARCH_MAX_VAL; 
   
   //step size for search of lowerbound and stability
-  static const double SEARCH_STEP_SIZE = 0.05; 
+  static const double SEARCH_STEP_SIZE; 
 
 };
 
