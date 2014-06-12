@@ -294,6 +294,55 @@ same_read(const size_t suffix_len,
   return (SAME_NAME && a.r.same_chrom(b.r));
 }
 
+// return true if the genomic region is null
+static inline bool
+GenomicRegionIsNull(const GenomicRegion &gr){
+  GenomicRegion null_gr;
+  if(gr == null_gr)
+    return true;
+
+  return false;
+}
+
+
+static void
+empty_pq(GenomicRegion &prev_gr,
+	 priority_queue<GenomicRegion, vector<GenomicRegion>,
+			GenomicRegionOrderChecker> &read_pq,
+	 const string &input_file_name,
+	 vector<double> &counts_hist,
+	 size_t &current_count){
+    
+  GenomicRegion curr_gr = read_pq.top();
+    //	       cerr << "outputting from queue : " << read_pq.top() << endl;
+  read_pq.pop();
+
+    // check if reads are sorted
+  if (curr_gr.same_chrom(prev_gr) &&
+      curr_gr.get_start() < prev_gr.get_start()
+      && curr_gr.get_end() < prev_gr.get_end()){
+    cerr << "prev = \t" << prev_gr << endl;
+    cerr << "curr = \t" << curr_gr << endl;
+    cerr << "Increase seg_len if in paired end mode" << endl;
+    throw SMITHLABException("reads unsorted in " + input_file_name);
+  }
+
+  if(GenomicRegionIsNull(prev_gr))
+    current_count = 1;
+  else{
+    bool UPDATE_HIST = 
+      update_pe_duplicate_counts_hist(curr_gr, prev_gr, counts_hist, current_count);
+    if(!UPDATE_HIST){
+      cerr << "prev = \t" << prev_gr << endl;
+      cerr << "curr = \t" << curr_gr << endl;
+      throw SMITHLABException("locations unsorted in: " + input_file_name);
+    }
+  }
+
+  prev_gr = curr_gr;
+}
+
+
 
 static size_t
 load_counts_BAM_pe(const bool VERBOSE,
@@ -310,16 +359,17 @@ load_counts_BAM_pe(const bool VERBOSE,
         throw SMITHLABException("problem opening input file " + input_file_name);
     
     SAMRecord samr;
-    size_t n_reads = 0;
     // resize vals_hist, make sure it starts out empty
     counts_hist.clear();
     counts_hist.resize(2, 0.0);
-    size_t current_count = 1;
+    size_t current_count = 0;
     size_t suffix_len = 0;
     n_paired = 0;
+    n_mates = 0;
     size_t n_unpaired = 0;
+    size_t progress_step = 1000000;
     
-    GenomicRegion curr_gr, prev_gr;
+    GenomicRegion prev_gr;
     
     std::priority_queue<GenomicRegion, vector<GenomicRegion>,
     GenomicRegionOrderChecker> read_pq;
@@ -349,91 +399,46 @@ load_counts_BAM_pe(const bool VERBOSE,
 	      if (MERGE_SUCCESS && 
 		  len >= 0 && 
 		  len <= static_cast<int>(MAX_SEGMENT_LENGTH)){
-	      // first iteration
-		if(n_reads == 0){
-		  prev_gr = merged;
-		  ++n_reads;
-		  ++n_paired;
-		}
-		else{
-		  ++n_reads;
-		  ++n_paired;
-		  read_pq.push(merged);
-                            
-		  if(!(read_pq.empty()) &&
-		     GenomicRegionOrderChecker::is_ready(read_pq, merged, MAX_SEGMENT_LENGTH)) {
-		  //begin emptying priority queue
-		    while(!(read_pq.empty()) &&
-			  GenomicRegionOrderChecker::is_ready(read_pq, merged,
-							      MAX_SEGMENT_LENGTH) ){
-		      empty_pq(curr_gr, prev_gr, current_count,
-			       counts_hist, read_pq, input_file_name);
-		    }//end while loop
-		  }//end statement for emptying priority queue
-		}
-		dangling_mates.erase(read_name);
-	     
-
-	      }//end if statement for if merge is successful
+		read_pq.push(merged);
+		++n_paired;
+	      }
 	      else{
 		// informative error message!
-		cerr << "problem merging read " << read_name << ", splitting read" << endl;
-		cerr << "To merge, set max segement length (seg_len) higher." << endl;
-
-		// don't throw error for problems merging
+		if(VERBOSE){
+		  cerr << "problem merging read " << read_name << ", splitting read" << endl;
+		  cerr << samr.mr << endl;
+		  cerr << dangling_mates[read_name].mr << endl;
+		  cerr << "To merge, set max segement length (seg_len) higher." << endl;
+		}
 		read_pq.push(samr.mr.r);
 		read_pq.push(dangling_mates[read_name].mr.r);
-		dangling_mates.erase(read_name);
+		n_unpaired += 2;
 	      }
+	      dangling_mates.erase(read_name);
 	    }
 	    else{
-	      // problem mergin reads from "different" chrom like chr1 & chr1_gl000191_random
-	      // flagged as proper pair, but not
 	      read_pq.push(samr.mr.r);
 	      read_pq.push(dangling_mates[read_name].mr.r);
 	      dangling_mates.erase(read_name);
+	      n_unpaired += 2;
 	    }
-	  }//end if statement for if read is in dangling mates
-	  else{	// other end not in dangling mates, add this read to dangling mates.
+	
+	  }
+	  else // didn't find read in dangling_mates, store for later
 	    dangling_mates[read_name] = samr;
-	  }
-	}
-	else{ // read is unpaired, put in queue
-	  if(n_reads == 0){
-	    ++n_reads;
-	    ++n_unpaired;
-	    prev_gr = samr.mr.r;
-	  }
-	  else{ 
-	    ++n_reads;
-	    ++n_unpaired;
-	    read_pq.push(samr.mr.r);
- 
-	    if(!(read_pq.empty()) &&
-	       GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
 	     
-	      while(!(read_pq.empty()) &&
-		    GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r,
-							MAX_SEGMENT_LENGTH) ){
-                              
-		empty_pq(curr_gr, prev_gr, current_count,
-			 counts_hist, read_pq, input_file_name);
-	      }
-                    
-	    }
-                
-	  }
-
-	} 
+	}
+	else{
+	  read_pq.push(samr.mr.r);
+	  ++n_unpaired;
+	}
             
 	// dangling mates is too large, flush dangling_mates of reads
 	// on different chroms and too far away
 	if (dangling_mates.size() > MAX_READS_TO_HOLD){
-	  
-	  // This message is really annoying
-	  //if(VERBOSE)
-	  //  cerr << "dangling mates too large, emptying" << endl;
-                
+	  //  if(VERBOSE)
+	  //  cerr << "dangling mates too large, " << dangling_mates.size() << ", emptying" << endl;
+
 	  unordered_map<string, SAMRecord> tmp;
 	  for (unordered_map<string, SAMRecord>::iterator
 		 itr = dangling_mates.begin();
@@ -443,8 +448,10 @@ load_counts_BAM_pe(const bool VERBOSE,
 		    && itr->second.mr.r.get_end() + MAX_SEGMENT_LENGTH <
 		    samr.mr.r.get_start())) 
 	      {
-		if(itr->second.seg_len >= 0)
+		if(itr->second.seg_len >= 0){
 		  read_pq.push(itr->second.mr.r);
+		  ++n_unpaired;
+		}
 	      }
 	    else
 	      tmp[itr->first] = itr->second;
@@ -452,7 +459,20 @@ load_counts_BAM_pe(const bool VERBOSE,
 	  std::swap(tmp, dangling_mates);
 	  tmp.clear();
 	}
-            
+
+	if(!(read_pq.empty()) &&
+	   GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
+	  //begin emptying priority queue
+	  while(!(read_pq.empty()) &&
+		GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r,
+						    MAX_SEGMENT_LENGTH) ){
+	    empty_pq(prev_gr, read_pq, input_file_name, 
+		     counts_hist, current_count);
+	  }//end while loop
+	}//end statement for emptying priority queue
+       
+	if (VERBOSE && n_mates % progress_step == 0)
+	  cerr << "Processed " << n_mates << " records" << endl;     
       }
     }
     
@@ -460,13 +480,13 @@ load_counts_BAM_pe(const bool VERBOSE,
     while (!dangling_mates.empty()) {
       read_pq.push(dangling_mates.begin()->second.mr.r);
       dangling_mates.erase(dangling_mates.begin());
-      ++n_reads;
+      ++n_unpaired;
     }
   
     //final iteration
     while(!read_pq.empty()){
-      empty_pq(curr_gr, prev_gr, current_count,
-	       counts_hist, read_pq, input_file_name);
+      empty_pq(prev_gr, read_pq, input_file_name, 
+	       counts_hist, current_count);
     }
     
     if(counts_hist.size() < current_count + 1)
@@ -475,7 +495,12 @@ load_counts_BAM_pe(const bool VERBOSE,
     ++counts_hist[current_count];
 
     assert((read_pq.empty()));
-    
+
+    size_t n_reads = n_unpaired + n_paired;    
+
+    cerr << "paired = " << n_paired << endl;
+    cerr << "unpaired = " << n_unpaired << endl;
+
     return n_reads;
 }
 
@@ -563,8 +588,7 @@ load_counts_BED_pe(const string input_file_name, vector<double> &counts_hist) {
     
     
     return n_reads;
-    
-    
+     
 }
 
 /*
@@ -596,7 +620,7 @@ load_counts(const string input_file_name, vector<double> &counts_hist) {
                 n_reads += count;
             }
             else if(val != 0)
-                throw SMITHLABException("problem reading file at line " + (n_reads + 1));
+                throw SMITHLABException("problem reading file at line " + toa(n_reads + 1));
         }
         in.peek();
     }
@@ -745,17 +769,8 @@ SplitMappedRead(const bool VERBOSE,
 
 }
 
-/*
-// return true if the genomic region is null
-static inline bool
-GenomicRegionIsNull(const GenomicRegion &gr){
-  GenomicRegion null_gr;
-  if(gr == null_gr)
-    return true;
 
-  return false;
-}
-*/
+
 
 /*
 // extend the read by increasing the end pos by n_bases
@@ -1818,7 +1833,7 @@ static void c_curve (const bool VERBOSE,
     else if (BAM_FORMAT_INPUT && PAIRED_END){
         if(VERBOSE)
             cerr << "PAIRED_END_BAM_INPUT" << endl;
-        const size_t MAX_READS_TO_HOLD = 100000;
+        const size_t MAX_READS_TO_HOLD = 1000000;
 	size_t n_paired = 0;
 	size_t n_mates = 0;
         n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
@@ -1859,6 +1874,7 @@ static void c_curve (const bool VERBOSE,
                                       bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
         cerr << "TOTAL READS     = " << n_reads << endl
+	     << "COUNTS_SUM      = " << total_reads << endl
         << "DISTINCT READS  = " << distinct_reads << endl
         << "DISTINCT COUNTS = " << distinct_counts << endl
         << "MAX COUNT       = " << max_observed_count << endl

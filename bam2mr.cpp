@@ -27,6 +27,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <queue>
 #include <tr1/unordered_map>
 
 #include "OptionParser.hpp"
@@ -42,6 +43,11 @@ using std::endl;
 using std::ifstream;
 using std::max;
 using std::min;
+using std::priority_queue;
+using std::tr1::unordered_map;
+
+
+
 
 
 /********Below are functions for merging pair-end reads********/
@@ -136,6 +142,8 @@ same_read(const size_t suffix_len,
   return (SAME_NAME && a.r.same_chrom(b.r));
 }
 
+
+
 static void
 revcomp(MappedRead &mr) {
   // set the strand to the opposite of the current value
@@ -145,6 +153,74 @@ revcomp(MappedRead &mr) {
   std::reverse(mr.scr.begin(), mr.scr.end());
 }
 /********Above are functions for merging pair-end reads********/
+
+
+/////comparison function for priority queue/////////////////
+
+/**************** FOR CLARITY BELOW WHEN COMPARING READS *************/
+static inline bool
+chrom_greater(const MappedRead &a, const MappedRead &b) {
+    return a.r.get_chrom() > b.r.get_chrom();
+}
+static inline bool
+same_start(const MappedRead &a, const MappedRead &b) {
+    return a.r.get_start() == b.r.get_start();
+}
+static inline bool
+start_greater(const MappedRead &a, const MappedRead &b) {
+    return a.r.get_start() > b.r.get_start();
+}
+static inline bool
+end_greater(const MappedRead &a, const MappedRead &b) {
+    return a.r.get_end() > b.r.get_end();
+}
+/******************************************************************************/
+
+
+struct MappedReadOrderChecker {
+    bool operator()(const MappedRead &prev, const MappedRead &gr) const {
+        return start_check(prev, gr);
+    }
+    static bool
+    is_ready(const priority_queue<MappedRead, vector<MappedRead>, MappedReadOrderChecker> &pq,
+             const MappedRead &mr, const size_t max_width) {
+        return !pq.top().r.same_chrom(mr.r) || pq.top().r.get_end() + max_width < mr.r.get_start();
+    }
+    static bool
+    start_check(const MappedRead &prev, const MappedRead &mr) {
+        return (chrom_greater(prev, mr)
+                || (prev.r.same_chrom(mr.r) && start_greater(prev, mr))
+                || (prev.r.same_chrom(mr.r) && same_start(prev, mr) && end_greater(prev, mr)));
+    }
+};
+
+
+
+static void empty_pq(MappedRead &prev_mr,
+                     priority_queue<MappedRead, vector<MappedRead>,
+                                    MappedReadOrderChecker> &read_pq,
+                     const string &input_file_name,
+		     std::ostream& out){
+    
+  MappedRead curr_mr = read_pq.top();
+    //	       cerr << "outputting from queue : " << read_pq.top() << endl;
+  read_pq.pop();
+
+    // check if reads are sorted
+  if (curr_mr.r.same_chrom(prev_mr.r) &&
+      curr_mr.r.get_start() < prev_mr.r.get_start()
+      && curr_mr.r.get_end() < prev_mr.r.get_end()){
+    cerr << "prev = \t" << prev_mr << endl;
+    cerr << "curr = \t" << curr_mr << endl;
+    cerr << "Increase seg_len if in paired end mode" << endl;
+    throw SMITHLABException("reads unsorted in " + input_file_name);
+  }
+
+  out << curr_mr << endl;
+
+  prev_mr = curr_mr;
+}
+
 
 int 
 main(int argc, const char **argv) {
@@ -158,7 +234,8 @@ main(int argc, const char **argv) {
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]),
-                           "Convert the SAM/BAM output to mapped read format",
+                           "Convert the SAM/BAM output from bsmap, "
+                           "bismark or bs_seeker to MethPipe mapped read format",
                            "sam/bam_file");
     opt_parse.add_opt("output", 'o', "Name of output file", 
                       false, outfile);
@@ -205,20 +282,21 @@ main(int argc, const char **argv) {
     SAMReader sam_reader(mapped_reads_file, mapper);
     std::tr1::unordered_map<string, SAMRecord> dangling_mates;
    
-    size_t count = 0;
     const size_t progress_step = 1000000;
     SAMRecord samr;
+    MappedRead prev_mr;
+    size_t n_mates = 0;
+
+    std::priority_queue<MappedRead, vector<MappedRead>, MappedReadOrderChecker> read_pq;
 
     while ((sam_reader >> samr, sam_reader.is_good()))
     {
       if(samr.is_primary && samr.is_mapped){
 	// only convert mapped and primary reads
-
+	++n_mates;
 	if (samr.is_mapping_paired){
-
 	  const string read_name
-	    = samr.mr.r.get_name().substr(
-	      0, samr.mr.r.get_name().size() - suffix_len);
+	    = samr.mr.r.get_name().substr(0, samr.mr.r.get_name().size() - suffix_len);
 
 	  if (dangling_mates.find(read_name) != dangling_mates.end()){
 	    // other end is in dangling mates, merge the two mates
@@ -235,18 +313,55 @@ main(int argc, const char **argv) {
 
 	      if (MERGE_SUCCESS && 
 		  len >= 0 && 
-		  len <= static_cast<int>(MAX_SEGMENT_LENGTH)) 
-		out << merged << endl;
-	      else
-		out << dangling_mates[read_name].mr << endl << samr.mr << endl;
+		  len <= static_cast<int>(MAX_SEGMENT_LENGTH)){
+		//if(read_pq.empty())
+		//prev_mr = merged;
+		//else
+		  read_pq.push(merged);
+	      }
+	      else{
+		// informative error message!
+		if(VERBOSE){
+		  cerr << "problem merging read " << read_name << ", splitting read" << endl;
+		  cerr << samr.mr << endl;
+		  cerr << dangling_mates[read_name].mr << endl;
+		  cerr << "To merge, set max segement length (seg_len) higher." << endl;
+		}
+
+		// don't throw error for problems merging
+		//if(read_pq.empty()){
+		// prev_mr = dangling_mates[read_name].mr;
+		// read_pq.push(samr.mr);
+		//}
+		//else{
+		  read_pq.push(samr.mr);
+		  read_pq.push(dangling_mates[read_name].mr);
+		  //}
+	      }
 
 	      dangling_mates.erase(read_name);
 	    }
 	    else{
-	      out << dangling_mates[read_name].mr << endl << samr.mr << endl;
+	      //if(read_pq.empty()){
+	      //prev_mr = dangling_mates[read_name].mr;
+	      //read_pq.push(samr.mr);
+	      //}
+	      //else{
+		read_pq.push(samr.mr);
+		read_pq.push(dangling_mates[read_name].mr);
+		//}
 	      dangling_mates.erase(read_name);
-
 	    }
+
+	    if(!(read_pq.empty()) &&
+	       MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH)) {
+	      //begin emptying priority queue
+	      while(!(read_pq.empty()) &&
+		    MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH) ){
+		empty_pq(prev_mr, read_pq, mapped_reads_file, out);
+	      }//end while loop
+	    }//end statement for emptying priority queue
+
 	  }
 	  else
 	    dangling_mates[read_name] = samr;
@@ -255,10 +370,22 @@ main(int argc, const char **argv) {
 	else{ 
 	    // unmatched, output read
 	  if (!samr.is_Trich) revcomp(samr.mr);
-	  //  if(samr.seg_len == 0)
-	    out << samr.mr << endl;
+
+	  //if(read_pq.empty())
+	  //prev_mr = samr.mr;
+	  //else 
+	    read_pq.push(samr.mr);
+
+	  if(!(read_pq.empty()) &&
+	     MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH)) {
+	      //begin emptying priority queue
+	    while(!(read_pq.empty()) &&
+		  MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH) ){
+	      empty_pq(prev_mr, read_pq, mapped_reads_file, out);
+	    }//end while loop
+	  }//end statement for emptying priority queue
+
 	}
-	++count;
 
       // dangling mates is too large, flush dangling_mates of reads
       // on different chroms and too far away 
@@ -278,17 +405,27 @@ main(int argc, const char **argv) {
 		    samr.mr.r.get_start())) {
 	      if (!itr->second.is_Trich) revcomp(itr->second.mr);
 	      if(itr->second.seg_len >= 0)
-		out << itr->second.mr << endl;
+		read_pq.push(itr->second.mr);
 	    }
 	    else
 	      tmp[itr->first] = itr->second;
 	  }
 	  std::swap(tmp, dangling_mates);
 	  tmp.clear();
+
+	  if(!(read_pq.empty()) &&
+	     MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH)) {
+	      //begin emptying priority queue
+	    while(!(read_pq.empty()) &&
+		  MappedReadOrderChecker::is_ready(read_pq, samr.mr, MAX_SEGMENT_LENGTH) ){
+	      empty_pq(prev_mr, read_pq, mapped_reads_file, out);
+	    }//end while loop
+	  }//end statement for emptying priority queue
+
 	}
       
-	if (VERBOSE && count % progress_step == 0)
-	  cerr << "Processed " << count << " records" << endl;
+	if (VERBOSE && n_mates % progress_step == 0)
+	  cerr << "Processed " << n_mates << " records" << endl;
       }
     }
     // flushing dangling_mates of all remaining ends
@@ -299,13 +436,17 @@ main(int argc, const char **argv) {
     while (!dangling_mates.empty()){
       if (!dangling_mates.begin()->second.is_Trich)
         revcomp(dangling_mates.begin()->second.mr);
-      out << dangling_mates.begin()->second.mr << endl;
+      read_pq.push(dangling_mates.begin()->second.mr);
       dangling_mates.erase(dangling_mates.begin());
+    }
+
+    while(!read_pq.empty()){
+      empty_pq(prev_mr, read_pq, mapped_reads_file, out);
     }
           
     if (VERBOSE){
       cerr << "Done." << endl;
-      cerr << "total reads = " << count << endl;
+      cerr << "total mates processed = " << n_mates << endl;
     }
   }
   catch (const SMITHLABException &e) {
