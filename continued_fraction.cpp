@@ -940,7 +940,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double> 
   for (size_t j = 1; j <= max_terms; j++)
     full_ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
 
-  ContinuedFraction full_CF(full_ps_coeffs, -1, max_terms);  
+  ContinuedFraction full_CF(full_ps_coeffs, diagonal_idx, max_terms);  
 
   // if max terms = 4, check only that degree
   if(max_terms == 4 || max_terms == 3 

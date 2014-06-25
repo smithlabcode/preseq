@@ -145,6 +145,8 @@ public:
   local_max(const ContinuedFraction &cf,
             const double deriv_upper_bound) const;
 
+  int get_diagonal() const {return diagonal_idx;}
+
 private:
   
   int diagonal_idx; // the diagonal to work with for estimates

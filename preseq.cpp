@@ -1266,8 +1266,7 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
     size_t counts_before_first_zero = 1;
     while (counts_before_first_zero < hist.size() &&
            hist[counts_before_first_zero] > 0)
-        ++counts_before_first_zero;
-    
+        ++counts_before_first_zero;    
     
     
     // Ensure we are not using a zero term
@@ -1300,13 +1299,16 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
     }
     
     if (VERBOSE) {
+      if(lower_cf.offset_coeffs.size() > 0){
         cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
         copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
              std::ostream_iterator<double>(cerr, "\n"));
-        
+      }
+      if(lower_cf.cf_coeffs.size() > 0){
         cerr << "CF_COEFF_ESTIMATES" << endl;
         copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
              std::ostream_iterator<double>(cerr, "\n"));
+      }
     }
     
     // SUCCESS!!
