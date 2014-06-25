@@ -1415,7 +1415,7 @@ lc_extrap(const bool VERBOSE,
     else if (BAM_FORMAT_INPUT && PAIRED_END){
         if(VERBOSE)
             cerr << "PAIRED_END_BAM_INPUT" << endl;
-        const size_t MAX_READS_TO_HOLD = 1000000;
+        const size_t MAX_READS_TO_HOLD = 5000000;
 	size_t n_paired = 0;
 	size_t n_mates = 0;
         n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
@@ -1833,7 +1833,7 @@ static void c_curve (const bool VERBOSE,
     else if (BAM_FORMAT_INPUT && PAIRED_END){
         if(VERBOSE)
             cerr << "PAIRED_END_BAM_INPUT" << endl;
-        const size_t MAX_READS_TO_HOLD = 1000000;
+        const size_t MAX_READS_TO_HOLD = 5000000;
 	size_t n_paired = 0;
 	size_t n_mates = 0;
         n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
@@ -1973,7 +1973,7 @@ main(const int argc, const char **argv) {
         size_t MAX_SEGMENT_LENGTH = 5000;
         size_t max_width = 10000;
         size_t bootstraps = 100;
-        int diagonal = -1;
+        int diagonal = 0;
         size_t bin_size = 10;
         double c_level = 0.95;
         //double tolerance = 1e-20;
