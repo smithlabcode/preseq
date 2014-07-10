@@ -398,22 +398,6 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
     estimates.push_back(hist_sum + t*operator()(t));
 }
 
-static double
-sample_count_distinct(const gsl_rng *rng,
-		      const vector<size_t> &full_umis,
-		      const size_t sample_size) {
-  vector<size_t> sample_umis(sample_size);
-  gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
-		 (size_t *)&full_umis.front(), full_umis.size(), 
-		 sizeof(size_t));
-  double count = 1.0;
-  for (size_t i = 1; i < sample_umis.size(); i++)
-    if(sample_umis[i] != sample_umis[i-1])
-      count++;
-
-  return count;
-}
-
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
