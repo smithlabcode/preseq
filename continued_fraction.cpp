@@ -20,8 +20,6 @@
 #include "continued_fraction.hpp"
 #include <vector>
 #include <cmath>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_rng.h>
 
 
 using std::vector;
