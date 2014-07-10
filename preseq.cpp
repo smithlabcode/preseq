@@ -16,7 +16,7 @@
  *    GNU General Public License for more details.
  *
  *    You should have received a copy of the GNU General Public License
- *    along with this program.    If not, see <http://www.gnu.org/licenses/>.
+ *    along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <fstream>
@@ -262,8 +262,8 @@ load_counts_BAM_se(const string &input_file_name, vector<double> &counts_hist) {
 
 static bool
 merge_mates(const size_t suffix_len, const size_t range,
-           const GenomicRegion &one, const GenomicRegion &two,
-           GenomicRegion &merged, int &len) {
+            const GenomicRegion &one, const GenomicRegion &two,
+            GenomicRegion &merged, int &len) {
     
     assert(one.same_chrom(two));
     const size_t read_start = min(one.get_start(), two.get_start());
@@ -290,7 +290,7 @@ merge_mates(const size_t suffix_len, const size_t range,
 
 inline static bool
 same_read(const size_t suffix_len, 
-      const MappedRead &a, const MappedRead &b) {
+        const MappedRead &a, const MappedRead &b) {
   const string sa(a.r.get_name());
   const string sb(b.r.get_name());
   bool SAME_NAME = false;
@@ -312,11 +312,11 @@ GenomicRegionIsNull(const GenomicRegion &gr){
 
 static void
 empty_pq(GenomicRegion &prev_gr,
-     priority_queue<GenomicRegion, vector<GenomicRegion>,
-            GenomicRegionOrderChecker> &read_pq,
-     const string &input_file_name,
-     vector<double> &counts_hist,
-     size_t &current_count){
+        priority_queue<GenomicRegion, vector<GenomicRegion>,
+        GenomicRegionOrderChecker> &read_pq,
+        const string &input_file_name,
+        vector<double> &counts_hist,
+        size_t &current_count){
     
   GenomicRegion curr_gr = read_pq.top();
     //           cerr << "outputting from queue : " << read_pq.top() << endl;
@@ -325,7 +325,8 @@ empty_pq(GenomicRegion &prev_gr,
     // check if reads are sorted
   if (curr_gr.same_chrom(prev_gr) &&
       curr_gr.get_start() < prev_gr.get_start()
-      && curr_gr.get_end() < prev_gr.get_end()){
+      && curr_gr.get_end() < prev_gr.get_end())
+  {
     cerr << "prev = \t" << prev_gr << endl;
     cerr << "curr = \t" << curr_gr << endl;
     cerr << "Increase seg_len if in paired end mode" << endl;
@@ -679,9 +680,8 @@ load_histogram(const string &filename, vector<double> &counts_hist) {
 // genomic regions of width equal to bin_size
 static void
 SplitGenomicRegion(const GenomicRegion &inputGR,
-           Runif &runif,
-           const size_t bin_size,
-           vector<GenomicRegion> &outputGRs){
+        Runif &runif, const size_t bin_size,
+        vector<GenomicRegion> &outputGRs){
   outputGRs.clear();
   GenomicRegion gr(inputGR);
 
@@ -746,12 +746,12 @@ SplitMappedRead(const bool VERBOSE,
     if(read_iterator % bin_size == bin_size - 1){
       double frac = static_cast<double>(covered_bases)/bin_size;
       if(runif.runif(0.0, 1.0) <= frac){
-    const size_t curr_start = read_iterator - (read_iterator % bin_size);
-    const size_t curr_end = curr_start + bin_size;
-    GenomicRegion binned_gr(inputMR.r.get_chrom(), curr_start, curr_end,
-                inputMR.r.get_name(), inputMR.r.get_score(),
-                inputMR.r.get_strand());
-    outputGRs.push_back(binned_gr);
+        const size_t curr_start = read_iterator - (read_iterator % bin_size);
+        const size_t curr_end = curr_start + bin_size;
+        GenomicRegion binned_gr(inputMR.r.get_chrom(), curr_start, curr_end,
+                  inputMR.r.get_name(), inputMR.r.get_score(),
+                  inputMR.r.get_strand());
+        outputGRs.push_back(binned_gr);
       }
       total_covered_bases += covered_bases;
       covered_bases = 0;
@@ -839,10 +839,10 @@ load_coverage_counts_MR(const bool VERBOSE,
     // remove Genomic Regions from the priority queue
     if(splitGRs.size() > 0){
       while(!PQ.empty() && 
-        GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width))
+          GenomicRegionOrderChecker::is_ready(PQ, splitGRs.back(), max_width))
       {
-        empty_pq(curr_gr, prev_gr, 
-             current_count, coverage_hist, PQ, input_file_name);
+        empty_pq(curr_gr, prev_gr, current_count, coverage_hist, PQ, 
+                 input_file_name);
       }
     }
 
@@ -1177,7 +1177,7 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t counts_before_first_zero = 1;
     while (counts_before_first_zero < hist.size() &&
-       hist[counts_before_first_zero] > 0)
+            hist[counts_before_first_zero] > 0)
       ++counts_before_first_zero;
     
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);
@@ -1478,11 +1478,11 @@ lc_extrap(const bool VERBOSE,
                                       bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
         cerr << "TOTAL READS     = " << n_reads << endl
-         << "DISTINCT READS  = " << distinct_reads << endl
-         << "DISTINCT COUNTS = " << distinct_counts << endl
-         << "MAX COUNT       = " << max_observed_count << endl
-         << "COUNTS OF 1     = " << counts_hist[1] << endl
-         << "MAX TERMS       = " << orig_max_terms << endl;
+             << "DISTINCT READS  = " << distinct_reads << endl
+             << "DISTINCT COUNTS = " << distinct_counts << endl
+             << "MAX COUNT       = " << max_observed_count << endl
+             << "COUNTS OF 1     = " << counts_hist[1] << endl
+             << "MAX TERMS       = " << orig_max_terms << endl;
     
     if (VERBOSE) {
         // OUTPUT THE ORIGINAL HISTOGRAM
@@ -1612,35 +1612,14 @@ gc_extrap(const bool VERBOSE,
 
     if(NO_SEQUENCE){
       if(VERBOSE)
-    cerr << "BED FORMAT" << endl;
-      n_reads = load_coverage_counts_GR(input_file_name, bin_size, max_width, 
-                    //n_bases_extend, 
-                    coverage_hist);
+        cerr << "BED FORMAT" << endl;
+      n_reads = load_coverage_counts_GR(input_file_name, bin_size, 
+                                        max_width, //n_bases_extend, 
+                                        coverage_hist);
     }
-    /*
-#ifdef HAVE_SAMTOOLS
-    else if(BAM_FORMAT_INPUT){
-      const string mapper = "general";
-      const size_t suffix_len = 0;
-      const size_t MAX_READS_TO_HOLD = 100000;
-      if(VERBOSE)
-    cerr << "BAM FORMAT" << endl;
-      size_t n_paired = 0;
-      size_t n_mates = 0;
-      n_reads = load_coverage_counts_bam(VERBOSE, input_file_name, mapper, bin_size,
-                     max_width, //n_bases_extend,
-                     MAX_SEGMENT_LENGTH, MAX_READS_TO_HOLD,
-                     suffix_len, n_paired, n_mates, coverage_hist);
-      if(VERBOSE){
-    cerr << "MERGED PAIRED END READS = " << n_paired << endl;
-    cerr << "MATES PROCESSED = " << n_mates << endl;
-      }
-    }
-#endif
-    */
     else{
       if(VERBOSE)
-    cerr << "MAPPED READ FORMAT" << endl;
+        cerr << "MAPPED READ FORMAT" << endl;
       n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, bin_size, 
                     max_width, // n_bases_extend, 
                     coverage_hist);
@@ -1659,7 +1638,7 @@ gc_extrap(const bool VERBOSE,
     if(bin_step_size < (total_bins/20)){
        bin_step_size = std::max(bin_step_size, bin_step_size*round(total_bins/(20*bin_step_size)));
        if(VERBOSE)
-     cerr << "ADJUSTED_STEP_SIZE = " << bin_step_size << endl;
+         cerr << "ADJUSTED_STEP_SIZE = " << bin_step_size << endl;
        base_step_size = bin_step_size*bin_size;
     }
     // recorrect the read step size
@@ -1676,23 +1655,23 @@ gc_extrap(const bool VERBOSE,
         
     if (VERBOSE)
       cerr << "TOTAL READS         = " << n_reads << endl
-       << "BASE STEP SIZE      = " << base_step_size << endl
-       << "BIN STEP SIZE       = " << bin_step_size << endl
-       << "TOTAL BINS          = " << total_bins << endl
-       << "BINS PER READ       = " << avg_bins_per_read << endl
-       << "DISTINCT BINS       = " << distinct_bins << endl
-       << "TOTAL BASES         = " << total_bins*bin_size << endl
-       << "TOTAL COVERED BASES = " << distinct_bins*bin_size << endl
-       << "MAX COVERAGE COUNT  = " << max_observed_count << endl
-       << "COUNTS OF 1         = " << coverage_hist[1] << endl;
+           << "BASE STEP SIZE      = " << base_step_size << endl
+           << "BIN STEP SIZE       = " << bin_step_size << endl
+           << "TOTAL BINS          = " << total_bins << endl
+           << "BINS PER READ       = " << avg_bins_per_read << endl
+           << "DISTINCT BINS       = " << distinct_bins << endl
+           << "TOTAL BASES         = " << total_bins*bin_size << endl
+           << "TOTAL COVERED BASES = " << distinct_bins*bin_size << endl
+           << "MAX COVERAGE COUNT  = " << max_observed_count << endl
+           << "COUNTS OF 1         = " << coverage_hist[1] << endl;
     
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED BIN COUNTS (" << coverage_hist.size() << ")" << endl;
       for (size_t i = 0; i < coverage_hist.size(); i++)
-    if (coverage_hist[i] > 0)
-      cerr << i << '\t' << coverage_hist[i] << endl;
-      cerr << endl;
+        if (coverage_hist[i] > 0)
+          cerr << i << '\t' << coverage_hist[i] << endl;
+          cerr << endl;
     }
 
 
@@ -1726,7 +1705,7 @@ gc_extrap(const bool VERBOSE,
     if(SINGLE_ESTIMATE){
 
       bool SINGLE_ESTIMATE_SUCCESS = 
-    extrap_single_estimate(VERBOSE, coverage_hist, orig_max_terms, diagonal,
+        extrap_single_estimate(VERBOSE, coverage_hist, orig_max_terms, diagonal,
                    bin_step_size, max_extrapolation/bin_size,
                    coverage_estimates);
 
@@ -1871,11 +1850,11 @@ static void c_curve (const bool VERBOSE,
                                       bind2nd(std::greater<double>(), 0.0)));
     if (VERBOSE)
         cerr << "TOTAL READS     = " << n_reads << endl
-         << "COUNTS_SUM      = " << total_reads << endl
-        << "DISTINCT READS  = " << distinct_reads << endl
-        << "DISTINCT COUNTS = " << distinct_counts << endl
-        << "MAX COUNT       = " << max_observed_count << endl
-        << "COUNTS OF 1     = " << counts_hist[1] << endl;
+             << "COUNTS_SUM      = " << total_reads << endl
+             << "DISTINCT READS  = " << distinct_reads << endl
+             << "DISTINCT COUNTS = " << distinct_counts << endl
+             << "MAX COUNT       = " << max_observed_count << endl
+             << "COUNTS OF 1     = " << counts_hist[1] << endl;
     
     if (VERBOSE) {
         // OUTPUT THE ORIGINAL HISTOGRAM
@@ -2025,7 +2004,7 @@ main(const int argc, const char **argv) {
 #ifdef HAVE_SAMTOOLS
             opt_parse.add_opt("bam", 'B', "input is in BAM format",
                               false, BAM_FORMAT_INPUT);
-        opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
+            opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
                   "paired end bam reads (default: " 
                   + toa(MAX_SEGMENT_LENGTH) + ")", 
                   false, MAX_SEGMENT_LENGTH);
@@ -2147,7 +2126,7 @@ main(const int argc, const char **argv) {
                          HIST_INPUT,
 #ifdef HAVE_SAMTOOLS
                          BAM_FORMAT_INPUT,
-             MAX_SEGMENT_LENGTH,
+                          MAX_SEGMENT_LENGTH,
 #endif
                          step_size,
                          upper_limit,
