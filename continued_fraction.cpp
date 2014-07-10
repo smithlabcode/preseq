@@ -36,7 +36,6 @@ using std::vector;
 using std::complex;
 using std::real;
 using std::imag;
-using std::cerr;
 using std::endl;
 using std::min;
 using std::isfinite;
@@ -188,9 +187,8 @@ ContinuedFraction::truncate_degree(const ContinuedFraction &CF,
 				   const size_t n_terms){
   ContinuedFraction truncated_CF;
   if(CF.degree < n_terms){
-    cerr << "current CF degree   = " << CF.degree << endl;
-    cerr << "truncated CF degree = " << n_terms << endl; 
-    throw SMITHLABException("degree of truncate CF must be at least as large as current");
+  // return a empty continued fraction if the degree < n_terms
+	return truncated_CF;
   }
 
   vector<double> truncated_ps_coeffs(CF.ps_coeffs);
@@ -624,7 +622,6 @@ ContinuedFraction::extrapolate_mincount(const vector<double> &counts_hist,
                                         vector<double> &estimates) const {
   const double current_observed = 
     accumulate(counts_hist.begin() + mincount, counts_hist.end(), 0.0);
-  //  cerr << "current_observed = " << current_observed << endl;
 
   estimates.clear();
   estimates.push_back(current_observed);
@@ -924,13 +921,11 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double> 
   //do this outside
   // ensure that we will use an underestimate
   //  const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
- 
-  if(max_terms >= counts_hist.size()){
-    cerr << "max terms = " << max_terms << endl;
-    cerr << "hist size = " << counts_hist.size() << endl;
-  } 
-  assert(max_terms < counts_hist.size());
-  
+  if(max_terms >= counts_hist.size()) {
+	  ContinuedFraction empty;
+	  return empty;
+  }
+
   // counts_sum = number of total captures
   double counts_sum  = 0.0;
   for(size_t i = 0; i < counts_hist.size(); i++)
@@ -1090,7 +1085,6 @@ ContinuedFractionApproximation::optimal_cont_frac_count(const vector<double> &co
   int order = 0;
 
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order)){
-    cerr << "max_terms too small" << endl;
     return ContinuedFraction();
   }
 
@@ -1241,20 +1235,11 @@ check_mincount_estimates_stability(const vector<double> &estimates,
   // is below the initial distinct per step_size
   for (size_t i = 1; i < estimates.size(); ++i){
     if(!isfinite(estimates[i])){
-      //    cerr << "not finite at " << i << "\t" << estimates[i] << endl;
       return false;
     }
     if ((estimates[i] < estimates[i - 1]) ||
         (estimates[i] - estimates[i - 1] > max_change_per_time_step)){
-      /*     if(estimates[i] < estimates[i - 1])
-	cerr << i - 1 << "th estimate (" << estimates[i-1] 
-	     << ") greater than " << i << "th (" << estimates[i] << ")" << endl;
-      if(estimates[i] - estimates[i - 1] > max_change_per_time_step)
-	cerr << "change is more than max_change_per_time_step, change = "
-	     << estimates[i] - estimates[i - 1] 
-	     << ", max_change_per_time_step = " << max_change_per_time_step << endl;
-      */
-      return false;
+            return false;
     }
   }
     
@@ -1276,13 +1261,6 @@ const int order) const {
 
   vector<double> ps_coeffs;
   construct_mincount_ps_coeffs(counts_hist, max_terms, mincount, ps_coeffs);
-
-  /*
-  cerr << "ps_coeffs = " << endl;
-  for(size_t i = 0; i < ps_coeffs.size(); i++)
-    cerr << ps_coeffs[i] << endl;
-  cerr << endl;
-  */
 
   // if max_terms is too small, unacceptable extrapolation
   if(max_terms < MIN_ALLOWED_DEGREE + abs(order))
