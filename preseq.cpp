@@ -157,15 +157,18 @@ struct GenomicRegionOrderChecker {
         return start_check(prev, gr);
     }
     static bool
-    is_ready(const priority_queue<GenomicRegion, vector<GenomicRegion>, GenomicRegionOrderChecker> &pq,
-             const GenomicRegion &gr, const size_t max_width) {
-        return !pq.top().same_chrom(gr) || pq.top().get_end() + max_width < gr.get_start();
+    is_ready(const priority_queue<GenomicRegion, vector<GenomicRegion>, 
+			 GenomicRegionOrderChecker> &pq, const GenomicRegion &gr, 
+			 const size_t max_width) 
+	{
+		return !pq.top().same_chrom(gr) || pq.top().get_end() + max_width < gr.get_start();
     }
     static bool
     start_check(const GenomicRegion &prev, const GenomicRegion &gr) {
         return (chrom_greater(prev, gr)
                 || (prev.same_chrom(gr) && start_greater(prev, gr))
-                || (prev.same_chrom(gr) && same_start(prev, gr) && end_greater(prev, gr)));
+                || (prev.same_chrom(gr) && same_start(prev, gr) 
+			    && end_greater(prev, gr)));
     }
 };
 
@@ -378,102 +381,103 @@ load_counts_BAM_pe(const bool VERBOSE,
     
     while ((sam_reader >> samr, sam_reader.is_good()))
     {
-      if(samr.is_primary && samr.is_mapped){
-	++n_mates;
-	// only convert mapped and primary reads
-	if (samr.is_mapping_paired){
-	  const string read_name
-	    = samr.mr.r.get_name().substr(0, samr.mr.r.get_name().size() - suffix_len);
-                
-	  if (dangling_mates.find(read_name) != dangling_mates.end()){
-	    // other end is in dangling mates, merge the two mates
-	    if(same_read(suffix_len, samr.mr, dangling_mates[read_name].mr)){
-	      if (samr.is_Trich) std::swap(samr, dangling_mates[read_name]);
-                    
-	      GenomicRegion merged;
-	      int len = 0;
-	      bool MERGE_SUCCESS =
-		merge_mates(suffix_len, MAX_SEGMENT_LENGTH,
-			    dangling_mates[read_name].mr.r, samr.mr.r, merged, len);
-	    // merge success!
-	      if (MERGE_SUCCESS && 
-		  len >= 0 && 
-		  len <= static_cast<int>(MAX_SEGMENT_LENGTH)){
-		read_pq.push(merged);
-		++n_paired;
-	      }
-	      else{
-		// informative error message!
-		if(VERBOSE){
-		  cerr << "problem merging read " << read_name << ", splitting read" << endl;
-		  cerr << samr.mr << endl;
-		  cerr << dangling_mates[read_name].mr << endl;
-		  cerr << "To merge, set max segement length (seg_len) higher." << endl;
-		}
-		read_pq.push(samr.mr.r);
-		read_pq.push(dangling_mates[read_name].mr.r);
-		n_unpaired += 2;
-	      }
-	      dangling_mates.erase(read_name);
-	    }
-	    else{
-	      read_pq.push(samr.mr.r);
-	      read_pq.push(dangling_mates[read_name].mr.r);
-	      dangling_mates.erase(read_name);
-	      n_unpaired += 2;
-	    }
-	
-	  }
-	  else // didn't find read in dangling_mates, store for later
-	    dangling_mates[read_name] = samr;
-	     
-	}
-	else{
-	  read_pq.push(samr.mr.r);
-	  ++n_unpaired;
-	}
+      if(samr.is_primary && samr.is_mapped)
+	  {
+		  ++n_mates;
+		  // only convert mapped and primary reads
+		  if (samr.is_mapping_paired)
+		  {
+			  const string read_name = samr.mr.r.get_name().substr(0, 
+					         samr.mr.r.get_name().size() - suffix_len);
+			  if (dangling_mates.find(read_name) != dangling_mates.end()) 
+			  {
+				  // other end is in dangling mates, merge the two mates
+				  if(same_read(suffix_len, samr.mr, dangling_mates[read_name].mr))
+				  {
+					  if (samr.is_Trich) 
+						  std::swap(samr, dangling_mates[read_name]);
+
+					  GenomicRegion merged;
+					  int len = 0;
+					  bool MERGE_SUCCESS = merge_mates(suffix_len, 
+							                           MAX_SEGMENT_LENGTH, 
+										               dangling_mates[read_name].mr.r, 
+										               samr.mr.r, merged, len);
+					  // merge success!
+					  if (MERGE_SUCCESS && len >= 0 && \
+						  len <= static_cast<int>(MAX_SEGMENT_LENGTH))
+					  {
+						  read_pq.push(merged);
+						  ++n_paired;
+					  }
+					  else
+					  {
+				          // informative error message!
+					      if(VERBOSE){
+							  cerr << "problem merging read " 
+								   << read_name << ", splitting read" << endl;
+							  cerr << samr.mr << endl;
+							  cerr << dangling_mates[read_name].mr << endl;
+							  cerr << "To merge, set max segement "
+								   << "length (seg_len) higher." << endl;
+						  }
+						  read_pq.push(samr.mr.r);
+						  read_pq.push(dangling_mates[read_name].mr.r);
+						  n_unpaired += 2;
+					  }
+					  dangling_mates.erase(read_name);
+				  }
+				  else {
+					  read_pq.push(samr.mr.r);
+					  read_pq.push(dangling_mates[read_name].mr.r);
+					  dangling_mates.erase(read_name);
+					  n_unpaired += 2;
+				  }
+			  }
+			  else // didn't find read in dangling_mates, store for later
+				  dangling_mates[read_name] = samr;
+		  }
+		  else {
+			  read_pq.push(samr.mr.r);
+			  ++n_unpaired;
+		  }
             
-	// dangling mates is too large, flush dangling_mates of reads
-	// on different chroms and too far away
-	if (dangling_mates.size() > MAX_READS_TO_HOLD){
-	  //  if(VERBOSE)
-	  //  cerr << "dangling mates too large, " << dangling_mates.size() << ", emptying" << endl;
+	  // dangling mates is too large, flush dangling_mates of reads
+	  // on different chroms and too far away
 
-	  unordered_map<string, SAMRecord> tmp;
-	  for (unordered_map<string, SAMRecord>::iterator
-		 itr = dangling_mates.begin();
-	       itr != dangling_mates.end(); ++itr)
-	    if (itr->second.mr.r.get_chrom() != samr.mr.r.get_chrom()
-		|| (itr->second.mr.r.get_chrom() == samr.mr.r.get_chrom()
-		    && itr->second.mr.r.get_end() + MAX_SEGMENT_LENGTH <
-		    samr.mr.r.get_start())) 
-	      {
-		if(itr->second.seg_len >= 0){
-		  read_pq.push(itr->second.mr.r);
-		  ++n_unpaired;
-		}
-	      }
-	    else
-	      tmp[itr->first] = itr->second;
-                
-	  std::swap(tmp, dangling_mates);
-	  tmp.clear();
-	}
-
-	if(!(read_pq.empty()) &&
-	   GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
-	  //begin emptying priority queue
-	  while(!(read_pq.empty()) &&
-		GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r,
-						    MAX_SEGMENT_LENGTH) ){
-	    empty_pq(prev_gr, read_pq, input_file_name, 
-		     counts_hist, current_count);
-	  }//end while loop
-	}//end statement for emptying priority queue
-       
-	if (VERBOSE && n_mates % progress_step == 0)
-	  cerr << "Processed " << n_mates << " records" << endl;     
-      }
+		  if (dangling_mates.size() > MAX_READS_TO_HOLD) {
+			  unordered_map<string, SAMRecord> tmp;
+			  for (unordered_map<string, SAMRecord>::iterator itr = 
+				   dangling_mates.begin(); itr != dangling_mates.end(); ++itr)
+			  {
+				  if (itr->second.mr.r.get_chrom() != samr.mr.r.get_chrom() 
+					  || (itr->second.mr.r.get_chrom() == samr.mr.r.get_chrom()
+					  && itr->second.mr.r.get_end() + MAX_SEGMENT_LENGTH < samr.mr.r.get_start()))
+				  {
+					  if(itr->second.seg_len >= 0) {
+					  read_pq.push(itr->second.mr.r);
+					  ++n_unpaired;
+					  }
+				  }
+				  else tmp[itr->first] = itr->second;
+			  }
+			  std::swap(tmp, dangling_mates);
+			  tmp.clear();
+		  }
+		  if(!(read_pq.empty()) && \
+			 GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH))
+		  {
+			  //begin emptying priority queue
+			  while(!(read_pq.empty()) && \
+					GenomicRegionOrderChecker::is_ready(read_pq, samr.mr.r,MAX_SEGMENT_LENGTH) )
+			  {
+				  empty_pq(prev_gr, read_pq, input_file_name, counts_hist, current_count);
+			  }//end while loop
+		  }//end statement for emptying priority queue
+   
+		  if (VERBOSE && n_mates % progress_step == 0)
+			  cerr << "Processed " << n_mates << " records" << endl;
+	  }
     }
     
     // empty dangling mates of any excess reads
@@ -484,10 +488,8 @@ load_counts_BAM_pe(const bool VERBOSE,
     }
   
     //final iteration
-    while(!read_pq.empty()){
-      empty_pq(prev_gr, read_pq, input_file_name, 
-	       counts_hist, current_count);
-    }
+    while(!read_pq.empty())
+      empty_pq(prev_gr, read_pq, input_file_name, counts_hist, current_count);
     
     if(counts_hist.size() < current_count + 1)
       counts_hist.resize(current_count + 1, 0.0);
@@ -1201,8 +1203,8 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
       if (check_yield_estimates(yield_vector)) {
 	bootstrap_estimates.push_back(yield_vector);
 	if (VERBOSE) cerr << '.';
-	//	Ylevel_estimates.push_back(lower_cf.Ylevel(hist, dupl_level, sample_vals_sum, sample_max_val, 
-	//					   tolerance, max_iter));
+	//	Ylevel_estimates.push_back(lower_cf.Ylevel(hist, dupl_level, 
+	//	sample_vals_sum, sample_max_val, tolerance, max_iter));
       }
       else if (VERBOSE){
 	cerr << "_";
@@ -1288,7 +1290,8 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
         while(sample_size < max_extrapolation){
             const double one_minus_fold_extrap = (sample_size - vals_sum)/vals_sum;
             assert(one_minus_fold_extrap >= 0.0);
-            yield_estimate.push_back(initial_distinct + one_minus_fold_extrap*lower_cf(one_minus_fold_extrap));
+			double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
+            yield_estimate.push_back(initial_distinct + tmp);
             sample_size += step_size;
         }
     }
@@ -1490,7 +1493,8 @@ lc_extrap(const bool VERBOSE,
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
     if(two_fold_extrap < 0.0)
-        throw SMITHLABException("Library expected to saturate in doubling of size, unable to extrapolate");
+        throw SMITHLABException("Library expected to saturate in doubling of "
+				                "size, unable to extrapolate");
     
     
     size_t total_reads = 0;
@@ -1502,7 +1506,9 @@ lc_extrap(const bool VERBOSE,
     
      // catch if all reads are distinct
     if (orig_max_terms < MIN_REQUIRED_COUNTS)
-      throw SMITHLABException("max count before zero is les than min required count (4), sample not sufficiently deep or duplicates removed");
+      throw SMITHLABException("max count before zero is les than min required "
+			                  "count (4), sample not sufficiently deep or "
+							  "duplicates removed");
         
     /////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
@@ -1520,7 +1526,8 @@ lc_extrap(const bool VERBOSE,
 				  step_size, max_extrapolation, yield_estimates);
         // IF FAILURE, EXIT
         if(!SINGLE_ESTIMATE_SUCCESS)
-            throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN FULL MODE FOR ESTIMATES");
+            throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN "
+				                   	"FULL MODE FOR ESTIMATES");
         
         std::ofstream of;
         if (!outfile.empty()) of.open(outfile.c_str());
@@ -1555,19 +1562,10 @@ lc_extrap(const bool VERBOSE,
         
         // yield ci
         vector<double> yield_upper_ci_lognormal, yield_lower_ci_lognormal;
-	     
-        //if(!SINGLE_ESTIMATE_SUCCESS){
-            // use bootstrap estimates to obtain median estimates
-            vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
+		
+		vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                                  yield_lower_ci_lognormal, yield_upper_ci_lognormal);
-	    /*    }
-        else{
-	
-            // use single estimates as the expected complexity curve
-            ci_given_estimates(bootstrap_estimates, c_level, yield_estimates,
-                               yield_lower_ci_lognormal, yield_upper_ci_lognormal);
-			       }*/
-        
+	          
         /////////////////////////////////////////////////////////////////////
         if (VERBOSE)
             cerr << "[WRITING OUTPUT]" << endl;
@@ -1698,7 +1696,9 @@ gc_extrap(const bool VERBOSE,
 
     // catch if all reads are distinct
     if (orig_max_terms < MIN_REQUIRED_COUNTS)
-      throw SMITHLABException("max count before zero is les than min required count (4), sample not sufficiently deep or duplicates removed");
+      throw SMITHLABException("max count before zero is les than min required "
+			                  "count (4), sample not sufficiently deep or " 
+							  "duplicates removed");
     
 
 
@@ -1706,7 +1706,8 @@ gc_extrap(const bool VERBOSE,
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(coverage_hist);
     if(two_fold_extrap < 0.0)
-        throw SMITHLABException("Library expected to saturate in doubling of experiment size, unable to extrapolate");
+        throw SMITHLABException("Library expected to saturate in doubling of "
+				                "experiment size, unable to extrapolate");
     
     
     /////////////////////////////////////////////////////////////////////
@@ -1729,7 +1730,8 @@ gc_extrap(const bool VERBOSE,
 
       // IF FAILURE, EXIT
       if(!SINGLE_ESTIMATE_SUCCESS)
-	throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN FULL MODE FOR ESTIMATES");
+	throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN FULL MODE FOR "
+		                  	"ESTIMATES");
 
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
@@ -1763,27 +1765,17 @@ gc_extrap(const bool VERBOSE,
             cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
         
         vector<double> coverage_upper_ci_lognormal, coverage_lower_ci_lognormal;
-	     
-        //if(!SINGLE_ESTIMATE_SUCCESS){
-            // use bootstrap estimates to obtain median estimates
-            vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
-                                 coverage_lower_ci_lognormal, coverage_upper_ci_lognormal);
-	    /*    }
-        else{
-	
-            // use single estimates as the expected complexity curve
-            ci_given_estimates(bootstrap_estimates, c_level, yield_estimates,
-                               yield_lower_ci_lognormal, yield_upper_ci_lognormal);
-			       }*/
-        
+		vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
+                             coverage_lower_ci_lognormal, coverage_upper_ci_lognormal);
+	          
         /////////////////////////////////////////////////////////////////////
         if (VERBOSE)
             cerr << "[WRITING OUTPUT]" << endl;
-        
-     write_predicted_coverage_curve(outfile, c_level, base_step_size, bin_size,
-				    coverage_estimates, coverage_lower_ci_lognormal, 
-				    coverage_upper_ci_lognormal);
-    }
+		write_predicted_coverage_curve(outfile, c_level, base_step_size, 
+				                       bin_size, coverage_estimates, 
+									   coverage_lower_ci_lognormal, 
+									   coverage_upper_ci_lognormal);
+	}
 }
 
 
@@ -1939,7 +1931,8 @@ static void c_curve (const bool VERBOSE,
 
 static int usage()
 {
-    cerr << "\nProgram: preseq (applications for analyzing library complexity)" << endl;
+    cerr << "\nProgram: preseq (applications for analyzing library complexity)" 
+		 << endl;
     cerr << "Version: "<< PRESEQ_VERSION << "\n\n";
     cerr << "Usage: preseq <command> [OPTIONS]\n\n";
     cerr << "Command: c_curve          generate complexity curve for a library\n";
