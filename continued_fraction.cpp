@@ -437,8 +437,12 @@ movement(const double a, const double b) {
  */
 static bool
 check_yield_estimates_stability(const vector<double> &estimates) {
+  
   // make sure that the estimate is increasing in the time_step and
   // is below the initial distinct per step_size
+  for (size_t i = 0; i < estimates.size(); ++i)
+	  if (!isfinite(estimates[i]))
+		  return false;
   for (size_t i = 1; i < estimates.size(); ++i){
     if (estimates[i] < estimates[i - 1] ){
       return false;
