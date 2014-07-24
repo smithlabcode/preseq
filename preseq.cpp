@@ -209,13 +209,12 @@ empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
 #include <SAM.hpp>
 
 
-const string mapper = "general";
 
 
 static size_t
 load_counts_BAM_se(const string &input_file_name, 
 		   vector<double> &counts_hist) {
-
+  const string mapper = "general";
   SAMReader sam_reader(input_file_name, mapper);
   if(!(sam_reader.is_good()))
     throw SMITHLABException("problem opening input file " 
@@ -362,7 +361,7 @@ load_counts_BAM_pe(const bool VERBOSE,
                    size_t &n_paired,
                    size_t &n_mates,
                    vector<double> &counts_hist) {
-
+  const string mapper = "general";
   SAMReader sam_reader(input_file_name, mapper);
   // check sam_reader
   if(!(sam_reader.is_good()))
