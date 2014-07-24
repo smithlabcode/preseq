@@ -70,8 +70,7 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf);
 class ContinuedFractionApproximation {
 public:
   // Constructor
-  ContinuedFractionApproximation(const int di, const size_t mt, 
-                                 const double ss, const double mv);
+  ContinuedFractionApproximation(const int di, const size_t mt);
   
   //find best cont frac approx for estimating distinct
   ContinuedFraction
@@ -83,8 +82,6 @@ private:
   
   int diagonal_idx; // the diagonal to work with for estimates
   size_t max_terms; // the maximum number of terms to try for a CF
-  double step_size; // the step size to use when training
-  double max_value; // the largest value to check when training
 
   static const size_t MIN_ALLOWED_DEGREE;
   

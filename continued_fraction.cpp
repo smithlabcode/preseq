@@ -421,14 +421,9 @@ const double ContinuedFractionApproximation::SEARCH_STEP_SIZE = 0.05;
 
 // calculate cf_coeffs depending on offset
 ContinuedFractionApproximation::ContinuedFractionApproximation(const int di, 
-			              const size_t mt, const double ss, const double mv) :
-  diagonal_idx(di), max_terms(mt), step_size(ss), max_value(mv) {}
+							       const size_t mt) :
+  diagonal_idx(di), max_terms(mt) {}
 
-
-static inline double
-movement(const double a, const double b) {
-  return fabs((a - b)/std::max(a, b)); //delta
-}
 
 /* 
  * Checks if estimates are stable (derivative large) for the
