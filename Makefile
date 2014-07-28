@@ -77,7 +77,7 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
           smithlab_os.o smithlab_utils.o GenomicRegion.o OptionParser.o RNG.o MappedRead.o)
 
-preseq: continued_fraction.o
+preseq: continued_fraction.o load_data_for_complexity.o
 
 ifdef SAMTOOLS_DIR
 bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
