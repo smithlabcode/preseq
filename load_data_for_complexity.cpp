@@ -29,6 +29,12 @@
 using std::string;
 using std::vector;
 using std::priority_queue;
+using std::min;
+using std::endl;
+using std::max;
+using std::cerr;
+using std::tr1::unordered_map;
+
 
 //////////////////////////////////////////////////////////////////////
 // Data imputation
