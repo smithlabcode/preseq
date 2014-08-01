@@ -310,6 +310,7 @@ empty_pq(GenomicRegion &prev_gr,
   if (GenomicRegionIsNull(prev_gr))
     current_count = 1;
   else {
+    std::ostringstream oss;
     bool UPDATE_HIST =
       update_pe_duplicate_counts_hist(curr_gr, prev_gr, 
                                       counts_hist, current_count);
