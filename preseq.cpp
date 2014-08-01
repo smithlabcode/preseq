@@ -44,7 +44,7 @@
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
-#define PRESEQ_VERSION "0.1.0"
+#define PRESEQ_VERSION "1.0.1"
 
 // AS: might not be good to depend on mapped read here
 // TD: if we're including gc_extrap, we need the dependence
@@ -140,7 +140,7 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 /////
-/////  LC_EXTRAP MODE BELOW HERE
+/////  EXTRAP MODE BELOW HERE
 /////
 
 
