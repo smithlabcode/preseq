@@ -234,9 +234,8 @@ main(int argc, const char **argv) {
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]),
-                           "Convert the SAM/BAM output from bsmap, "
-                           "bismark or bs_seeker to MethPipe mapped read format",
-                           "sam/bam_file");
+                           "Convert the SAM/BAM output from "
+                           "mapped read format to sam/bam_file");
     opt_parse.add_opt("output", 'o', "Name of output file", 
                       false, outfile);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 0)",
