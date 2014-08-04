@@ -33,6 +33,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>
@@ -45,9 +46,6 @@
 #include <smithlab_os.hpp>
 
 #define PRESEQ_VERSION "1.0.1"
-
-// AS: might not be good to depend on mapped read here
-// TD: if we're including gc_extrap, we need the dependence
 
 #include "continued_fraction.hpp"
 #include "load_data_for_complexity.hpp"
@@ -92,9 +90,9 @@ median_and_ci(const vector<double> &estimates,
   vector<double> sorted_estimates(estimates);
   sort(sorted_estimates.begin(), sorted_estimates.end());
   median_estimate =
-    gsl_stats_median_from_sorted_data(&sorted_estimates[0], 
+    gsl_stats_median_from_sorted_data(&sorted_estimates[0],
                                       1, n_est);
-  const double variance = 
+  const double variance =
     gsl_stats_variance(&sorted_estimates[0], 1, n_est);
   const double confint_mltr =
     alpha_log_confint_multiplier(median_estimate, variance, alpha);
@@ -106,7 +104,7 @@ median_and_ci(const vector<double> &estimates,
 
 static void
 vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
-                     const double ci_level, 
+                     const double ci_level,
                      vector<double> &yield_estimates,
                      vector<double> &lower_ci_lognormal,
                      vector<double> &upper_ci_lognormal) {
@@ -231,7 +229,7 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
   for(size_t i = 0; i < orig_hist.size(); i++)
     vals_sum += orig_hist[i]*i;
 
-  const double initial_distinct 
+  const double initial_distinct
     = accumulate(orig_hist.begin(), orig_hist.end(), 0.0);
 
 
@@ -243,7 +241,7 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
       distinct_orig_hist.push_back(orig_hist[i]);
     }
   }
-  
+
   for (size_t iter = 0;
        (iter < max_iter && bootstrap_estimates.size() < bootstraps);
        ++iter) {
@@ -286,12 +284,12 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
     while (counts_before_first_zero < hist.size() &&
            hist[counts_before_first_zero] > 0)
       ++counts_before_first_zero;
-    
+
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);
     // refit curve for lower bound (degree of approx is 1 less than
     // max_terms)
     max_terms = max_terms - (max_terms % 2 == 1);
-    
+
     //refit curve for lower bound
     const ContinuedFractionApproximation
       lower_cfa(diagonal, max_terms);
@@ -332,7 +330,7 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
 static bool
 extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
                        size_t max_terms, const int diagonal,
-                       const double step_size, 
+                       const double step_size,
                        const double max_extrapolation,
                        vector<double> &yield_estimate) {
 
@@ -347,7 +345,7 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
   double vals_sum = 0.0;
   for(size_t i = 0; i < hist.size(); i++)
     vals_sum += i*hist[i];
-  const double initial_distinct 
+  const double initial_distinct
     = accumulate(hist.begin(), hist.end(), 0.0);
 
   //construct umi vector to sample from
@@ -395,7 +393,7 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
   if (lower_cf.is_valid()){
     double sample_size = static_cast<double>(sample);
     while(sample_size < max_extrapolation){
-      const double one_minus_fold_extrap 
+      const double one_minus_fold_extrap
         = (sample_size - vals_sum)/vals_sum;
       assert(one_minus_fold_extrap >= 0.0);
       double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
@@ -491,13 +489,13 @@ write_predicted_coverage_curve(const string outfile,
 
 static int
 lc_extrap(const int argc, const char **argv) {
-  
+
   try {
     const size_t MIN_REQUIRED_COUNTS = 4;
-    
+
     /* FILES */
     string outfile;
-    
+
     size_t orig_max_terms = 100;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
@@ -505,19 +503,19 @@ lc_extrap(const int argc, const char **argv) {
     int diagonal = 0;
     double c_level = 0.95;
     double dupl_level = 0.5;
-      
+
     /* FLAGS */
     bool VERBOSE = false;
     bool VALS_INPUT = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool SINGLE_ESTIMATE = false;
-      
+
 #ifdef HAVE_SAMTOOLS
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
-      
+
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
     OptionParser opt_parse(strip_path(argv[1]),
                            "", "<sorted-bed-file>");
@@ -604,9 +602,9 @@ lc_extrap(const int argc, const char **argv) {
       const size_t MAX_READS_TO_HOLD = 5000000;
       size_t n_paired = 0;
       size_t n_mates = 0;
-      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, 
-                                   MAX_SEGMENT_LENGTH, 
-                                   MAX_READS_TO_HOLD, n_paired, 
+      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name,
+                                   MAX_SEGMENT_LENGTH,
+                                   MAX_READS_TO_HOLD, n_paired,
                                    n_mates, counts_hist);
       if(VERBOSE){
         cerr << "MERGED PAIRED END READS = " << n_paired << endl;
@@ -638,7 +636,7 @@ lc_extrap(const int argc, const char **argv) {
     // otherwise small relative steps do not account for variance
     // in extrapolation
     if(step_size < (n_reads/20)){
-      step_size = std::max(step_size, 
+      step_size = std::max(step_size,
                            step_size*round(n_reads/(20*step_size)));
       if(VERBOSE)
         cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
@@ -705,8 +703,8 @@ lc_extrap(const int argc, const char **argv) {
 
     if(SINGLE_ESTIMATE){
       bool SINGLE_ESTIMATE_SUCCESS =
-        extrap_single_estimate(VERBOSE, counts_hist, orig_max_terms, 
-                               diagonal, step_size, max_extrapolation, 
+        extrap_single_estimate(VERBOSE, counts_hist, orig_max_terms,
+                               diagonal, step_size, max_extrapolation,
                                yield_estimates);
       // IF FAILURE, EXIT
       if(!SINGLE_ESTIMATE_SUCCESS)
@@ -782,7 +780,7 @@ gc_extrap(const int argc, const char **argv) {
   try {
 
     const size_t MIN_REQUIRED_COUNTS = 4;
-    
+
     int diagonal = 0;
     size_t orig_max_terms = 100;
     size_t bin_size = 10;
@@ -873,9 +871,9 @@ gc_extrap(const int argc, const char **argv) {
     double total_bins = 0.0;
     for(size_t i = 0; i < coverage_hist.size(); i++)
       total_bins += coverage_hist[i]*i;
-    const double distinct_bins = 
+    const double distinct_bins =
       accumulate(coverage_hist.begin(), coverage_hist.end(), 0.0);
-    
+
     const double avg_bins_per_read = total_bins/n_reads;
     double bin_step_size = base_step_size/bin_size;
 
@@ -883,7 +881,7 @@ gc_extrap(const int argc, const char **argv) {
     // otherwise small relative steps do not account for variance in
     // extrapolation
     if(bin_step_size < (total_bins/20)){
-      bin_step_size 
+      bin_step_size
         = std::max(bin_step_size,
                    bin_step_size*round(total_bins/(20*bin_step_size)));
       if (VERBOSE)
@@ -947,54 +945,54 @@ gc_extrap(const int argc, const char **argv) {
 
 
     if (SINGLE_ESTIMATE) {
-      
+
       bool SINGLE_ESTIMATE_SUCCESS =
         extrap_single_estimate(VERBOSE, coverage_hist, orig_max_terms, diagonal,
                                bin_step_size, max_extrapolation/bin_size,
                                coverage_estimates);
-      
-      
+
+
       // IF FAILURE, EXIT
       if (!SINGLE_ESTIMATE_SUCCESS)
         throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN IN "
                                 "FULL MODE FOR ESTIMATES");
-      
+
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-      
+
       out << "TOTAL_BASES\tEXPECTED_DISTINCT" << endl;
-      
+
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
       out.precision(1);
-      
+
       out << 0 << '\t' << 0 << endl;
       for (size_t i = 0; i < coverage_estimates.size(); ++i)
         out << (i + 1)*base_step_size << '\t'
             << coverage_estimates[i]*bin_size << endl;
     }
     else {
-      
+
       if (VERBOSE)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
-      
+
       const size_t max_iter = 4*bootstraps;
-      
+
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, coverage_hist, bootstraps, orig_max_terms,
                        diagonal, bin_step_size, max_extrapolation/bin_size,
                        max_iter, bootstrap_estimates);
-      
-      
+
+
       /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
-      
+
       vector<double> coverage_upper_ci_lognormal, coverage_lower_ci_lognormal;
-      vector_median_and_ci(bootstrap_estimates, c_level, 
-                           coverage_estimates, coverage_lower_ci_lognormal, 
+      vector_median_and_ci(bootstrap_estimates, c_level,
+                           coverage_estimates, coverage_lower_ci_lognormal,
                            coverage_upper_ci_lognormal);
-      
+
       /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[WRITING OUTPUT]" << endl;
@@ -1028,7 +1026,7 @@ gc_extrap(const int argc, const char **argv) {
 static int
 c_curve(const int argc, const char **argv) {
 
-  try {  
+  try {
 
     bool VERBOSE = false;
     bool PAIRED_END = false;
@@ -1039,7 +1037,7 @@ c_curve(const int argc, const char **argv) {
 
     size_t upper_limit = 0;
     double step_size = 1e6;
-  
+
 #ifdef HAVE_SAMTOOLS
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
@@ -1071,7 +1069,7 @@ c_curve(const int argc, const char **argv) {
                       + toa(MAX_SEGMENT_LENGTH) + ")",
                       false, MAX_SEGMENT_LENGTH);
 #endif
-  
+
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
@@ -1092,7 +1090,7 @@ c_curve(const int argc, const char **argv) {
     }
     const string input_file_name = leftover_args.front();
     /******************************************************************/
-  
+
     // Setup the random number generator
     gsl_rng_env_setup();
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type
@@ -1120,8 +1118,8 @@ c_curve(const int argc, const char **argv) {
       const size_t MAX_READS_TO_HOLD = 5000000;
       size_t n_paired = 0;
       size_t n_mates = 0;
-      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, 
-                                   MAX_SEGMENT_LENGTH, MAX_READS_TO_HOLD, 
+      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name,
+                                   MAX_SEGMENT_LENGTH, MAX_READS_TO_HOLD,
                                    n_paired, n_mates, counts_hist);
       if (VERBOSE)
         cerr << "MERGED PAIRED END READS = " << n_paired << endl
@@ -1144,15 +1142,15 @@ c_curve(const int argc, const char **argv) {
         cerr << "BED_INPUT" << endl;
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
-  
+
     const size_t max_observed_count = counts_hist.size() - 1;
     const double distinct_reads = accumulate(counts_hist.begin(),
                                              counts_hist.end(), 0.0);
-  
+
     size_t total_reads = 0;
     for(size_t i = 0; i < counts_hist.size(); i++)
       total_reads += i*counts_hist[i];
-  
+
     const size_t distinct_counts =
       static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
                                         bind2nd(std::greater<double>(), 0.0)));
@@ -1164,8 +1162,8 @@ c_curve(const int argc, const char **argv) {
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl;
-  
-  
+
+
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
@@ -1174,7 +1172,7 @@ c_curve(const int argc, const char **argv) {
           cerr << i << '\t' << static_cast<size_t>(counts_hist[i]) << endl;
       cerr << endl;
     }
-  
+
     //construct umi vector to sample from
     vector<size_t> full_umis;
     size_t umi = 1;
@@ -1203,7 +1201,6 @@ c_curve(const int argc, const char **argv) {
         cerr << "sample size: " << i << endl;
       out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl;
     }
-
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
@@ -1218,41 +1215,53 @@ c_curve(const int argc, const char **argv) {
 
 
 
+struct preseq_mode {
+
+  static const int invalid = -1;
+  static const int LIBRARY = 1;
+  static const int GENOME  = 2;
+  static const int CURVE   = 3;
+
+  static int interpret(string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    if (s[0] == 'l') return LIBRARY;
+    else if (s[0] == 'g') return GENOME;
+    else if (s[0] == 'c') return CURVE;
+    else return invalid;
+  }
+};
+
+
 int
 main(const int argc, const char **argv) {
-  
-  static const string 
+
+  static const string
     USAGE_MESSAGE("preseq:  a program for analyzing library complexity\n"
                   "Version: " + toa(PRESEQ_VERSION) + "\n\n"
                   "Usage:   preseq <command> [OPTIONS]\n\n"
-                  "<command>: c_curve    generate complexity curve for a library\n"
-                  "           lc_extrap  predict the yield for future experiments\n"
-                  "           gc_extrap  predict genome coverage low input\n"
-                  "                      sequencing experiments\n"
+                  "<command>: curve      generate complexity curve for a library\n"
+                  "           library    predict library yield from deeper sequencing\n"
+                  "           genome     predict genome coverage from deeper sequencing\n"
                   );
-  
-  if (argc < 2)
-    cerr << USAGE_MESSAGE << endl;
 
-  else if (strcmp(argv[1], "lc_extrap") == 0) {
-    
+  if (argc < 2) {
+    cerr << USAGE_MESSAGE << endl;
+    return EXIT_FAILURE;
+  }
+
+  const int mode_interpretation = preseq_mode::interpret(argv[1]);
+  if (mode_interpretation == preseq_mode::LIBRARY) {
     return lc_extrap(argc, argv);
-    
   }
-  else if (strcmp(argv[1], "c_curve") == 0) {
-    
-    return c_curve(argc, argv);
-    
-  }
-  else if (strcmp(argv[1], "gc_extrap") == 0) {
-    
+  else if (mode_interpretation == preseq_mode::GENOME) {
     return gc_extrap(argc, argv);
-    
+  }
+  else if (mode_interpretation == preseq_mode::CURVE) {
+    return c_curve(argc, argv);
   }
   else {
     cerr << "unrecognized command: " << argv[1] << endl
          << USAGE_MESSAGE << endl;
     return EXIT_SUCCESS;
-    
   }
 }
