@@ -27,9 +27,9 @@ SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
 endif
 
 
-#ifndef SAMTOOLS_DIR
-#SAMTOOLS_DIR=$(ROOT)/samtools/
-#endif
+ifndef SAMTOOLS_DIR
+SAMTOOLS_DIR=$(ROOT)/samtools/
+endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))

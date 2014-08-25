@@ -206,6 +206,7 @@ static void empty_pq(MappedRead &prev_mr,
     //	       cerr << "outputting from queue : " << read_pq.top() << endl;
   read_pq.pop();
 
+  /*
     // check if reads are sorted
   if (curr_mr.r.same_chrom(prev_mr.r) &&
       curr_mr.r.get_start() < prev_mr.r.get_start()
@@ -215,6 +216,7 @@ static void empty_pq(MappedRead &prev_mr,
     cerr << "Increase seg_len if in paired end mode" << endl;
     throw SMITHLABException("reads unsorted in " + input_file_name);
   }
+  */
 
   out << curr_mr << endl;
 

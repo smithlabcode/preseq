@@ -21,6 +21,8 @@
 
 #include <queue>
 #include <sstream>
+#include <unistd.h>
+
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"

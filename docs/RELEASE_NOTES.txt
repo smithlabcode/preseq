@@ -1,4 +1,4 @@
-preseq beta release 1.0.0 (Mar 21, 2014)
+preseq beta release 1.0.2 (Aug 25, 2014)
 
 ------------------------------------------------------------------
 
@@ -32,6 +32,14 @@ Notable changes in preseq software:
 
   * Extensively updated the manual with examples and FAQ
 
+
+preseq beta release 1.0.2 (Aug 25, 2014)
+
+------------------------------------------------------------------
+
+  * Functions for input in header file load_data_for_complexity
+
+  * Fix samtools linking problem
+
 If you have any questions, comments or bugs, please contact us at 
 tdaley@usc.edu.  Thank you for using preseq.
-
