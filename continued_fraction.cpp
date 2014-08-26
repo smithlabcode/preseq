@@ -389,7 +389,7 @@ ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
                                         const double max_value, 
                                         const double step_size,
                                         vector<double> &estimates) const {
-  const double hist_sum = accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
+  const double hist_sum = std::accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   estimates.clear();
   estimates.push_back(hist_sum);
   for (double t = step_size; t <= max_value; t += step_size)
