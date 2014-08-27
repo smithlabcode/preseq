@@ -476,7 +476,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
   
   vector<double> full_ps_coeffs;
   for (size_t j = 1; j <= max_terms; j++)
-    full_ps_coeffs.push_back( counts_hist[j]*std::pow( -1, (int)(j + 1) ) );
+    full_ps_coeffs.push_back( counts_hist[j]*std::pow((double)(-1), (int)(j + 1)) );
 
   ContinuedFraction full_CF(full_ps_coeffs, diagonal_idx, max_terms);  
 
