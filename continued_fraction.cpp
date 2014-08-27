@@ -252,9 +252,9 @@ evaluate_above_diagonal(const vector<double> &cf_coeffs,
 
   double offset_part = 0.0;
   for (size_t i = 0; i < offset_coeffs.size(); i++)
-    offset_part += offset_coeffs[i]*pow(val, i);
+    offset_part += offset_coeffs[i]*pow(val, (int)i);
   
-  return offset_part + pow(val, min(depth, offset_coeffs.size()))*
+  return offset_part + pow(val, (int)min(depth, offset_coeffs.size()))*
     current_num/current_denom;
 } 
 
@@ -301,10 +301,10 @@ evaluate_below_diagonal(const vector<double> &cf_coeffs,
   
   double offset_terms = 0.0;
   for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
-    offset_terms += offset_coeffs[i]*pow(val, i);
+    offset_terms += offset_coeffs[i]*pow(val, (int)i);
   
   // recall that if lower_offset > 0, we are working with 1/f, invert approx
-  return 1.0/(offset_terms + pow(val, min(offset_coeffs.size(),depth))*
+  return 1.0/(offset_terms + pow(val, (int)min(offset_coeffs.size(),depth))*
               current_num/current_denom);
 }
 
@@ -476,7 +476,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
   
   vector<double> full_ps_coeffs;
   for (size_t j = 1; j <= max_terms; j++)
-    full_ps_coeffs.push_back(counts_hist[j]*pow(-1, j + 1));
+    full_ps_coeffs.push_back( counts_hist[j]*pow( -1, (int)(j + 1) ) );
 
   ContinuedFraction full_CF(full_ps_coeffs, diagonal_idx, max_terms);  
 
