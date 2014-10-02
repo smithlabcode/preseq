@@ -8,15 +8,19 @@ screen multiple libraries to avoid low complexity samples.
 UPDATES FROM PREVIOUS RELEASE
 ========================================================================
 We have switched the dependency on the BamTools API to SAMTools, which 
-we believe will be more convenient for most users of preseq. A submodule
-called preseqR is added which contains the source code to build the 
-preseq into an R package. Minor bugs have been fixed, and algorithms have
-been refined to more accurately construct counts histograms and extrapolate
-the complexity curve. More options have been added to lc_extrap. c_curve
-and lc_extrap are now both under a single binary for easier use, and
-commands will now be written as "preseq lc_extrap [OPTIONS]." 
-Furthermore, there are updates to the manual for any minor issues 
-encountered when compiling the preseq binary.
+we believe will be more convenient for most users of preseq. Minor bugs
+have been fixed, and algorithms have been refined to more accurately 
+construct counts histograms and extrapolate the complexity curve. More
+options have been added to lc_extrap. c_curve and lc_extrap are now both
+under a single binary for easier use, and commands will now be written as
+"preseq lc_extrap [OPTIONS]." Furthermore, there are updates to the 
+manual for any minor issues encountered when compiling the preseq binary.
+
+We release an R package called 
+[preseqR](http://cran.r-project.org/web/packages/preseqR/index.html)
+along with the preseq. It makes the preseq available in the R statistical
+environment. The submodule preseqR contains all required source code
+to build the R package.
 
 CONTACT INFORMATION:
 ========================================================================
@@ -91,7 +95,7 @@ at the University of Southern California.
 LICENSE
 ========================================================================
 The preseq software for estimating complexity
-Copyright (C) 2013 Timothy Daley and Andrew D Smith and 
+Copyright (C) 2014 Timothy Daley and Andrew D Smith and Chao Deng and
 the University of Southern California
 
 This program is free software: you can redistribute it and/or modify
