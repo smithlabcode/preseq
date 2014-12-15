@@ -326,11 +326,12 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
   if (VERBOSE)
     cerr << endl;
   if (bootstrap_estimates.size() < bootstraps)
-    throw SMITHLABException("too many iterations, poor sample");
+    throw SMITHLABException("too many defects in the approximation, consider running in defect mode");
 }
 
 static bool
-extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
+extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
+		       vector<double> &hist,
                        size_t max_terms, const int diagonal,
                        const double step_size, 
                        const double max_extrapolation,
@@ -392,7 +393,7 @@ extrap_single_estimate(const bool VERBOSE, vector<double> &hist,
     lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
 
   // extrapolate curve
-  if (lower_cf.is_valid()){
+  if (lower_cf.is_valid() || DEFECTS){
     double sample_size = static_cast<double>(sample);
     while(sample_size < max_extrapolation){
       const double one_minus_fold_extrap 
@@ -512,6 +513,7 @@ lc_extrap(const int argc, const char **argv) {
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool SINGLE_ESTIMATE = false;
+    bool DEFECTS = false;
       
 #ifdef HAVE_SAMTOOLS
     bool BAM_FORMAT_INPUT = false;
@@ -560,6 +562,9 @@ lc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("quick",'Q',
                       "quick mode, estimate yield without bootstrapping for confidence intervals",
                       false, SINGLE_ESTIMATE);
+    opt_parse.add_opt("defects", 'D', 
+		      "defects mode to extrapolate without testing for defects",
+		      false, DEFECTS);
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -703,9 +708,9 @@ lc_extrap(const int argc, const char **argv) {
     vector<double> yield_estimates;
 
 
-    if(SINGLE_ESTIMATE){
+    if(SINGLE_ESTIMATE || DEFECTS){
       bool SINGLE_ESTIMATE_SUCCESS =
-        extrap_single_estimate(VERBOSE, counts_hist, orig_max_terms, 
+        extrap_single_estimate(VERBOSE, DEFECTS, counts_hist, orig_max_terms, 
                                diagonal, step_size, max_extrapolation, 
                                yield_estimates);
       // IF FAILURE, EXIT
@@ -732,7 +737,7 @@ lc_extrap(const int argc, const char **argv) {
       if (VERBOSE)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
 
-      const size_t max_iter = 4*bootstraps;
+      const size_t max_iter = 10*bootstraps;
 
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, counts_hist, bootstraps, orig_max_terms,
@@ -793,6 +798,7 @@ gc_extrap(const int argc, const char **argv) {
     bool SINGLE_ESTIMATE = false;
     double max_extrapolation = 1.0e12;
     size_t bootstraps = 100;
+    bool DEFECTS = false;
 
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
@@ -830,6 +836,10 @@ gc_extrap(const int argc, const char **argv) {
                       "quick mode: run gc_extrap without "
                       "bootstrapping for confidence intervals",
                       false, SINGLE_ESTIMATE);
+    opt_parse.add_opt("defects", 'D', 
+		      "defects mode to extrapolate without testing for defects",
+		      false, DEFECTS);
+
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -949,7 +959,7 @@ gc_extrap(const int argc, const char **argv) {
     if (SINGLE_ESTIMATE) {
       
       bool SINGLE_ESTIMATE_SUCCESS =
-        extrap_single_estimate(VERBOSE, coverage_hist, orig_max_terms, diagonal,
+        extrap_single_estimate(VERBOSE, DEFECTS, coverage_hist, orig_max_terms, diagonal,
                                bin_step_size, max_extrapolation/bin_size,
                                coverage_estimates);
       
@@ -978,7 +988,7 @@ gc_extrap(const int argc, const char **argv) {
       if (VERBOSE)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
       
-      const size_t max_iter = 4*bootstraps;
+      const size_t max_iter = 10*bootstraps;
       
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, coverage_hist, bootstraps, orig_max_terms,

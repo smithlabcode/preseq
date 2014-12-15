@@ -1,5 +1,5 @@
-#    Copyright (C) 2011 University of Southern California and
-#                       Andrew D. Smith and Timothy Daley
+#    Copyright (C) 2011-2104 University of Southern California and
+#                            Andrew D. Smith and Timothy Daley
 #
 #    Authors: Timothy Daley and Andrew D. Smith
 #
@@ -33,7 +33,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS = preseq 
+PROGS = preseq mincount_extrap mincount_c_curve saturation_extrap test_quad_bootstrap
 ifdef SAMTOOLS_DIR
 PROGS += bam2mr
 endif
@@ -45,12 +45,12 @@ LIBS += -lgsl -lgslcblas -lz
 CXX = g++ 
 CXXFLAGS = -Wall -fPIC -fmessage-length=50
 
-KER = $(shell sysctl -n kern.osrelease | cut -d. -f1)
-
-ifeq ($(shell uname),Darwin)
-CXXFLAGS+= -arch x86_64
-ifeq ($(KER), 13)
-CXXFLAGS+= -stdlib=libstdc++
+# Flags for Mavericks
+ifeq "$(shell uname)" "Darwin"
+CXXFLAGS += -arch x86_64
+ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
+              then echo 'true'; fi)" "true"
+CXXFLAGS += -stdlib=libstdc++
 endif
 endif
 
@@ -62,10 +62,9 @@ ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
 endif
 
-ifdef SAMTOOLS_DIR
 INCLUDEDIRS += $(SAMTOOLS_DIR)
 CXXFLAGS += -DHAVE_SAMTOOLS
-endif
+
 
 
 ifdef OPT
