@@ -395,6 +395,17 @@ ContinuedFraction::extrapolate_distinct(const double initial_sum,
     estimates.push_back(initial_sum + t*operator()(t));
 }
 
+//Extrapolates the curve without adding the result from the initial experiment
+void
+ContinuedFraction::extrapolate_distinct(const double max_value, 
+                                        const double step_size,
+                                        vector<double> &estimates) const {
+  estimates.clear();
+  estimates.push_back(0);
+  for (double t = step_size; t <= max_value; t += step_size)
+    estimates.push_back(t*operator()(t));
+}
+
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -435,7 +446,7 @@ check_yield_estimates_stability(const vector<double> &estimates) {
   // make sure that the estimate is increasing in the time_step and
   // is below the initial distinct per step_size
   for (size_t i = 0; i < estimates.size(); ++i)
-	  if (!isfinite(estimates[i]))
+	  if (!isfinite(estimates[i]) && estimates[i] < 0)
 		  return false;
   for (size_t i = 1; i < estimates.size(); ++i){
     if (estimates[i] < estimates[i - 1] ){
@@ -506,6 +517,50 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
     // return the continued fraction if it is stable
       if (check_yield_estimates_stability(estimates))
 	return curr_cf;
+    
+      curr_terms += 2;
+    // if not cf not acceptable, increase degree
+    }
+  }
+   // no stable continued fraction: return null
+  return ContinuedFraction();  
+}
+
+// find the optimal RFA for a given power series with coefficients ps_coeff
+ContinuedFraction
+ContinuedFractionApproximation::optimal_powerseries_to_cont_frac(
+                                  const std::vector<double> &ps_coeffs) const {
+  if (max_terms > ps_coeffs.size()) {
+	  ContinuedFraction empty;
+	  return empty;
+  }
+  
+  ContinuedFraction full_CF(ps_coeffs, diagonal_idx, max_terms);  
+  // if max terms = 4, check only that degree
+  if(max_terms == 4 || max_terms == 3 
+     || max_terms == 5 || max_terms == 6){   
+    vector<double> estimates;
+    full_CF.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+    // return the continued fraction if it is stable
+    if (check_yield_estimates_stability(estimates))
+      return full_CF;
+  }
+  else{
+    //if max terms >= 8, start at 8 and check increasing cont frac's
+    size_t curr_terms = 0;
+    if(max_terms % 2 == 0)
+      curr_terms = 8;
+    else
+      curr_terms = 7;
+    while (curr_terms <= max_terms) {    
+      ContinuedFraction curr_cf 
+	= ContinuedFraction::truncate_degree(full_CF, curr_terms);
+      vector<double> estimates;
+      curr_cf.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
+          
+    // return the continued fraction if it is stable
+      if (check_yield_estimates_stability(estimates))
+	      return curr_cf;
     
       curr_terms += 2;
     // if not cf not acceptable, increase degree
