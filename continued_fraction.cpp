@@ -385,15 +385,14 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
 
 // Extrapolates the curve, for given values (step & max) and numbers of terms
 void
-ContinuedFraction::extrapolate_distinct(const vector<double> &counts_hist,
+ContinuedFraction::extrapolate_distinct(const double initial_sum,
                                         const double max_value, 
                                         const double step_size,
                                         vector<double> &estimates) const {
-  const double hist_sum = std::accumulate(counts_hist.begin(), counts_hist.end(), 0.0);
   estimates.clear();
-  estimates.push_back(hist_sum);
+  estimates.push_back(initial_sum);
   for (double t = step_size; t <= max_value; t += step_size)
-    estimates.push_back(hist_sum + t*operator()(t));
+    estimates.push_back(initial_sum + t*operator()(t));
 }
 
 
@@ -469,22 +468,22 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
 	  return empty;
   }
 
-  // counts_sum = number of total captures
-  double counts_sum  = 0.0;
-  for(size_t i = 0; i < counts_hist.size(); i++)
-    counts_sum += i*counts_hist[i];
-  
   vector<double> full_ps_coeffs;
   for (size_t j = 1; j <= max_terms; j++)
     full_ps_coeffs.push_back( counts_hist[j]*std::pow((double)(-1), (int)(j + 1)) );
 
   ContinuedFraction full_CF(full_ps_coeffs, diagonal_idx, max_terms);  
 
+  // counts_sum = number of total captures
+  double counts_sum  = 0.0;
+  for(size_t i = 0; i < counts_hist.size(); i++)
+    counts_sum += i*counts_hist[i];
+  
   // if max terms = 4, check only that degree
   if(max_terms == 4 || max_terms == 3 
      || max_terms == 5 || max_terms == 6){   
     vector<double> estimates;
-    full_CF.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
+    full_CF.extrapolate_distinct(counts_sum, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
 			                     estimates);
     // return the continued fraction if it is stable
     if (check_yield_estimates_stability(estimates))
@@ -501,7 +500,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
       ContinuedFraction curr_cf 
 	= ContinuedFraction::truncate_degree(full_CF, curr_terms);
       vector<double> estimates;
-      curr_cf.extrapolate_distinct(counts_hist, SEARCH_MAX_VAL, SEARCH_STEP_SIZE,
+      curr_cf.extrapolate_distinct(counts_sum, SEARCH_MAX_VAL, SEARCH_STEP_SIZE,
 			                       estimates);
           
     // return the continued fraction if it is stable
