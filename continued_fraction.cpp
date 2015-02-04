@@ -461,25 +461,6 @@ check_yield_estimates_stability(const vector<double> &estimates) {
   return true;
 }
 
-static bool
-check_mincount_estimates_stability(const vector<double> &estimates,
-				   const double max_change_per_time_step) {
-  // make sure that the estimate is increasing in the time_step and
-  // is below the initial distinct per step_size
-  for (size_t i = 1; i < estimates.size(); ++i){
-    if(!std::isfinite(estimates[i]) || estimates[i] < 0){
-      return false;
-    }
-    if ((estimates[i] < estimates[i - 1]) ||
-	(estimates[i] - estimates[i - 1] > max_change_per_time_step)){
-      return false;
-    }
-  }
-  //add more checking mechanisms into this function
-
-  return true;
-}
-
 /*
  * Finds the optimal number of terms (i.e. degree, depth, etc.) of the
  * continued fraction by checking for stability of estimates at
@@ -547,8 +528,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
 // find the optimal RFA for a given power series with coefficients ps_coeff
 ContinuedFraction
 ContinuedFractionApproximation::optimal_powerseries_to_cont_frac(
-                                  const std::vector<double> &ps_coeffs,
-                                  const double step_size) const {
+                                  const std::vector<double> &ps_coeffs) const {
   if (max_terms > ps_coeffs.size()) {
 	  ContinuedFraction empty;
 	  return empty;
@@ -561,7 +541,7 @@ ContinuedFractionApproximation::optimal_powerseries_to_cont_frac(
     vector<double> estimates;
     full_CF.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
     // return the continued fraction if it is stable
-    if (check_mincount_estimates_stability(estimates, step_size))
+    if (check_yield_estimates_stability(estimates))
       return full_CF;
   }
   else{
@@ -579,7 +559,7 @@ ContinuedFractionApproximation::optimal_powerseries_to_cont_frac(
       curr_cf.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, estimates);
           
     // return the continued fraction if it is stable
-      if (check_mincount_estimates_stability(estimates, step_size))
+      if (check_yield_estimates_stability(estimates))
 	      return curr_cf;
     
       curr_terms += 2;

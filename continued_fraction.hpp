@@ -84,8 +84,7 @@ public:
 
   //find best cont frac approx for a power series
   ContinuedFraction
-  optimal_powerseries_to_cont_frac(const std::vector<double> &ps_coeff,
-                                   const double step_size) const;
+  optimal_powerseries_to_cont_frac(const std::vector<double> &ps_coeff) const;
 
 private:
   
