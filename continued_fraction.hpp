@@ -41,11 +41,6 @@ struct ContinuedFraction {
 
   // Evaluate the continued fraction estimating distinct
   // along a curve from 0 to max_value
-  void 
-  extrapolate_distinct(const double initial_sum,
-                       const double max_value, const double step_size,
-                       std::vector<double> &estimates) const;
-
   void
   extrapolate_distinct(const double max_value, const double step_size,
                        std::vector<double> &estimates) const;

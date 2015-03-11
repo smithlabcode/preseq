@@ -383,18 +383,6 @@ operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
 }
 
 
-// Extrapolates the curve, for given values (step & max) and numbers of terms
-void
-ContinuedFraction::extrapolate_distinct(const double initial_sum,
-                                        const double max_value, 
-                                        const double step_size,
-                                        vector<double> &estimates) const {
-  estimates.clear();
-  estimates.push_back(initial_sum);
-  for (double t = step_size; t <= max_value; t += step_size)
-    estimates.push_back(initial_sum + t*operator()(t));
-}
-
 //Extrapolates the curve without adding the result from the initial experiment
 void
 ContinuedFraction::extrapolate_distinct(const double max_value, 
@@ -493,7 +481,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
   if(max_terms == 4 || max_terms == 3 
      || max_terms == 5 || max_terms == 6){   
     vector<double> estimates;
-    full_CF.extrapolate_distinct(counts_sum, SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
+    full_CF.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
 			                     estimates);
     // return the continued fraction if it is stable
     if (check_yield_estimates_stability(estimates))
@@ -510,7 +498,7 @@ ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double>
       ContinuedFraction curr_cf 
 	= ContinuedFraction::truncate_degree(full_CF, curr_terms);
       vector<double> estimates;
-      curr_cf.extrapolate_distinct(counts_sum, SEARCH_MAX_VAL, SEARCH_STEP_SIZE,
+      curr_cf.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE,
 			                       estimates);
           
     // return the continued fraction if it is stable
