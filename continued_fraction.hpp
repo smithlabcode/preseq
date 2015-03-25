@@ -41,9 +41,8 @@ struct ContinuedFraction {
 
   // Evaluate the continued fraction estimating distinct
   // along a curve from 0 to max_value
-  void 
-  extrapolate_distinct(const std::vector<double> &counts_hist,
-                       const double max_value, const double step_size,
+  void
+  extrapolate_distinct(const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
   
   bool is_valid() const {return !cf_coeffs.empty();}
@@ -77,6 +76,10 @@ public:
   optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
 
   int get_diagonal() const {return diagonal_idx;}
+
+  //find best cont frac approx for a power series
+  ContinuedFraction
+  optimal_powerseries_to_cont_frac(const std::vector<double> &ps_coeff) const;
 
 private:
   
