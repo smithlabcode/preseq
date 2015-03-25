@@ -396,8 +396,9 @@ load_counts_BAM_pe(const bool VERBOSE,
               if (VERBOSE) {
                 cerr << "problem merging read "
                      << read_name << ", splitting read" << endl
-                     << samr.mr << endl
-                     << dangling_mates[read_name].mr << endl
+                     << samr.mr << "\t" << samr.is_mapping_paired << endl
+                     << dangling_mates[read_name].mr << "\t" 
+		     << dangling_mates[read_name].is_mapping_paired << endl
                      << "To merge, set max segement "
                      << "length (seg_len) higher." << endl;
               }

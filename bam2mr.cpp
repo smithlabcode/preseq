@@ -242,7 +242,7 @@ main(int argc, const char **argv) {
                       false, outfile);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 0)",
                       false, suffix_len); 
-    opt_parse.add_opt("max-frag", 'L', "maximum allowed insert size", 
+    opt_parse.add_opt("seg_len", 'L', "maximum allowed insert size", 
                       false, MAX_SEGMENT_LENGTH); 
     opt_parse.add_opt("max_reads", 'R', "maximum number of reads to hold for merging",
 		      false, MAX_READS_TO_HOLD);
