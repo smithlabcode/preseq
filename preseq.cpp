@@ -37,6 +37,7 @@
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_statistics_double.h>
+#include <gsl/gsl_sf_gamma.h>
 
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
@@ -171,21 +172,26 @@ resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_count
       static_cast<double>(sample_distinct_counts_hist[i]);
 }
 
-// sample umis without replacement to interpolate complexity
+// interpolate by explicit calculating the expectation 
+// for sampling without replacement; 
+// see K.L Heck 1975
+// N total sample size; S the total number of distincts
+// n sub sample size
 static double
-sample_count_distinct(const gsl_rng *rng,
-                      const vector<size_t> &full_umis,
-                      const size_t sample_size) {
-  vector<size_t> sample_umis(sample_size);
-  gsl_ran_choose(rng, (size_t *)&sample_umis.front(), sample_size,
-                 (size_t *)&full_umis.front(), full_umis.size(),
-                 sizeof(size_t));
-  double count = 1.0;
-  for (size_t i = 1; i < sample_umis.size(); i++)
-    if(sample_umis[i] != sample_umis[i-1])
-      count++;
-
-  return count;
+sample_count_distinct(vector<double> &hist, size_t N,
+                      size_t S, const size_t n) {
+  double denom = gsl_sf_lngamma(N + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - n + 1);
+  vector<double> numer(hist.size(), 0); 
+  for (size_t i = 1; i < hist.size(); i++) {
+	// N - i -n + 1 should be greater than 0
+	if (N < i + n) {
+	  numer[i] = 0;
+	} else {
+	  numer[i] = gsl_sf_lngamma(N - i + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - i - n + 1);
+	  numer[i] = exp(numer[i] - denom) * hist[i];
+	}
+  }
+  return S - accumulate(numer.begin(), numer.end(), 0);
 }
 
 
@@ -260,24 +266,13 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
     while (hist.back() == 0)
       hist.pop_back();
 
-    //construct umi vector to sample from
-    vector<size_t> umis;
-    size_t umi = 1;
-    for(size_t i = 1; i < hist.size(); i++){
-      for(size_t j = 0; j < hist[i]; j++){
-        for(size_t k = 0; k < i; k++)
-          umis.push_back(umi);
-        umi++;
-      }
-    }
-    assert(umis.size() == static_cast<size_t>(sample_vals_sum));
-
     // compute complexity curve by random sampling w/out replacement
     const size_t upper_limit = static_cast<size_t>(sample_vals_sum);
+	const size_t distinct = static_cast<size_t>(accumulate(hist.begin(), hist.end(), 0.0));
     const size_t step = static_cast<size_t>(bin_step_size);
     size_t sample = step;
     while(sample < upper_limit){
-      yield_vector.push_back(sample_count_distinct(rng, umis, sample));
+      yield_vector.push_back(sample_count_distinct(hist, upper_limit, distinct, sample));
       sample += step;
     }
 
@@ -337,13 +332,6 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
                        const double max_extrapolation,
                        vector<double> &yield_estimate) {
 
-  //setup rng
-  srand(time(0) + getpid());
-  gsl_rng_env_setup();
-  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(rng, rand());
-
-
   yield_estimate.clear();
   double vals_sum = 0.0;
   for(size_t i = 0; i < hist.size(); i++)
@@ -351,24 +339,14 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
   const double initial_distinct 
     = accumulate(hist.begin(), hist.end(), 0.0);
 
-  //construct umi vector to sample from
-  vector<size_t> umis;
-  size_t umi = 1;
-  for(size_t i = 1; i < hist.size(); i++){
-    for(size_t j = 0; j < hist[i]; j++){
-      for(size_t k = 0; k < i; k++)
-        umis.push_back(umi);
-      umi++;
-    }
-  }
-  assert(umis.size() == static_cast<size_t>(vals_sum));
-
   // interpolate complexity curve by random sampling w/out replacement
   size_t upper_limit = static_cast<size_t>(vals_sum);
   size_t step = static_cast<size_t>(step_size);
   size_t sample = step;
   while (sample < upper_limit){
-    yield_estimate.push_back(sample_count_distinct(rng, umis, sample));
+    yield_estimate.push_back(
+		sample_count_distinct(hist, upper_limit, 
+		                      static_cast<size_t>(initial_distinct), sample));
     sample += step;
   }
 
@@ -639,16 +617,6 @@ lc_extrap(const int argc, const char **argv) {
     const double distinct_reads = accumulate(counts_hist.begin(),
                                              counts_hist.end(), 0.0);
 
-    // for large initial experiments need to adjust step size
-    // otherwise small relative steps do not account for variance
-    // in extrapolation
-    if(step_size < (n_reads/20)){
-      step_size = std::max(step_size, 
-                           step_size*round(n_reads/(20*step_size)));
-      if(VERBOSE)
-        cerr << "ADJUSTED_STEP_SIZE = " << step_size << endl;
-    }
-
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t counts_before_first_zero = 1;
     while (counts_before_first_zero < counts_hist.size() &&
@@ -888,19 +856,6 @@ gc_extrap(const int argc, const char **argv) {
     
     const double avg_bins_per_read = total_bins/n_reads;
     double bin_step_size = base_step_size/bin_size;
-
-    // for large initial experiments need to adjust step size
-    // otherwise small relative steps do not account for variance in
-    // extrapolation
-    if(bin_step_size < (total_bins/20)){
-      bin_step_size 
-        = std::max(bin_step_size,
-                   bin_step_size*round(total_bins/(20*bin_step_size)));
-      if (VERBOSE)
-        cerr << "ADJUSTED_STEP_SIZE = " << bin_step_size << endl;
-      base_step_size = bin_step_size*bin_size;
-    }
-    // recorrect the read step size
 
     const size_t max_observed_count = coverage_hist.size() - 1;
 
@@ -1184,18 +1139,6 @@ c_curve(const int argc, const char **argv) {
           cerr << i << '\t' << static_cast<size_t>(counts_hist[i]) << endl;
       cerr << endl;
     }
-  
-    //construct umi vector to sample from
-    vector<size_t> full_umis;
-    size_t umi = 1;
-    for (size_t i = 1; i < counts_hist.size(); i++){
-      for (size_t j = 0; j < counts_hist[i]; j++){
-        for (size_t k = 0; k < i; k++)
-          full_umis.push_back(umi);
-        umi++;
-      }
-    }
-    assert(full_umis.size() == n_reads);
 
     if (upper_limit == 0)
       upper_limit = n_reads; //set upper limit to equal the number of molecules
@@ -1211,9 +1154,10 @@ c_curve(const int argc, const char **argv) {
     for (size_t i = step_size; i <= upper_limit; i += step_size) {
       if (VERBOSE)
         cerr << "sample size: " << i << endl;
-      out << i << "\t" << sample_count_distinct(rng, full_umis, i) << endl;
+      out << i << "\t" 
+		  << sample_count_distinct(counts_hist, total_reads, distinct_reads, i) 
+		  << endl;
     }
-
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
