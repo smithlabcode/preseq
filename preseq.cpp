@@ -1,10 +1,10 @@
 /*
  *    preseq: to predict properties of genomic sequencing libraries
  *
- *    Copyright (C) 2013-2014 University of Southern California and
+ *    Copyright (C) 2013-2015 University of Southern California and
  *             Andrew D. Smith and Timothy Daley
  *
- *    Authors: Timothy Daley, Victoria Helus, and Andrew Smith
+ *    Authors: Timothy Daley, Chao Deng, Victoria Helus, and Andrew Smith
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -178,7 +178,7 @@ resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_count
 // N total sample size; S the total number of distincts
 // n sub sample size
 static double
-sample_count_distinct(vector<double> &hist, size_t N,
+interpolate_distinct(vector<double> &hist, size_t N,
                       size_t S, const size_t n) {
   double denom = gsl_sf_lngamma(N + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - n + 1);
   vector<double> numer(hist.size(), 0); 
@@ -272,7 +272,7 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
     const size_t step = static_cast<size_t>(bin_step_size);
     size_t sample = step;
     while(sample < upper_limit){
-      yield_vector.push_back(sample_count_distinct(hist, upper_limit, distinct, sample));
+      yield_vector.push_back(interpolate_distinct(hist, upper_limit, distinct, sample));
       sample += step;
     }
 
@@ -345,7 +345,7 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
   size_t sample = step;
   while (sample < upper_limit){
     yield_estimate.push_back(
-		sample_count_distinct(hist, upper_limit, 
+		interpolate_distinct(hist, upper_limit, 
 		                      static_cast<size_t>(initial_distinct), sample));
     sample += step;
   }
@@ -1155,7 +1155,7 @@ c_curve(const int argc, const char **argv) {
       if (VERBOSE)
         cerr << "sample size: " << i << endl;
       out << i << "\t" 
-		  << sample_count_distinct(counts_hist, total_reads, distinct_reads, i) 
+		  << interpolate_distinct(counts_hist, total_reads, distinct_reads, i) 
 		  << endl;
     }
   }
