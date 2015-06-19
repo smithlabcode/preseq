@@ -5,7 +5,15 @@ experiment. The estimates can then be used to examine the utility
 of further sequencing, optimize the sequencing depth, or to 
 screen multiple libraries to avoid low complexity samples.
 
-UPDATES FROM PREVIOUS RELEASE
+UPDATES TO VERSION 2.0.0
+========================================================================
+We have added a new module, bound_pop, to estimate a lower bound of
+the population sampled from.  Interpolation is calculated by 
+expectation rather than subsampling, dramatically improving the
+speed.
+
+
+UPDATES TO VERSION 1.0.2
 ========================================================================
 We have switched the dependency on the BamTools API to SAMTools, which 
 we believe will be more convenient for most users of preseq. Minor bugs
