@@ -33,7 +33,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS = preseq mincount_extrap mincount_c_curve saturation_extrap test_quad_bootstrap
+PROGS = preseq mincount_extrap mincount_c_curve saturation_extrap test_quadrature
 ifdef SAMTOOLS_DIR
 PROGS += bam2mr
 endif
@@ -76,7 +76,7 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
           smithlab_os.o smithlab_utils.o GenomicRegion.o OptionParser.o RNG.o MappedRead.o)
 
-preseq: continued_fraction.o load_data_for_complexity.o
+preseq: continued_fraction.o load_data_for_complexity.o moment_sequence.o
 
 ifdef SAMTOOLS_DIR
 bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
