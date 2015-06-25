@@ -22,6 +22,10 @@ ifndef ROOT
 ROOT = $(shell pwd)
 endif
 
+ifndef PREFIX
+PREFIX = $(ROOT)
+endif
+
 ifndef SMITHLAB_CPP
 SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
 endif
@@ -79,10 +83,17 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
 preseq: continued_fraction.o load_data_for_complexity.o moment_sequence.o
 
 ifdef SAMTOOLS_DIR
+ifdef LIBBAM
+LIBS += -pthread
+bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
+        $(LIBBAM)
+else
 bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
         $(addprefix $(SAMTOOLS_DIR)/, sam.o bam.o bam_import.o bam_pileup.o \
         faidx.o bam_aux.o kstring.o knetfile.o sam_header.o razf.o bgzf.o)
 endif
+endif # SAMTOOLS_DIR
+
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
@@ -91,8 +102,8 @@ endif
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
 
 install: $(PROGS)
-	@mkdir -p $(ROOT)/bin
-	@install -m 755 $(PROGS) $(ROOT)/bin
+	@mkdir -p $(PREFIX)/bin
+	@install -m 755 $(PROGS) $(PREFIX)/bin
 
 clean:
 	@-rm -f $(PROGS) *.o *~
