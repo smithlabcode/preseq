@@ -22,6 +22,10 @@ ifndef ROOT
 ROOT = $(shell pwd)
 endif
 
+ifndef PREFIX
+PREFIX = $(ROOT)
+endif
+
 ifndef SMITHLAB_CPP
 SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
 endif
@@ -91,8 +95,8 @@ endif
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
 
 install: $(PROGS)
-	@mkdir -p $(ROOT)/bin
-	@install -m 755 $(PROGS) $(ROOT)/bin
+	@mkdir -p $(PREFIX)/bin
+	@install -m 755 $(PROGS) $(PREFIX)/bin
 
 clean:
 	@-rm -f $(PROGS) *.o *~
