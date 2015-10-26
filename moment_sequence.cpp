@@ -89,7 +89,7 @@ ensure_pos_def_mom_seq(vector <double> &moments,
 
     if(VERBOSE){
       cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det" << endl;
-      cerr << hankel_dim << '\t' << hankel_matrix_det <<  
+      cerr << hankel_dim << '\t' << hankel_matrix_det   
 	   << '\t' << shifted_hankel_matrix_det << endl;
     }
 
