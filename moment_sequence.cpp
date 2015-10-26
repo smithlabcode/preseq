@@ -339,7 +339,7 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
   for(size_t i = 0; i < b.size(); i++)
     b[i] = sqrt(b[i]);
 
-
+  /*
   if(VERBOSE){
     for(size_t i = 0; i < a.size(); i++)
       cerr << "alpha_" << i << '\t';
@@ -355,6 +355,7 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
       cerr << b[i] << '\t';
     cerr << endl;
   }
+  */
 
   vector<double> eigenvec(a.size(), 0.0);
   eigenvec[0] = 1.0;
@@ -378,12 +379,14 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
   // eigenvalues are on diagonal of J
   bool POSITIVE_POINTS = check_positivity(eigenvals);
 
+  /*
   if(VERBOSE){
     cerr << "points = " << endl;
     for(size_t i = 0; i < eigenvals.size(); i++)
       cerr << eigenvals[i] << '\t';
     cerr << endl;
   }
+  */
 
 
   if(POSITIVE_POINTS){
@@ -394,12 +397,14 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
   for(size_t i = 0; i < weights.size(); i++)
     weights[i] = weights[i]*weights[i];
 
+  /*
   if(VERBOSE){
     cerr << "weights = " << endl;
     for(size_t i = 0; i < weights.size(); i++)
       cerr << weights[i] << '\t';
     cerr << endl;
   }
+  */
 
   return POSITIVE_POINTS;
 }
