@@ -1477,7 +1477,7 @@ bound_pop(const int argc, const char **argv) {
 					  - log(sample_hist[1])) );
 
 	size_t n_points = 0;
-	n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
+	n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, false);
 
 
 	MomentSequence bootstrap_mom_seq(bootstrap_moments);

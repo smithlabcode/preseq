@@ -92,6 +92,7 @@ ensure_pos_def_mom_seq(vector <double> &moments,
       cerr << hankel_dim << '\t' << hankel_matrix_det   
 	   << '\t' << shifted_hankel_matrix_det << endl;
     }
+  
 
     if(hankel_matrix_det > tolerance &&
        shifted_hankel_matrix_det > tolerance){
