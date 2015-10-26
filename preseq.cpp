@@ -797,7 +797,7 @@ gc_extrap(const int argc, const char **argv) {
     // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
     OptionParser opt_parse(strip_path(argv[1]),
                            "", "<sorted-mapped-read-file>");
-    opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
+    opt_parse.add_opt("output", 'o', "coverage yield output file (default: stdout)",
                       false , outfile);
     opt_parse.add_opt("max_width", 'w', "max fragment length, "
                       "set equal to read length for single end reads",
@@ -1226,7 +1226,7 @@ bound_pop(const int argc, const char **argv) {
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
     OptionParser opt_parse(strip_path(argv[1]),
                            "", "<sorted-bed-file>");
-    opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
+    opt_parse.add_opt("output", 'o', "species richness output file (default: stdout)",
                       false , outfile);
     opt_parse.add_opt("max_num_points",'p',"maximum number of points in quadrature "
                       "estimates (default: " + toa(max_num_points) + ")",
@@ -1247,7 +1247,7 @@ bound_pop(const int argc, const char **argv) {
                       "input is a text file containing the observed histogram",
                       false, HIST_INPUT);
     opt_parse.add_opt("vals", 'V',
-                      "input is a text file containing only the observed counts",
+                      "input is a text file containing only the observed duplicate counts",
                       false, VALS_INPUT);
 #ifdef HAVE_SAMTOOLS
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
@@ -1257,7 +1257,7 @@ bound_pop(const int argc, const char **argv) {
                       + toa(MAX_SEGMENT_LENGTH) + ")",
                       false, MAX_SEGMENT_LENGTH);
 #endif
-    opt_parse.add_opt("quick", 'Q', "quick mode, estimates without bootstrapping",
+    opt_parse.add_opt("quick", 'Q', "quick mode, estimate without bootstrapping",
 		      false, QUICK_MODE);
 
 
