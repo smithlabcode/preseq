@@ -77,10 +77,6 @@ public:
 
   int get_diagonal() const {return diagonal_idx;}
 
-  //find best cont frac approx for a power series
-  ContinuedFraction
-  optimal_powerseries_to_cont_frac(const std::vector<double> &ps_coeff) const;
-
 private:
   
   int diagonal_idx; // the diagonal to work with for estimates

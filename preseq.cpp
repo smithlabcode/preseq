@@ -45,7 +45,7 @@
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
-#define PRESEQ_VERSION "1.1.2"
+#define PRESEQ_VERSION "2.0.0"
 
 // AS: might not be good to depend on mapped read here
 // TD: if we're including gc_extrap, we need the dependence
