@@ -506,7 +506,6 @@ lc_extrap(const int argc, const char **argv) {
     size_t bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    double dupl_level = 0.5;
       
     /* FLAGS */
     bool VERBOSE = false;
@@ -537,9 +536,6 @@ lc_extrap(const int argc, const char **argv) {
                       false, bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals "
                       "(default: " + toa(c_level) + ")", false, c_level);
-    opt_parse.add_opt("dupl_level",'d', "fraction of duplicate to predict "
-                      "(default: " + toa(dupl_level) + ")",
-                      false, dupl_level);
     opt_parse.add_opt("terms",'x',"maximum number of terms", false,
                       orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information",
