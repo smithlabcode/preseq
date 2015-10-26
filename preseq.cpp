@@ -1378,14 +1378,18 @@ bound_pop(const int argc, const char **argv) {
       MomentSequence obs_mom_seq(measure_moments);
     
       if(VERBOSE){
-	cerr << "alpha = ";
 	for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
-	  cerr << obs_mom_seq.alpha[k] << ", ";
+	  cerr << "alpha_" << k << '\t';
+	cerr << endl;
+	for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
+	  cerr << obs_mom_seq.alpha[k] << '\t';
 	cerr << endl;
 
-	cerr << "beta = ";
 	for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
-	  cerr << obs_mom_seq.beta[k] << ", ";
+	  cerr << "beta_" << k << '\t';
+	cerr << endl;
+	for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
+	  cerr << obs_mom_seq.beta[k] << '\t';
 	cerr << endl;
       }
     
@@ -1395,21 +1399,19 @@ bound_pop(const int argc, const char **argv) {
 
       const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
       if(weights_sum != 1.0){
-	if(VERBOSE)
-	  cerr << "weights sum = " << weights_sum << endl;
 	for(size_t i = 0; i < weights.size(); i++)
 	  weights[i] = weights[i]/weights_sum;
       }
 
       if(VERBOSE){
-	cerr << "points = ";
+	cerr << "points = " << endl;
 	for(size_t i = 0; i < points.size(); i++)
-	  cerr << setprecision(16) << points[i] << ", ";
+	  cerr << points[i] << '\t';
 	cerr << endl;
 
-	cerr << "weights = ";
+	cerr << "weights = " << endl;
 	for(size_t i = 0; i < weights.size(); i++)
-	  cerr << setprecision(16) << weights[i] << ", ";
+	  cerr << weights[i] << '\t';
 	cerr << endl;
       }
 

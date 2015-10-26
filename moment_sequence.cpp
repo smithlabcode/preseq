@@ -51,12 +51,11 @@ size_t
 ensure_pos_def_mom_seq(vector <double> &moments,
 		       const double tolerance,
 		       const bool VERBOSE){
-  if(VERBOSE)
-    cerr << "moments.size = " << moments.size() << endl;
 
   size_t hankel_dim = 2;
   if(moments.size() < 2*hankel_dim){
-    cerr << "too few moments" << endl;
+    if(VERBOSE)
+      cerr << "too few moments" << endl;
     return 1;
   }
 
@@ -89,9 +88,9 @@ ensure_pos_def_mom_seq(vector <double> &moments,
     double shifted_hankel_matrix_det = gsl_linalg_LU_det(shifted_hankel_matrix, s);
 
     if(VERBOSE){
-      cerr << "dim = " << hankel_dim << endl;
-      cerr << "hankel det = " << hankel_matrix_det << endl;
-      cerr << "shifted hankel det = " << shifted_hankel_matrix_det << endl;
+      cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det" << endl;
+      cerr << hankel_dim << '\t' << hankel_matrix_det <<  
+	   << '\t' << shifted_hankel_matrix_det << endl;
     }
 
     if(hankel_matrix_det > tolerance &&
@@ -178,27 +177,6 @@ MomentSequence::unmodified_Chebyshev(const bool VERBOSE){
     }
   }  
 
-  if(VERBOSE){
-    cerr << "3-term relations:" << endl;
-    cerr << "alpha = ";
-    for(size_t i = 0; i < a.size(); i++)
-      cerr << a[i] << ", ";
-    cerr << endl;
-    cerr << "beta = ";
-    for(size_t i = 0; i < b.size(); i++)
-      cerr << b[i] << ", ";
-    cerr << endl;
-  }
-
-  //  check_three_term_relation(a, b);
-
-  // !TAKE SQRT BEFORE FORMING JACOBI MATRIX!
-  // See Gautschi pgs 10-13,
-  // the nu here is the square of the off-diagonal
-  // of the Jacobi matrix
-  //  for(size_t i = 0; i < b.size(); i++)
-  //  b[i] = sqrt(b[i]);
-
   alpha = a;
   beta = b;
 }
@@ -231,18 +209,6 @@ MomentSequence::full_3term_recurrence(const bool VERBOSE,
       b[k-1] = sigma[k][k]/sigma[k-1][k-1];
     }
   }  
-
-  if(VERBOSE){
-    cerr << "3-term relations:" << endl;
-    cerr << "alpha = ";
-    for(size_t i = 0; i < a.size(); i++)
-      cerr << a[i] << ", ";
-    cerr << endl;
-    cerr << "beta = ";
-    for(size_t i = 0; i < b.size(); i++)
-      cerr << b[i] << ", ";
-    cerr << endl;
-  }
 
   full_alpha.swap(a);
   full_beta.swap(b);
@@ -375,17 +341,20 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
 
 
   if(VERBOSE){
-    cerr << "QR" << endl;
-    cerr << "alpha = ";
     for(size_t i = 0; i < a.size(); i++)
-      cerr << setprecision(16) << a[i] << ", ";
+      cerr << "alpha_" << i << '\t';
     cerr << endl;
-    cerr << "beta = ";
+    for(size_t i = 0; i < a.size(); i++)
+      cerr << a[i] << '\t';
+    cerr << endl;
+
     for(size_t i = 0; i < b.size(); i++)
-      cerr << setprecision(16) << b[i] << ", ";
+      cerr << "beta_" << i << '\t';
+    cerr << endl;
+    for(size_t i = 0; i < b.size(); i++)
+      cerr << b[i] << '\t';
     cerr << endl;
   }
-
 
   vector<double> eigenvec(a.size(), 0.0);
   eigenvec[0] = 1.0;
@@ -410,9 +379,9 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
   bool POSITIVE_POINTS = check_positivity(eigenvals);
 
   if(VERBOSE){
-    cerr << "POINTS = ";
+    cerr << "points = " << endl;
     for(size_t i = 0; i < eigenvals.size(); i++)
-      cerr << eigenvals[i] << ", ";
+      cerr << eigenvals[i] << '\t';
     cerr << endl;
   }
 
@@ -426,9 +395,9 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
     weights[i] = weights[i]*weights[i];
 
   if(VERBOSE){
-    cerr << "WEIGHTS = ";
+    cerr << "weights = " << endl;
     for(size_t i = 0; i < weights.size(); i++)
-      cerr << weights[i] << ", ";
+      cerr << weights[i] << '\t';
     cerr << endl;
   }
 
