@@ -1257,7 +1257,7 @@ bound_pop(const int argc, const char **argv) {
                       + toa(MAX_SEGMENT_LENGTH) + ")",
                       false, MAX_SEGMENT_LENGTH);
 #endif
-    opt_parse.add_opt("quick", 'q', "quick mode, estimates without bootstrapping",
+    opt_parse.add_opt("quick", 'Q', "quick mode, estimates without bootstrapping",
 		      false, QUICK_MODE);
 
 
