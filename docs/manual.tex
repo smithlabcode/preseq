@@ -26,8 +26,8 @@
 \titleformat*{\paragraph}{\large\bfseries}
 
 
-\title{The preseq Manual}
-\author{Timothy Daley \and Victoria Helus \and Andrew Smith }
+\title{The \textbf{preseq} Manual}
+\author{Timothy Daley \and Victoria Helus \and Chao Deng \and Andrew Smith }
 
 \begin{document}
 \maketitle
@@ -42,38 +42,44 @@
 
 
 
-The \textbf{preseq} package is aimed at predicting
-the yield of distinct reads from a genomic library
-from an initial sequencing experiment.  The estimates
+The \textbf{preseq} package is aimed to help researchers
+design and optimize sequencing experiments by using
+population sampling models to infer properties of the
+population or the behavior under deeper sampling based 
+upon a small initial sequencing experiment.  The estimates
 can then be used to examine the utility of further
 sequencing, optimize the sequencing depth,
 or to screen multiple libraries to avoid low complexity
 samples.~\\[-.2cm]
 
-\noindent The three main programs are \fn{c\_curve}, \fn{lc\_extrap},
-and \fn{gc\_extrap}.
-\fn{c\_curve} samples reads without replacement from the 
-given mapped sequenced read file or duplicate count file to estimate the yield
-of the experiment and the subsampled experiments.  These estimates
-are used construct the complexity
-curve of the experiment.  \fn{lc\_extrap} uses rational function approximations
+\noindent The four main programs are \fn{c\_curve}, 
+\fn{lc\_extrap}, \fn{gc\_extrap}, and \fn{bound\_pop}.
+\fn{c\_curve}  interpolates the expected complexity
+curve based upon a hypergeometric formula and
+is primarily used to check predictions from 
+\fn{lc\_extrap} and \fn{gc\_extrap}.  
+\fn{lc\_extrap} uses rational function approximations
 of Good \& Toulmin's~\cite{good1956number} non-parametric
-empirical Bayes estimator to predict the yield
+empirical Bayes estimator to predict the library complexity
 of future experiments, in essence looking into the future
-for hypothetical experiments.  \fn{lc\_extrap} is used to predict 
-the yield and then \fn{c\_curve} can be used to check the yield
-from the larger experiment.
+for hypothetical experiments.  
 
-\fn{gc\_extrap} uses rational function approximations
-to Good \& Toulmin's estimator to predict the genomic
-coverage, i.e. the number of bases covered at least once,
+\fn{gc\_extrap} uses a similar approach as \fn{lc\_extrap}
+to predict the genome coverage, 
+i.e. the number of bases covered at least once,
 from deeper sequencing in a single cell or low input sequencing
 experiment based on the observed coverage counts.
-The option is available to predict the coverage based on binned
+An option is available to predict the coverage based on binned
 coverage counts to speed up the estimates.  
 \fn{gc\_extrap} requires mapped read or bed format
 input, so the tool \fn{bam2mr} is provided to convert
 bam format read to mapped read format.
+
+\fn{bound\_pop} uses a non-parametric moment-based
+approach to conservatively estimate the total number
+of classes in the sample, also called the species
+richness of the population that is sampled.
+
 
 \newpage
 
@@ -83,7 +89,8 @@ bam format read to mapped read format.
 \paragraph{Download}
 \label{sub:download}~\\~\\[-.2cm]
 \raggedright{\textbf{preseq} is available at }
-\url{http://smithlab.cmb.usc.edu/software/}.
+\url{http://smithlabresearch.org/software/preseq/}
+or \url{https://github.com/smithlabcode/preseq}.
 
 
 \paragraph{System Requirements}
@@ -92,10 +99,10 @@ bam format read to mapped read format.
 \textbf{preseq} runs on Unix-type system
 with GNU Scientific Library (GSL), available
 at ~\url{http://www.gnu.org/software/gsl/}.  
-If the input file is in BAM format, SAMTools is
-required, available at ~\url{http://samtools.sourceforge.net/}.
-If the input is 
-a text file of counts in a single column or is 
+If the input file is in BAM format, the SAMTools
+API is required but is included in all binaries and 
+source code.
+If the input is a text file of counts in a single column or is 
 in BED format, 
 SAMTools is not required.
 It has been tested on Linux and 
@@ -103,35 +110,45 @@ Mac OS-X.
 
 \paragraph{Installation}~\\~\\[-.2cm]
 \label{sub:install}
-Download the source code and decompress
-it with 
+If the source code was downloaded from the Smithlab
+website the first step is to decompress it using the
+command
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
  $ tar -jxvf preseq.tar.bz2
 \end{alltt} \endgroup
+To download the source code from GitHub, use
+the command
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+ $ git clone --recursive git://github.com/smithlabcode/preseq.git
+\end{alltt} \endgroup
 % 
-Enter the \textbf{preseq/} directory and run
+In both cases, enter the \textbf{preseq/} directory and run
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
 $ make all
 \end{alltt}\endgroup
+to compile all the code.
 
-The input file may possibly be in BAM format. If the root directory 
-of SAMTools is \$SAMTools, instead run
+If one wishes to link to SAMTools API not
+included with the source code, the if the
+SAMTools API is located at \$SAMTools instead run
 \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
 $ make all SAMTOOLS_DIR=$SAMTools
 \end{alltt}\endgroup
 Output after typing this command should include the flag \fn{-DHAVE\_SAMTOOLS} if the linking is successful. If compiled successfully, the executable file is available
 in \textbf{preseq/}. 
 
-If a BAM file is used as input without first having run \begingroup \fontsize{9pt}{11pt}\selectfont  \fn{\$ make all SAMTOOLS\_DIR=/loc/of/SAMTools}\endgroup, then the following error will occur: \begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup. 
+If a BAM file is used as input without successful linking to 
+SAMTools, then the following error will occur: 
+\begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup. 
 
 \newpage
 
-\section{Using preseq}
+\section{Using \textbf{preseq}}
 \label{sec:usage}
 
 \paragraph{Basic usage}~\\~\\[-.2cm]
 \label{sub:basic}
-To generate the complexity plot of a genomic
+To generate the complexity curve of a genomic
 library from a read file in BED or BAM format or a duplicate count file,
 use the function \fn{c\_curve}.  Use
 \fn{-o} to specify the output name.
@@ -139,9 +156,9 @@ use the function \fn{c\_curve}.  Use
 $ ./preseq c_curve -o complexity_output.txt input.bed
 \end{alltt}\endgroup
 
-To estimate the future yield 
-of a genomic library
-using an initial experiment in BED  format,
+To predict the complexity curve 
+of a sequencing library
+using an initial experiment in BED format,
 use the function \fn{lc\_extrap}.
 The required options are \fn{-o} to specify
 the output of the yield estimates and 
@@ -159,7 +176,7 @@ For a low input sequencing experiment the genomic
 coverage is highly variable and uncertain function
 of sequencing depth.  Some regions may be missing
 due to locus dropout or preferentially amplified during
-MDA (multiple displacement amplification).  
+whole genome amplification.  
 \fn{gc\_extrap} allows the level genomic coverage from deep
 sequencing to be predicted based on an initial sample.
 The input file format need to be a mapped read (MR) or BED,
@@ -198,7 +215,9 @@ In this case concordantly mapped reads and disconcordantly
 mapped fragments are counted.  This means that both ends
 of a disconcordantly mapped read will each be counted separately.
 If a large number of reads are disconcordant, then
-the default single end should be used.  In this case only the mapping 
+the default single end should be used or the disconcordantly
+mapped reads removed prior to running \textbf{preseq}.
+In this case only the mapping 
 location of the first mate
 is used as the unique molecular identifier~\cite{kivioja2011counting}.
 
@@ -223,7 +242,9 @@ awk '{\{ if (NR\%4==2) print substr($0,1,20); \}}' input.fastq | sort | uniq -c
 \end{alltt}\endgroup
 More complicated unique molecular identifiers
 can be used, such as mapping position plus a random barcode,
-but are too complicated to detail in this manual. For questions with such usage, please contact us at \href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
+but are too complicated to detail in this manual. 
+For questions with such usage, please contact us at 
+\href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
 
 \paragraph{Mapped read format for \fn{gc\_extrap}}~\\~\\[-.2cm]
 
@@ -247,9 +268,8 @@ end position before input into \fn{gc\_extrap}.
 \label{sec:complexityplot}
 
 \fn{c\_curve} is used to compute the 
-expected complexity curve of a mapped read file by 
-subsampling smaller experiments without replacement 
-and counting the distinct reads.
+expected complexity curve of a mapped read file 
+with a hypergeometric formula~\cite{heck1975explicit}.
 Output is a text file with two 
 columns.  The first gives the total number
 of reads and the second the corresponding number
@@ -264,6 +284,8 @@ of distinct reads.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-H, -hist\endgroup] Input is a text file of the observed histogram
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-V, -vals\endgroup] Input is a text file of read counts
 \end{description}
+
+\newpage
 
 \paragraph{lc\_extrap}~\\~\\[-.2cm]
 \label{sec:librarycomplexity}
@@ -297,7 +319,10 @@ of the input file.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-H, -hist\endgroup] Input is a text file of the observed histogram
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-V, -vals\endgroup] Input is a text file of read counts
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q, -quick\endgroup] Quick mode, option to estimate yield without bootstrapping for confidence intervals
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-D, -defects\endgroup] Defects mode, estimates the complexity curve without checking for instabilities in the curve.  Should only be used on datasets that fail estimation without defects.
 \end{description}
+
+\newpage
 
 \paragraph{gc\_extrap}~\\~\\[-.2cm]
 \label{sec:genomiccoverage}
@@ -332,6 +357,8 @@ of the input file.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-D, -bed\endgroup] Input file is in BED format without sequence information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q, -quick\endgroup] Quick mode, option to estimate genomic coverage without bootstrapping for confidence intervals
 \end{description}
+
+\newpage
 
 \paragraph{bound\_pop}~\\~\\[-.2cm]
 \label{sec:lib_size}
@@ -468,7 +495,10 @@ Notice the slight changes, with the step sizes of the extrapolation now at 500,0
 10      146334
 \end{alltt}\endgroup
 
-The following command will give output of the same format as the above examples.\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./preseq lc_extrap -o future_yield.txt -H histogram.txt \end{alltt}\endgroup
+The following command will give output of the same format as the above examples.
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} 
+$./preseq lc_extrap -o future_yield.txt -H histogram.txt 
+\end{alltt}\endgroup
 
 Similarly, both \fn{lc\_extrap} and \fn{c\_curve} allow the option to input read counts (text file should contain ONLY the observed counts in a single column). For example, if a dataset had the following counts histogram:
 
@@ -490,7 +520,10 @@ Then, the corresponding input file of just read counts could be as such:
 1
 \end{alltt}\endgroup
 
-Command should be run with the \fn{-V} flag (not to be confused with \fn{-v} for verbose mode): \begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} $./preseq lc_extrap -o future_yield.txt -V counts.txt \end{alltt}\endgroup
+Command should be run with the \fn{-V} flag (not to be confused with \fn{-v} for verbose mode): 
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt} 
+$./preseq lc_extrap -o future_yield.txt -V counts.txt 
+\end{alltt}\endgroup
 
 \newpage
 
@@ -665,11 +698,11 @@ sequences are unobserved in this sample.
 
 \newpage
 
-\section{preseq Application Examples}
+\section{\textbf{preseq} Application Examples}
 
 \subsection*{Screening multiple libraries}
 \label{sec:multlib}
-This section provides a more detailed example using data from different experiments to illustrate how preseq might be applied. Because it is important to avoid spending time on low complexity samples, it is important to decide after observing an initial experiment whether or not it is beneficial to continue with sequencing. The data in this example comes from a study (accession number SRA061610) using single cell sperm cells amplified by Multiple Annealing and Looping Based Amplification Cycles (MALBAC)~\cite{lu2012probing} and focuses on three libraries coming from different experiments from the study (SRX205369, SRX205370, SRX205372). 
+This section provides a more detailed example using data from different experiments to illustrate how \textbf{preseq} might be applied. Because it is important to avoid spending time on low complexity samples, it is important to decide after observing an initial experiment whether or not it is beneficial to continue with sequencing. The data in this example comes from a study (accession number SRA061610) using single cell sperm cells amplified by Multiple Annealing and Looping Based Amplification Cycles (MALBAC)~\cite{lu2012probing} and focuses on three libraries coming from different experiments from the study (SRX205369, SRX205370, SRX205372). 
 
 These libraries help show what would be considered a relatively poor library and a relatively good library, as well as compare the complexity curves obtained from running \fn{c\_curve} and \fn{lc\_extrap}, to show how \fn{lc\_extrap} would help in the decision to sequence further. The black diagonal line represents an ideal library, in which every read is a distinct read (though this cannot be achieved in reality). The full experiments were down sampled at 5\% to obtain a mock initial experiment of the libraries, as shown here, where we have the complexity curves  of the initial experiments generated by \fn{c\_curve}:
 ~\newline
@@ -853,7 +886,7 @@ immune repertoire and age will be of interest.
 
 \section{FAQ}
 
-\Que{When compiling the preseq binary, I receive the error
+\Que{When compiling the \textbf{preseq} binary, I receive the error
 
 \fn{fatal error: gsl/gsl\_cdf.h: No such file or directory
 }
@@ -864,7 +897,7 @@ immune repertoire and age will be of interest.
 
 
 
-\Que{When compiling the preseq binary, I receive the error
+\Que{When compiling the \textbf{preseq} binary, I receive the error
 
 \fn{Undefined symbols for architecture x86\_64: ~\\
 \tab"\_packInt16", referenced from:~\\
@@ -883,14 +916,14 @@ Go to the SAMTools directory and open the file bgzf.c. Find the functions \fn{pa
 
 
 
-\Que{I compile the preseq binary but receive the error 
+\Que{I compile the \textbf{preseq} binary but receive the error 
 
 \fn{terminate called after throwing an instance of 'std::string'}
 }
 
 \Ans{This error is typically called because either the flag -B was not included to 
 specify bam input or because the linking to SAMTools was not included when
-compiling preseq.  To ensure that the linking was done properly, check for the flag
+compiling \textbf{preseq}.  To ensure that the linking was done properly, check for the flag
 \fn{-DHAVE\_SAMTOOLS}.}
 
 \Que{When running \fn{lc\_extrap}, I receive the error 
@@ -950,12 +983,12 @@ the number of remaining in the library.
 \vspace{5mm}
 If none of these solutions worked, please email us at 
 \href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
-and please include the standard output from running preseq in
+and please include the standard output from running \textbf{preseq} in
 verbose mode (specifically the duplicate counts histogram) so 
 that we can look into the problem and rectify problems in future
 versions.  Also, feel free to email us with any other questions or
 concerns.
-The preseq software is still under development so we would appreciate any 
+The \textbf{preseq} software is still under development so we would appreciate any 
 advice, comments, or notification of any possible bugs. Thanks!
 
 \newpage
