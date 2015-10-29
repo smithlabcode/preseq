@@ -229,15 +229,14 @@ main(int argc, const char **argv) {
   try {
     string outfile;
     string mapper = "general";
-    size_t MAX_SEGMENT_LENGTH = 5000;
+    size_t MAX_SEGMENT_LENGTH = 10000;
     size_t suffix_len = 0;
     bool VERBOSE = false;
     size_t MAX_READS_TO_HOLD = 1000000;
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]),
-                           "Convert the SAM/BAM output from "
-                           "mapped read format to sam/bam_file");
+			   "", "bam format mapped read file");
     opt_parse.add_opt("output", 'o', "Name of output file", 
                       false, outfile);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 0)",
@@ -251,7 +250,7 @@ main(int argc, const char **argv) {
 
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
-    if (argc < 3 || opt_parse.help_requested()) {
+    if (argc < 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl
            << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
