@@ -230,8 +230,8 @@ but are too complicated to detail in this manual. For questions with such usage,
 
 \fn{gc\_extrap} does not allow for input files to be in BAM format.
 We have found that some mappers give inconsistent SAM flags
-for paired end reads, preventing proper merging of reads in the proper
-order.  
+for paired end reads, preventing efficient merging of reads in 
+the proper order.  
 We provide the tool \fn{bam2mr}
 to convert SAM or BAM format files to MR format.  The MR
 or BED format file needs to be sorted by chromosome, start, and
@@ -290,7 +290,6 @@ of the input file.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-s, -step\endgroup] The step size for samples. Default is 1 million reads
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-n, -bootstraps\endgroup] The number of bootstraps. Default is 100
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-c, -cval\endgroup] Level for confidence intervals. Default is 0.95
-\item[\begingroup \fontsize{9pt}{12pt}\selectfont-d, -dupl\_level\endgroup] Fraction of duplicates to predict. Default is 0.5
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-x, -terms\endgroup] Max number of terms for extrapolation. Default is 100
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-B, -bam\endgroup] Input file is in BAM format
@@ -307,6 +306,9 @@ For single cell or low input sequencing experiments
 \fn{gc\_extrap} is used to extrapolate
 the expected number of bases covered at least once
 for theoretical larger experiments.  
+Input format is required to be in mapped read
+format and we have provided the tool
+\fn{bam2mr} to convert bam format files to mr.
 Output is a text file with four columns.  The
 first is the total number of sequenced and mapped
 bases, second gives the corresponding
@@ -329,6 +331,40 @@ of the input file.
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-D, -bed\endgroup] Input file is in BED format without sequence information
 \item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q, -quick\endgroup] Quick mode, option to estimate genomic coverage without bootstrapping for confidence intervals
+\end{description}
+
+\paragraph{bound\_pop}~\\~\\[-.2cm]
+\label{sec:lib_size}
+
+\fn{bound\_pop} is a method for estimating species
+richness, the total number of species or classes
+in the sampled population.  
+Input format is the same as \fn{lc\_extrap}.
+Default output is a three column text file, 
+with the first column containing the estimated
+species richness and the second and third
+containing the estimated lower and upper
+confidence intervals.  
+If \fn{bound\_pop} is run in quick mode, then 
+the output is two columns.
+The first column will contain the estimated species
+richness and the second column will contain
+the dimension or order of the approximation.
+
+
+
+\begin{description}[style=multiline,leftmargin=6cm,font=\ttfamily]
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-o, -output\endgroup] Name of output file. Default prints to screen
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-p, -max\_num\_points\endgroup] Maximum number of points to use in the quadrature estimator.  Default is 10, corresponding to 20 entries of the counts histogram being used.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-t, -tolerance\endgroup] Numerical tolerance for convergence of QR algorithm.  Default is $1\mbox{\sc{e}}-20$.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-n, -bootstraps\endgroup] The number of bootstraps. Default is 100.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-c, -clevel\endgroup] Level for confidence intervals. Default is 0.95.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-v -verbose\endgroup] Prints more information.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-B, -bam\endgroup] Input file is in BAM format.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-P, -pe\endgroup] Input is a paired end read file.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-H, -hist\endgroup] Input is a text file of the observed histogram.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-V, -vals\endgroup] Input is a text file of read counts.
+\item[\begingroup \fontsize{9pt}{12pt}\selectfont-Q, -quick\endgroup] Quick mode, option to estimate species richness without bootstrapping for confidence intervals.
 \end{description}
 
 
@@ -458,6 +494,177 @@ Command should be run with the \fn{-V} flag (not to be confused with \fn{-v} for
 
 \newpage
 
+\section{gc\_extrap Example}
+
+\fn{gc\_extrap} is designed for coverage extrapolation
+in single cell whole genome sequencing experiments.
+For illustrative purposes we will examine an MDA whole
+genome sequencing experiment, SRA accession 
+SRR1777281.  This experiment has 5.76 million paired end
+101 base pair reads.
+We mapped the experiment with bowtie2 v0.0-beta7
+under default parameters.  This resulted in 3.63 million 
+concordantly mapped fragment pairs and 2.1 million 
+disconcordantly mapped fragments.  
+
+The first step is to convert the sorted bam file to mr format
+and sort it.
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+$ ./bam2mr SRR1777281_bwt2.sort.bam -o SRR1777281_bwt2.mr -L 10000 -R 1000000
+$ sort -k 1,1 -k 2,2n -k 3,3n SRR1777281_bwt2.mr > SRR1777281_bwt2.sort.mr
+\end{alltt}\endgroup
+The resulting mapped read has 813 million bases (note
+that bases covered by two fragments of the same read are
+only counted once) and 410 million covered bases.
+
+As a default, \fn{gc\_extrap} divides the genome into
+10 base pair non-overlapping bins. 
+In default mode, the running time of \fn{gc\_extrap}
+was under 12 minutes.
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+LOADING READS
+MAPPED READ FORMAT
+TOTAL READS         = 5726883
+BASE STEP SIZE      = 1e+08
+BIN STEP SIZE       = 1e+07
+TOTAL BINS          = 8.1325e+07
+BINS PER READ       = 14.2006
+DISTINCT BINS       = 4.09582e+07
+TOTAL BASES         = 8.1325e+08
+TOTAL COVERED BASES = 4.09582e+08
+MAX COVERAGE COUNT  = 79775
+COUNTS OF 1         = 3.13723e+07
+OBSERVED BIN COUNTS (79776)
+1	3.13723e+07
+2	6.97799e+06
+3	1.72101e+06
+.
+.
+\end{alltt}\endgroup
+
+The output is as follows:
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{llll}
+TOTAL\_BASES & EXPECTED\_COVERED\_BASES & LOWER\_95\%CI & UPPER\_95\%CI \\ \hline
+0& 0 & 0 & 0 \\
+100000000.0 & 64522380.0 & 63075879.1 & 66002053.1 \\
+200000000.0 & 123422455.0 & 120747705.7 & 126156454.1 \\
+300000000.0 & 178054120.0 & 174319619.1 & 181868626.2 \\
+400000000.0 & 229008295.0 & 224352188.5 & 233761032.3 \\
+500000000.0 & 276727080.0 & 271265011.6 & 282299130.1 \\
+. & . & . & .\\
+. & . & . & .\\
+999900000000.0 & 1826891418.6 & 1621208958.1 & 2058668772.4 \\
+\end{tabular}
+\end{table}
+
+To run \fn{gc\_extrap} at single base resolution, the option
+\fn{-b 1} is required.  This results in a significant increase
+in the running time of the algorithm.  For this case the
+running time was 113 minutes. 
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+$ ./preseq gc_extrap SRR1777281_bwt2.sort.mr -o SRR1777281_bwt2_1bp_gc_extrap.txt -b 1 -v
+\end{alltt}\endgroup
+
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+LOADING READS
+MAPPED READ FORMAT
+TOTAL READS         = 5726883
+BASE STEP SIZE      = 1e+08
+BIN STEP SIZE       = 1e+08
+TOTAL BINS          = 8.13236e+08
+BINS PER READ       = 142.003
+DISTINCT BINS       = 4.09454e+08
+TOTAL BASES         = 8.13236e+08
+TOTAL COVERED BASES = 4.09454e+08
+MAX COVERAGE COUNT  = 80028
+COUNTS OF 1         = 3.13527e+08
+OBSERVED BIN COUNTS (80029)
+1	3.13527e+08
+2	6.98288e+07
+3	1.722e+07
+.
+.
+\end{alltt}\endgroup
+
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{llll}
+TOTAL\_BASES & EXPECTED\_COVERED\_BASES & LOWER\_95\%CI & UPPER\_95\%CI \\ \hline
+0& 0 & 0 & 0 \\
+100000000.0 & 64680427.0 & 64284593.4 & 65078698.0 \\
+200000000.0 & 123709880.0 & 122978429.6 & 124445680.9 \\
+300000000.0 & 178447901.0 & 177427065.8 & 179474609.6 \\
+400000000.0 & 229488768.0 & 228216803.2 & 230767822.1 \\
+500000000.0 & 277279369.5 & 275788078.2 & 278778724.8 \\
+. & . & . & .\\
+. & . & . & .\\
+999900000000.0 & 1838021604.0 & 1682515315.7 & 2007900543.3 \\
+\end{tabular}
+\end{table}
+
+\newpage
+
+\section{bound\_pop Example}
+\label{bound_pop_example}
+
+We examine T-Cell $\beta$ repertoire (TCR$\beta$) sampling
+data downloaded from \url{http://mitcr.milaboratory.com/datasets/aging2013/}
+and viewed through MiTCR (\url{http://mitcr.milaboratory.com/}).  
+The first column corresponds to the observed TCR$\beta$ counts.
+This can be summarized in a duplicate counts histogram,
+easily formed by using the \fn{hist} function in R.
+
+We will first examine the experiment L1\_10\_M9.  The first
+ten entries of the duplicate counts histogram is as follows:
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+1	433541
+2	56447
+3	13030
+4	4120
+5	2841
+6	1981
+7	1338
+8	970
+9	814
+10	632
+\end{alltt}\endgroup
+
+There are 861,156 total observed TCR$\beta$ sequences
+and 520,315 distinct TCR$\beta$ sequencing.  We 
+
+\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
+$ ./preseq bound_pop -H L1_10_M9_hist.txt -o L1_10_M9_estim_species_richness.txt
+\end{alltt}\endgroup
+
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{lll}
+log\_mean\_estimated\_unobs & log\_lower\_ci & log\_upper\_ci \\
+$2976677.3$ & $2862770.9$ & $3095116.0$ \\
+\end{tabular}
+\end{table}
+ 
+In quick mode, the output is as follows:
+\begin{table}[ht!]
+ \fontfamily{pcr}\fontsize{9pt}{12pt}\selectfont
+\begin{tabular}{ll}
+quadrature\_estimated\_unobs & n\_points \\
+$2969646.3$ & $2$ \\
+\end{tabular}
+\end{table}
+
+\textbf{preseq} estimates that there are at least two million
+unobserved TCR$\beta$ sequences in the sample.
+This implies that the vast majority of the TCR$\beta$ 
+sequences are unobserved in this sample.
+
+
+
+
+\newpage
+
 \section{preseq Application Examples}
 
 \subsection*{Screening multiple libraries}
@@ -504,7 +711,7 @@ and long non-coding RNAs were newly identified with the targeted sequencing.
 A current vigorous debate exists on whether these rare events are truly transcriptional
 events or are merely due to sequencing or transcriptional noise 
 (see~\cite{van2010most} and~\cite{clark2011reality}).  We do not seek to address
-these issues, but merely to comment on the true complexity
+these issues, but merely to comment on the estimated complexity
 of rare transcriptional events in sequencing libraries identified by current
 protocols.
 
@@ -540,6 +747,105 @@ both libraries indicates that the full scope of juctions identified
 by Tophat is far from saturated in both libraries.  This indicates
 that large number of rare junctions still remain to be identified
 in the libraries.
+
+
+\newpage
+
+\subsection*{Comparing coverage for single cell whole genome sequencing library preparations}
+
+We will use \fn{gc\_extrap} to compare coverage profiles
+across library preparation protocols.  We use the data
+from Fu {\em et al.}~\cite{fu2015uniform}.  
+We downloaded SRA accessions , 
+SRR1777243, SRR1777245, SRR1777251, 
+SRR1777274, and SRR1777281.
+These correspond to bulk, DOP-PCR,
+eWGA, MALBAC, and MDA.
+We mapped the reads with bowtie2 to hg19
+and ran \fn{gc\_extrap} on the libraries with default
+parameters.  To compare the libraries we scaled 
+the $x$-axis to the total number of sequenced
+reads by dividing by the number total bases
+(TOTAL BASES in verbose mode) and multiplying
+by the number of sequenced reads.
+
+\begin{figure}[h!]
+\centering{\includegraphics[width=10cm]{comparing_scWGA_coverage.pdf}}
+\caption{Coverage comparison of single cell 
+whole genome sequencing experiments.}
+\end{figure}
+
+In our previous paper~\cite{daley2014modeling}
+we compared  coverage for DOP-PCR, MALBAC,
+and MDA.  We found that typically DOP-PCR results in the
+lowest coverage and MDA the highest.
+The results for the libraries investigated here
+agree with our previous results.  
+Notably, eWGA had the highest estimated
+coverage.  This indicates that more investigation of
+this new library prep is worthwhile to determine if the
+observed results hold in general.
+
+\newpage 
+
+\subsection*{Estimating and analyzing TCR$\beta$ richness}
+
+In this section we will use \fn{bound\_pop}
+to estimate TCR$\beta$ richness from TCR$\beta$
+sequencing data taken from Britanova {\em et al.}
+\cite{britanova2014age}.  We examined one
+of the datasets in section~\ref{bound_pop_example}
+but now we investigate all 39 TCR$\beta$ sequencing
+experiments.
+
+The average number of observations, or sampled
+TCR$\beta$ sequences, was 992,359 with a
+range of  $($861,156, 999,024$)$
+indicating that all experiments were sampled to a similar
+depth.  
+In contrast, the range of the number of distinct TCR$\beta$
+sequences observed was quite large with a minimum of
+133,464, a maximum of 772,223, and a mean of 461,797.  
+
+The observed TCR$\beta$ richness is obviously biased so 
+we used \fn{bound\_pop} to estimate the total richness.
+The estimated TCR$\beta$ richness ranges from a minimum
+of 823,223 to a maximum of 8,945,797 with a mean
+of 2,969,305.  
+
+Note that any statistical test for relationship will be liberal
+since the estimation procedure adds extra variance that is not
+apparent from the estimated values~\cite{willis2015inference}.
+A standard test will tend to reject more often when the
+null hypothesis is false and will tend to accept less often
+when the null hypothesis is true.
+Therefore we can use standard tests to determine
+where to investigate further.
+
+First there appears to be no difference in 
+estimated TCR$\beta$ richness between the sexes
+of the participants (mean of 3,296,501 from 19 females
+versus 2,658,468 from 20 males).
+We next investigate the relationship between the age
+of the participant and the estimated TCR$\beta$ richness,
+a topic investigated by Britanova {\em et al.}
+
+
+
+ \begin{figure}[h!]
+\centering{\includegraphics[width=8cm]{TCR_richness_vs_age_lm.pdf}}
+\caption{Estimated TCR$\beta$ richness versus age and the
+least square fit.  $R^{2} = 0.452$, intercept $ = 5,117,862$, slope $= -43,802$.
+}
+\end{figure}
+
+We see that there is a strong negative relationship between the
+estimated species richness and age.  Interestingly we see a lack
+of homoscedasticity in the data, as the data shows a noticable
+decrease in variation as a function of age.  
+Clearly further investigation into the relationship between 
+immune repertoire and age will be of interest.  
+
 
 
 \newpage

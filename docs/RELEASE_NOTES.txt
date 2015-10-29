@@ -1,3 +1,14 @@
+preseq beta release 2.0.0 (October 29, 2014)
+
+------------------------------------------------------------------
+
+Notable changes in preseq software:
+
+  * Include the module bound_pop.  This module constructs a 
+    nonparametric moment-based estimator of species richness,
+    the total number of species or classes in the population.
+
+
 preseq beta release 1.0.3 (December 15, 2014)
 
 ------------------------------------------------------------------
