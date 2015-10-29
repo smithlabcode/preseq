@@ -236,7 +236,7 @@ main(int argc, const char **argv) {
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]),
-			   "", "bam format mapped read file");
+			   "", "<bam file>");
     opt_parse.add_opt("output", 'o', "Name of output file", 
                       false, outfile);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 0)",
