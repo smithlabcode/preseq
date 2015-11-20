@@ -37,7 +37,7 @@ endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
-PROGS = preseq mincount_extrap mincount_c_curve saturation_extrap test_quadrature
+PROGS = preseq
 ifdef SAMTOOLS_DIR
 PROGS += bam2mr
 endif
