@@ -242,7 +242,8 @@ check_yield_estimates(const vector<double> &estimates) {
 
 
 void
-extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
+extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
+		 const vector<double> &orig_hist,
                  const size_t bootstraps, const size_t orig_max_terms,
                  const int diagonal, const double bin_step_size,
                  const double max_extrapolation, const size_t max_iter,
@@ -310,36 +311,57 @@ extrap_bootstrap(const bool VERBOSE, const vector<double> &orig_hist,
     // max_terms)
     max_terms = max_terms - (max_terms % 2 == 1);
     
-    //refit curve for lower bound
-    const ContinuedFractionApproximation
-      lower_cfa(diagonal, max_terms);
+    // defect mode, simple extrapolation
+    if(DEFECTS){
+      vector<double> ps_coeffs;
+      for (size_t j = 1; j <= max_terms; j++)
+	ps_coeffs.push_back(hist[j]*std::pow((double)(-1), (int)(j + 1)) );
+    
+      const ContinuedFraction
+	defect_cf(ps_coeffs, diagonal, max_terms);
 
-    const ContinuedFraction
-      lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
-
-    //extrapolate the curve start
-    if (lower_cf.is_valid()){
       double sample_size = static_cast<double>(sample);
       while(sample_size < max_extrapolation){
-        double t = (sample_size - sample_vals_sum)/sample_vals_sum;
-        assert(t >= 0.0);
-        yield_vector.push_back(initial_distinct + t*lower_cf(t));
-        sample_size += bin_step_size;
+	double t = (sample_size - sample_vals_sum)/sample_vals_sum;
+	assert(t >= 0.0);
+	yield_vector.push_back(initial_distinct + t*defect_cf(t));
+	sample_size += bin_step_size;
       }
+      // no checking of curve in defect mode
+      if (VERBOSE) cerr << '.';
+    }
+    else{
+      //refit curve for lower bound
+      const ContinuedFractionApproximation
+	lower_cfa(diagonal, max_terms);
 
-      // SANITY CHECK
-      if (check_yield_estimates(yield_vector)) {
-        bootstrap_estimates.push_back(yield_vector);
-        if (VERBOSE) cerr << '.';
+      const ContinuedFraction
+	lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
+
+      //extrapolate the curve start
+      if (lower_cf.is_valid()){
+	double sample_size = static_cast<double>(sample);
+	while(sample_size < max_extrapolation){
+	  double t = (sample_size - sample_vals_sum)/sample_vals_sum;
+	  assert(t >= 0.0);
+	  yield_vector.push_back(initial_distinct + t*lower_cf(t));
+	  sample_size += bin_step_size;
+	}
+
+	// SANITY CHECK
+	if (check_yield_estimates(yield_vector)) {
+	  bootstrap_estimates.push_back(yield_vector);
+	  if (VERBOSE) cerr << '.';
+	}
+	else if (VERBOSE){
+	  cerr << "_";
+	}
       }
       else if (VERBOSE){
-        cerr << "_";
+	cerr << "_";
       }
-    }
-    else if (VERBOSE){
-      cerr << "_";
-    }
 
+    }
   }
   if (VERBOSE)
     cerr << endl;
@@ -762,9 +784,9 @@ lc_extrap(const int argc, const char **argv) {
       const size_t max_iter = 10*bootstraps;
 
       vector<vector <double> > bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, counts_hist, bootstraps, orig_max_terms,
-                       diagonal, step_size, max_extrapolation, max_iter,
-                       bootstrap_estimates);
+      extrap_bootstrap(VERBOSE, DEFECTS, counts_hist, bootstraps, 
+		       orig_max_terms, diagonal, step_size, max_extrapolation, 
+		       max_iter, bootstrap_estimates);
 
 
       /////////////////////////////////////////////////////////////////////
@@ -1000,7 +1022,7 @@ gc_extrap(const int argc, const char **argv) {
       const size_t max_iter = 10*bootstraps;
       
       vector<vector <double> > bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, coverage_hist, bootstraps, orig_max_terms,
+      extrap_bootstrap(VERBOSE, DEFECTS, coverage_hist, bootstraps, orig_max_terms,
                        diagonal, bin_step_size, max_extrapolation/bin_size,
                        max_iter, bootstrap_estimates);
       
