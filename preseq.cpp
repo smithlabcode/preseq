@@ -45,7 +45,7 @@
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
-#define PRESEQ_VERSION "2.0.0"
+#define PRESEQ_VERSION "2.0.1"
 
 // AS: might not be good to depend on mapped read here
 // TD: if we're including gc_extrap, we need the dependence
@@ -387,40 +387,75 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
   // max_terms)
   max_terms = max_terms - (max_terms % 2 == 1);
 
-  const ContinuedFractionApproximation
-    lower_cfa(diagonal, max_terms);
+  if(DEFECTS){
+    vector<double> ps_coeffs;
+    for (size_t j = 1; j <= max_terms; j++)
+      ps_coeffs.push_back(hist[j]*std::pow((double)(-1), (int)(j + 1)) );
+    
+    const ContinuedFraction
+      defect_cf(ps_coeffs, diagonal, max_terms);
 
-  const ContinuedFraction
-    lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
-
-  // extrapolate curve
-  if (lower_cf.is_valid() || DEFECTS){
     double sample_size = static_cast<double>(sample);
     while(sample_size < max_extrapolation){
       const double one_minus_fold_extrap 
-        = (sample_size - vals_sum)/vals_sum;
+	= (sample_size - vals_sum)/vals_sum;
       assert(one_minus_fold_extrap >= 0.0);
-      double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
+      double tmp = one_minus_fold_extrap*defect_cf(one_minus_fold_extrap);
       yield_estimate.push_back(initial_distinct + tmp);
       sample_size += step_size;
     }
+
+    if (VERBOSE) {
+      if(defect_cf.offset_coeffs.size() > 0){
+	cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
+	copy(defect_cf.offset_coeffs.begin(), defect_cf.offset_coeffs.end(),
+	     std::ostream_iterator<double>(cerr, "\n"));
+      }
+      if(defect_cf.cf_coeffs.size() > 0){
+	cerr << "CF_COEFF_ESTIMATES" << endl;
+	copy(defect_cf.cf_coeffs.begin(), defect_cf.cf_coeffs.end(),
+	     std::ostream_iterator<double>(cerr, "\n"));
+      }
+    }
+
+    // NO FAIL!  DEFECT MODE DOESN'T CARE ABOUT FAILURE
   }
   else{
+    const ContinuedFractionApproximation
+      lower_cfa(diagonal, max_terms);
+
+    const ContinuedFraction
+      lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
+
+    // extrapolate curve
+    if (lower_cf.is_valid()){
+      double sample_size = static_cast<double>(sample);
+      while(sample_size < max_extrapolation){
+	const double one_minus_fold_extrap 
+	  = (sample_size - vals_sum)/vals_sum;
+	assert(one_minus_fold_extrap >= 0.0);
+	double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
+	yield_estimate.push_back(initial_distinct + tmp);
+	sample_size += step_size;
+      }
+    }
+    else{
     // FAIL!
     // lower_cf unacceptable, need to bootstrap to obtain estimates
-    return false;
-  }
-
-  if (VERBOSE) {
-    if(lower_cf.offset_coeffs.size() > 0){
-      cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
-      copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
-           std::ostream_iterator<double>(cerr, "\n"));
+      return false;
     }
-    if(lower_cf.cf_coeffs.size() > 0){
-      cerr << "CF_COEFF_ESTIMATES" << endl;
-      copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
-           std::ostream_iterator<double>(cerr, "\n"));
+
+    if (VERBOSE) {
+      if(lower_cf.offset_coeffs.size() > 0){
+	cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
+	copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
+	     std::ostream_iterator<double>(cerr, "\n"));
+      }
+      if(lower_cf.cf_coeffs.size() > 0){
+	cerr << "CF_COEFF_ESTIMATES" << endl;
+	copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
+	     std::ostream_iterator<double>(cerr, "\n"));
+      }
     }
   }
 
@@ -695,7 +730,7 @@ lc_extrap(const int argc, const char **argv) {
     vector<double> yield_estimates;
 
 
-    if(SINGLE_ESTIMATE || DEFECTS){
+    if(SINGLE_ESTIMATE){
       bool SINGLE_ESTIMATE_SUCCESS =
         extrap_single_estimate(VERBOSE, DEFECTS, counts_hist, orig_max_terms, 
                                diagonal, step_size, max_extrapolation, 
