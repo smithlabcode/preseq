@@ -328,6 +328,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
 	sample_size += bin_step_size;
       }
       // no checking of curve in defect mode
+      bootstrap_estimates.push_back(yield_vector);
       if (VERBOSE) cerr << '.';
     }
     else{
