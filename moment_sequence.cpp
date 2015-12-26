@@ -52,11 +52,12 @@ ensure_pos_def_mom_seq(vector <double> &moments,
 		       const double tolerance,
 		       const bool VERBOSE){
 
+  const size_t min_hankel_dim = 1;
   size_t hankel_dim = 2;
   if(moments.size() < 2*hankel_dim){
     if(VERBOSE)
       cerr << "too few moments" << endl;
-    return 1;
+    return min_hankel_dim;
   }
 
   bool ACCEPT_HANKEL = true;
@@ -107,7 +108,7 @@ ensure_pos_def_mom_seq(vector <double> &moments,
     }
   }
 
-  return hankel_dim - 1;
+  return max(hankel_dim - 1, min_hankel_dim);
 }
 
 
