@@ -1272,7 +1272,7 @@ bound_pop(const int argc, const char **argv) {
 
     size_t max_num_points = 10;
     double tolerance = 1e-20;
-    size_t bootstraps = 100;
+    size_t bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
 
@@ -1525,13 +1525,16 @@ bound_pop(const int argc, const char **argv) {
 	// initialize moments, 0th moment is 1
 	vector<double> bootstrap_moments(1, 1.0);
 	// moments[r] = (r + 1)! n_{r+1} / n_1
-	for(size_t i = 0; i < 2*max_num_points + 1; i++)
+	for(size_t i = 0; i < 2*max_num_points; i++)
 	  bootstrap_moments.push_back(exp(gsl_sf_lnfact(i + 2) 
 					  + log(sample_hist[i + 2])
 					  - log(sample_hist[1])) );
 
 	size_t n_points = 0;
-	n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, false);
+	n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
+	n_points = std::min(n_points, max_num_points);
+	if(VERBOSE)
+	  cerr << "n_points = " << n_points << endl;    
 
 
 	MomentSequence bootstrap_mom_seq(bootstrap_moments);
@@ -1556,6 +1559,16 @@ bound_pop(const int argc, const char **argv) {
 	else{
 	  estimated_unobs = sampled_distinct;
 	  n_points = 0;
+	}
+	if(VERBOSE){
+	  cerr << "points=" << "\t";
+	  for(size_t i = 0; i < points.size(); i++)
+	    cerr << points[i] << "\t";
+	  cerr << endl;
+	  cerr << "weights=" << "\t";
+	  for(size_t i = 0; i < weights.size(); i++)
+	    cerr << weights[i] << "\t";
+	  cerr << endl;
 	}
 
 	quad_estimates.push_back(estimated_unobs);
