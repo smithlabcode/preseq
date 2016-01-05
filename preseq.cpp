@@ -96,13 +96,13 @@ median_and_ci(const vector<double> &estimates,
   median_estimate =
     gsl_stats_median_from_sorted_data(&sorted_estimates[0], 
                                       1, n_est);
-  const double variance = 
-    gsl_stats_variance(&sorted_estimates[0], 1, n_est);
-  const double confint_mltr =
-    alpha_log_confint_multiplier(median_estimate, variance, alpha);
 
-  lower_ci_estimate = median_estimate/confint_mltr;
-  upper_ci_estimate = median_estimate*confint_mltr;
+  lower_ci_estimate = 
+    gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
+					1, n_est, alpha/2);
+  upper_ci_estimate = 
+    gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
+					1, n_est, 1.0 - alpha/2);
 
 }
 
@@ -158,6 +158,30 @@ log_mean(const bool VERBOSE,
   log_lower_ci = exp(log(log_mean) - inv_norm_alpha*log_std_dev);
   log_upper_ci = exp(log(log_mean) + inv_norm_alpha*log_std_dev);
 }
+
+void
+mean_and_ci(const vector<double> &estimates,
+	const double ci_level,
+	double &mean_estimate,
+	double &lower_ci_estimate,
+	double &upper_ci_estimate){
+  assert(!estimates.empty());
+  const double alpha = 1.0 - ci_level;
+  const size_t n_est = estimates.size();
+  vector<double> sorted_estimates(estimates);
+  sort(sorted_estimates.begin(), sorted_estimates.end());
+  mean_estimate =
+    gsl_stats_mean(&sorted_estimates[0], 1, n_est);
+
+  lower_ci_estimate = 
+    gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
+					1, n_est, alpha/2);
+  upper_ci_estimate = 
+    gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
+					1, n_est, 1.0 - alpha/2);
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -1516,6 +1540,8 @@ bound_pop(const int argc, const char **argv) {
       for(size_t iter = 0; 
 	  iter < max_iter && quad_estimates.size() < bootstraps; 
 	  ++iter){
+	if(VERBOSE)
+	  cerr << "iter=" << "\t" << iter << endl;
 
 	vector<double> sample_hist;
 	resample_hist(rng, counts_hist_distinct_counts, 
@@ -1531,7 +1557,7 @@ bound_pop(const int argc, const char **argv) {
 					  - log(sample_hist[1])) );
 
 	size_t n_points = 0;
-	n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
+	n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
 	n_points = std::min(n_points, max_num_points);
 	if(VERBOSE)
 	  cerr << "n_points = " << n_points << endl;    
@@ -1560,6 +1586,27 @@ bound_pop(const int argc, const char **argv) {
 	  estimated_unobs = sampled_distinct;
 	  n_points = 0;
 	}
+
+	if(VERBOSE){
+	  cerr << "bootstrapped_moments=" << endl;
+	  for(size_t i = 0; i < bootstrap_moments.size(); i++)
+	    cerr << bootstrap_moments[i] << endl;
+	}
+	if(VERBOSE){
+	  for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+	    cerr << "alpha_" << k << '\t';
+	  cerr << endl;
+	  for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+	    cerr << bootstrap_mom_seq.alpha[k] << '\t';
+	  cerr << endl;
+
+	  for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+	    cerr << "beta_" << k << '\t';
+	  cerr << endl;
+	  for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+	    cerr << bootstrap_mom_seq.beta[k] << '\t';
+	  cerr << endl;
+	}
 	if(VERBOSE){
 	  cerr << "points=" << "\t";
 	  for(size_t i = 0; i < points.size(); i++)
@@ -1569,17 +1616,36 @@ bound_pop(const int argc, const char **argv) {
 	  for(size_t i = 0; i < weights.size(); i++)
 	    cerr << weights[i] << "\t";
 	  cerr << endl;
+	  cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
 	}
 
 	quad_estimates.push_back(estimated_unobs);
       }
 
+      double median_estimate, lower_ci, upper_ci;
+      median_and_ci(quad_estimates, c_level, median_estimate,
+		    lower_ci, upper_ci);
+
+      std::ofstream of;
+      if (!outfile.empty()) of.open(outfile.c_str());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+
+      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
+      out.precision(1);
+
+      out << "median_estimated_unobs" << '\t'
+	  << "lower_ci" << '\t'
+	  << "upper_ci" << endl;
+      out << median_estimate << '\t'
+	  << lower_ci << '\t'
+	  << upper_ci << endl;
+      /*
       double log_mean_estimate, lower_log_ci, upper_log_ci;
 
       log_mean(VERBOSE, quad_estimates, c_level, log_mean_estimate, 
 	       lower_log_ci, upper_log_ci);
 
-     std::ofstream of;
+      std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
@@ -1592,7 +1658,7 @@ bound_pop(const int argc, const char **argv) {
       out << log_mean_estimate << '\t'
 	  << lower_log_ci << '\t'
 	  << upper_log_ci << endl;
-
+      */
 
    }
 
