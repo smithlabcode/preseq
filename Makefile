@@ -107,5 +107,7 @@ install: $(PROGS)
 
 clean:
 	@-rm -f $(PROGS) *.o *~
+	@-rm -f $(SMITHLAB_CPP)*.o $(SMITHLAB_CPP)*~
+	@-rm -f $(SAMTOOLS_DIR)*.o $(SAMTOOLS_DIR)*~
 
 .PHONY: clean
