@@ -54,7 +54,7 @@ ifeq "$(shell uname)" "Darwin"
 CXXFLAGS += -arch x86_64
 ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
               then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++
+CXXFLAGS += -stdlib=libstdc++ -I/usr/local/include -L/usr/local/lib
 endif
 endif
 
