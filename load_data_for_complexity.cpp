@@ -751,6 +751,9 @@ load_coverage_counts_MR(const bool VERBOSE,
                         vector<double> &coverage_hist,
                         const unsigned int seed) {
 
+  if(VERBOSE){
+      cerr << "Setting the random seed to " << seed << endl;
+  }
   srand(seed);
   Runif runif(rand());
 
@@ -812,6 +815,7 @@ load_coverage_counts_GR(const string input_file_name,
                         vector<double> &coverage_hist,
                         const unsigned int seed) {
 
+  cerr << "Setting the random seed to " << seed << endl;
   srand(seed);
   Runif runif(rand());
 

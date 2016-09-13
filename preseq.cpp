@@ -277,6 +277,9 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
   bootstrap_estimates.clear();
 
   //setup rng
+  if(VERBOSE){
+      cerr << "Setting the random seed to " << seed << endl;
+  }
   srand(seed);
   gsl_rng_env_setup();
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
@@ -1175,6 +1178,9 @@ c_curve(const int argc, const char **argv) {
     // Setup the random number generator
     gsl_rng_env_setup();
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type
+    if(VERBOSE){
+        cerr << "Setting the random seed to " << seed << endl;
+    }
     srand(seed); //give the random fxn a new seed
     gsl_rng_set(rng, rand()); //initialize random number generator with the seed
 
@@ -1538,6 +1544,9 @@ bound_pop(const int argc, const char **argv) {
       vector<double> quad_estimates;
 
   //setup rng
+      if(VERBOSE){
+          cerr << "Setting the random seed to " << seed << endl;
+      }
       srand(seed);
       gsl_rng_env_setup();
       gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
