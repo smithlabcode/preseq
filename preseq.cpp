@@ -272,7 +272,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
                  const int diagonal, const double bin_step_size,
                  const double max_extrapolation, const size_t max_iter,
                  vector< vector<double> > &bootstrap_estimates,
-                 seed const unsigned int) {
+                 const unsigned int seed) {
   // clear returning vectors
   bootstrap_estimates.clear();
 
