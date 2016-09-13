@@ -271,12 +271,13 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
                  const size_t bootstraps, const size_t orig_max_terms,
                  const int diagonal, const double bin_step_size,
                  const double max_extrapolation, const size_t max_iter,
-                 vector< vector<double> > &bootstrap_estimates) {
+                 vector< vector<double> > &bootstrap_estimates,
+                 seed const unsigned int) {
   // clear returning vectors
   bootstrap_estimates.clear();
 
   //setup rng
-  srand(time(0) + getpid());
+  srand(seed);
   gsl_rng_env_setup();
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(rng, rand());
@@ -588,7 +589,8 @@ lc_extrap(const int argc, const char **argv) {
     size_t bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-      
+    unsigned int seed = time(0) + getpid();  
+
     /* FLAGS */
     bool VERBOSE = false;
     bool VALS_INPUT = false;
@@ -641,6 +643,9 @@ lc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("quick",'Q',
                       "quick mode, estimate yield without bootstrapping for confidence intervals",
                       false, SINGLE_ESTIMATE);
+    opt_parse.add_opt("seed", 'e',
+                      "Supply a seed for random number generation?",
+                      false, seed);
     opt_parse.add_opt("defects", 'D', 
 		      "defects mode to extrapolate without testing for defects",
 		      false, DEFECTS);
@@ -811,7 +816,7 @@ lc_extrap(const int argc, const char **argv) {
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, DEFECTS, counts_hist, bootstraps, 
 		       orig_max_terms, diagonal, step_size, max_extrapolation, 
-		       max_iter, bootstrap_estimates);
+		       max_iter, bootstrap_estimates, seed);
 
 
       /////////////////////////////////////////////////////////////////////
@@ -869,6 +874,8 @@ gc_extrap(const int argc, const char **argv) {
     size_t bootstraps = 100;
     bool DEFECTS = false;
 
+    unsigned int seed = time(0) + getpid();
+
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
 
@@ -901,6 +908,9 @@ gc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("bed", 'D',
                       "input is in bed format without sequence information",
                       false, NO_SEQUENCE);
+    opt_parse.add_opt("seed", 'e',
+                      "Supply a seed for the random number generation?",
+                      false, seed);
     opt_parse.add_opt("quick",'Q',
                       "quick mode: run gc_extrap without "
                       "bootstrapping for confidence intervals",
@@ -940,13 +950,13 @@ gc_extrap(const int argc, const char **argv) {
       if(VERBOSE)
         cerr << "BED FORMAT" << endl;
       n_reads = load_coverage_counts_GR(input_file_name, bin_size,
-                                        max_width, coverage_hist);
+                                        max_width, coverage_hist, seed);
     }
     else{
       if(VERBOSE)
         cerr << "MAPPED READ FORMAT" << endl;
       n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, bin_size,
-                                        max_width, coverage_hist);
+                                        max_width, coverage_hist, seed);
     }
 
     double total_bins = 0.0;
@@ -1049,7 +1059,7 @@ gc_extrap(const int argc, const char **argv) {
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, DEFECTS, coverage_hist, bootstraps, orig_max_terms,
                        diagonal, bin_step_size, max_extrapolation/bin_size,
-                       max_iter, bootstrap_estimates);
+                       max_iter, bootstrap_estimates, seed);
       
       
       /////////////////////////////////////////////////////////////////////
@@ -1102,6 +1112,7 @@ c_curve(const int argc, const char **argv) {
     bool VALS_INPUT = false;
 
     string outfile;
+    unsigned int seed = time(0) + getpid();
 
     size_t upper_limit = 0;
     double step_size = 1e6;
@@ -1129,6 +1140,8 @@ c_curve(const int argc, const char **argv) {
     opt_parse.add_opt("vals", 'V',
                       "input is a text file containing only the observed counts",
                       false, VALS_INPUT);
+    opt_parse.add_opt("seed", 'e', "Supply a seed for random number generation?",
+                      false, seed);
 #ifdef HAVE_SAMTOOLS
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
@@ -1162,7 +1175,7 @@ c_curve(const int argc, const char **argv) {
     // Setup the random number generator
     gsl_rng_env_setup();
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type
-    srand(time(0) + getpid()); //give the random fxn a new seed
+    srand(seed); //give the random fxn a new seed
     gsl_rng_set(rng, rand()); //initialize random number generator with the seed
 
     vector<double> counts_hist;
@@ -1299,7 +1312,8 @@ bound_pop(const int argc, const char **argv) {
     size_t bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
-
+    
+    unsigned int seed = time(0) + getpid();
 
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
     OptionParser opt_parse(strip_path(argv[1]),
@@ -1327,6 +1341,9 @@ bound_pop(const int argc, const char **argv) {
     opt_parse.add_opt("vals", 'V',
                       "input is a text file containing only the observed duplicate counts",
                       false, VALS_INPUT);
+    opt_parse.add_opt("seed", 'e',
+                      "Supply a seed for random number generation?",
+                      false, seed);
 #ifdef HAVE_SAMTOOLS
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
@@ -1521,7 +1538,7 @@ bound_pop(const int argc, const char **argv) {
       vector<double> quad_estimates;
 
   //setup rng
-      srand(time(0) + getpid());
+      srand(seed);
       gsl_rng_env_setup();
       gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
       gsl_rng_set(rng, rand());

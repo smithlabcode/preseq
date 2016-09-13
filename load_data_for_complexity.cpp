@@ -748,9 +748,10 @@ load_coverage_counts_MR(const bool VERBOSE,
                         const string input_file_name,
                         const size_t bin_size,
                         const size_t max_width,
-                        vector<double> &coverage_hist) {
+                        vector<double> &coverage_hist,
+                        const unsigned int seed) {
 
-  srand(time(0) + getpid());
+  srand(seed);
   Runif runif(rand());
 
   std::ifstream in(input_file_name.c_str());
@@ -808,9 +809,10 @@ size_t
 load_coverage_counts_GR(const string input_file_name,
                         const size_t bin_size,
                         const size_t max_width,
-                        vector<double> &coverage_hist) {
+                        vector<double> &coverage_hist,
+                        const unsigned int seed) {
 
-  srand(time(0) + getpid());
+  srand(seed);
   Runif runif(rand());
 
   std::ifstream in(input_file_name.c_str());
