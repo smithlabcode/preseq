@@ -45,7 +45,7 @@
 #include <RNG.hpp>
 #include <smithlab_os.hpp>
 
-#define PRESEQ_VERSION "2.0.2"
+#define PRESEQ_VERSION "2.0.3"
 
 // AS: might not be good to depend on mapped read here
 // TD: if we're including gc_extrap, we need the dependence
@@ -73,6 +73,7 @@ using std::tr1::unordered_map;
 /////////////////////////////////////////////////////////
 // Confidence interval stuff
 
+/*
 static inline double
 alpha_log_confint_multiplier(const double estimate,
                              const double variance, const double alpha) {
@@ -80,6 +81,7 @@ alpha_log_confint_multiplier(const double estimate,
   return exp(inv_norm_alpha*
              sqrt(log(1.0 + variance/pow(estimate, 2))));
 }
+*/
 
 
 static void
@@ -267,6 +269,7 @@ check_yield_estimates(const vector<double> &estimates) {
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
+		 const unsigned long int seed,
 		 const vector<double> &orig_hist,
                  const size_t bootstraps, const size_t orig_max_terms,
                  const int diagonal, const double bin_step_size,
@@ -279,7 +282,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
   srand(time(0) + getpid());
   gsl_rng_env_setup();
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(rng, rand());
+  gsl_rng_set(rng, seed);
 
   double vals_sum = 0.0;
   for(size_t i = 0; i < orig_hist.size(); i++)
@@ -588,6 +591,7 @@ lc_extrap(const int argc, const char **argv) {
     size_t bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
+    unsigned long int seed = 0;
       
     /* FLAGS */
     bool VERBOSE = false;
@@ -644,6 +648,8 @@ lc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("defects", 'D', 
 		      "defects mode to extrapolate without testing for defects",
 		      false, DEFECTS);
+    opt_parse.add_opt("seed", 'r', "seed for random number generator",
+		      false, seed);
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -666,6 +672,10 @@ lc_extrap(const int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     /******************************************************************/
 
+    // if seed is not set, make it random
+    if(seed == 0){
+      seed = rand();
+    }
 
     vector<double> counts_hist;
     size_t n_reads = 0;
@@ -809,7 +819,7 @@ lc_extrap(const int argc, const char **argv) {
       const size_t max_iter = 10*bootstraps;
 
       vector<vector <double> > bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, DEFECTS, counts_hist, bootstraps, 
+      extrap_bootstrap(VERBOSE, DEFECTS, seed, counts_hist, bootstraps, 
 		       orig_max_terms, diagonal, step_size, max_extrapolation, 
 		       max_iter, bootstrap_estimates);
 
@@ -867,6 +877,7 @@ gc_extrap(const int argc, const char **argv) {
     bool SINGLE_ESTIMATE = false;
     double max_extrapolation = 1.0e12;
     size_t bootstraps = 100;
+    unsigned long int seed = 0;
     bool DEFECTS = false;
 
     bool NO_SEQUENCE = false;
@@ -908,6 +919,9 @@ gc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("defects", 'D', 
 		      "defects mode to extrapolate without testing for defects",
 		      false, DEFECTS);
+    opt_parse.add_opt("seed", 'r', "seed for random number generator",
+		      false, seed);
+
 
 
     vector<string> leftover_args;
@@ -930,6 +944,11 @@ gc_extrap(const int argc, const char **argv) {
     }
     const string input_file_name = leftover_args.front();
     // ****************************************************************
+
+    // if seed is not set, set it to random
+    if(seed == 0){
+      seed = rand();
+    }
 
     vector<double> coverage_hist;
     size_t n_reads = 0;
@@ -1047,7 +1066,7 @@ gc_extrap(const int argc, const char **argv) {
       const size_t max_iter = 10*bootstraps;
       
       vector<vector <double> > bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, DEFECTS, coverage_hist, bootstraps, orig_max_terms,
+      extrap_bootstrap(VERBOSE, DEFECTS, seed, coverage_hist, bootstraps, orig_max_terms,
                        diagonal, bin_step_size, max_extrapolation/bin_size,
                        max_iter, bootstrap_estimates);
       
@@ -1100,6 +1119,7 @@ c_curve(const int argc, const char **argv) {
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool VALS_INPUT = false;
+    unsigned long int seed = 0;
 
     string outfile;
 
@@ -1137,6 +1157,9 @@ c_curve(const int argc, const char **argv) {
                       + toa(MAX_SEGMENT_LENGTH) + ")",
                       false, MAX_SEGMENT_LENGTH);
 #endif
+    opt_parse.add_opt("seed", 'r', "seed for random number generator",
+		      false, seed);
+
   
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -1159,11 +1182,14 @@ c_curve(const int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     /******************************************************************/
   
+    if(seed == 0){
+      seed = rand();
+    }
     // Setup the random number generator
     gsl_rng_env_setup();
     gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type
     srand(time(0) + getpid()); //give the random fxn a new seed
-    gsl_rng_set(rng, rand()); //initialize random number generator with the seed
+    gsl_rng_set(rng, seed); //initialize random number generator with the seed
 
     vector<double> counts_hist;
     size_t n_reads = 0;
@@ -1299,6 +1325,7 @@ bound_pop(const int argc, const char **argv) {
     size_t bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
+    unsigned long int seed = 0;
 
 
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
@@ -1337,6 +1364,8 @@ bound_pop(const int argc, const char **argv) {
 #endif
     opt_parse.add_opt("quick", 'Q', "quick mode, estimate without bootstrapping",
 		      false, QUICK_MODE);
+    opt_parse.add_opt("seed", 'r', "seed for random number generator",
+		      false, seed);
 
 
     vector<string> leftover_args;
@@ -1521,10 +1550,13 @@ bound_pop(const int argc, const char **argv) {
       vector<double> quad_estimates;
 
   //setup rng
+      if(seed == 0){
+	seed = rand();
+      }
       srand(time(0) + getpid());
       gsl_rng_env_setup();
       gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-      gsl_rng_set(rng, rand());
+      gsl_rng_set(rng, seed);
 
       // hist may be sparse, to speed up bootstrapping
       // sample only from positive entries
