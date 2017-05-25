@@ -5,6 +5,11 @@ experiment. The estimates can then be used to examine the utility
 of further sequencing, optimize the sequencing depth, or to 
 screen multiple libraries to avoid low complexity samples.
 
+UPDATES TO VERSION 2.0.3
+========================================================================
+A bug in defect mode was fixed and a rng seed was added to allow for
+reproducibility.
+
 UPDATES TO VERSION 2.0.0
 ========================================================================
 We have added a new module, bound_pop, to estimate a lower bound of
