@@ -99,7 +99,7 @@ endif # SAMTOOLS_DIR
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
 
 %: %.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LDFLAGS) $(LIBS)
 
 install: $(PROGS)
 	@mkdir -p $(PREFIX)/bin
