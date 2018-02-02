@@ -39,9 +39,6 @@ CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
 tdaley@stanford.edu
-or
-Chao Deng 
-chaodeng@usc.edu
 http://smithlabresearch.org
 
 SYSTEM REQUIREMENTS:
