@@ -38,7 +38,10 @@ to build the R package.
 CONTACT INFORMATION:
 ========================================================================
 Timothy Daley
-tdaley@usc.edu
+tdaley@stanford.edu
+or
+Chao Deng 
+chaodeng@usc.edu
 http://smithlabresearch.org
 
 SYSTEM REQUIREMENTS:
