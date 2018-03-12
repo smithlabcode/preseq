@@ -909,7 +909,7 @@ gc_extrap(const int argc, const char **argv) {
                       false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information",
                       false, VERBOSE);
-    opt_parse.add_opt("bed", 'D',
+    opt_parse.add_opt("bed", 'B',
                       "input is in bed format without sequence information",
                       false, NO_SEQUENCE);
     opt_parse.add_opt("quick",'Q',
