@@ -23,6 +23,11 @@
 #include <sstream>
 #include <unistd.h>
 
+#ifdef _WIN32
+  #include <unordered_map>
+#else
+  #include <tr1/unordered_map>
+#endif
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"

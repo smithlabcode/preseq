@@ -27,12 +27,12 @@ PREFIX = $(ROOT)
 endif
 
 ifndef SMITHLAB_CPP
-SMITHLAB_CPP=$(ROOT)/smithlab_cpp/
+SMITHLAB_CPP=$(ROOT)/smithlab_cpp
 endif
 
 
 ifndef SAMTOOLS_DIR
-SAMTOOLS_DIR=$(ROOT)/samtools/
+SAMTOOLS_DIR=$(ROOT)/samtools
 endif
 
 SOURCES = $(wildcard *.cpp)
@@ -47,7 +47,7 @@ INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 LIBS += -lgsl -lgslcblas -lz
 
 CXX = g++ 
-CXXFLAGS = -Wall -fPIC -fmessage-length=50
+CXXFLAGS = --std=c++11 -Wall -fPIC -fmessage-length=50
 
 # Flags for Mavericks
 ifeq "$(shell uname)" "Darwin"
