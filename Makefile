@@ -18,58 +18,43 @@
 #
 
 
-ifndef ROOT
-ROOT = $(shell pwd)
+ifndef SRC_ROOT
+SRC_ROOT = $(shell pwd)
 endif
 
 ifndef PREFIX
-PREFIX = $(ROOT)
+PREFIX = $(SRC_ROOT)
 endif
 
 ifndef SMITHLAB_CPP
-SMITHLAB_CPP=$(ROOT)/smithlab_cpp
-endif
-
-
-ifndef SAMTOOLS_DIR
-SAMTOOLS_DIR=$(ROOT)/samtools
+SMITHLAB_CPP = $(SRC_ROOT)/smithlab_cpp
 endif
 
 SOURCES = $(wildcard *.cpp)
 OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
 PROGS = preseq
-ifdef SAMTOOLS_DIR
-PROGS += bam2mr
+ifdef HAVE_HTSLIB
+PROGS += to-mr
 endif
-INCLUDEDIRS = $(SMITHLAB_CPP) $(SAMTOOLS_DIR)
+INCLUDEDIRS = $(SMITHLAB_CPP)
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 LIBS += -lgsl -lgslcblas -lz
 
-CXX = g++ 
-CXXFLAGS = --std=c++11 -Wall -fPIC -fmessage-length=50
-
-# Flags for Mavericks
-ifeq "$(shell uname)" "Darwin"
-CXXFLAGS += -arch x86_64
-ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
-              then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++ -I/usr/local/include -L/usr/local/lib
-endif
-endif
-
+CXX = g++
+CXXFLAGS = -std=c++11 -Wall -fPIC
 
 OPTFLAGS = -O2
-DEBUGFLAGS = -g -lefence -lpthread -L/usr/local/lib/
+DEBUGFLAGS = -g
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
 endif
 
-INCLUDEDIRS += $(SAMTOOLS_DIR)
-CXXFLAGS += -DHAVE_SAMTOOLS
-
-
+ifdef HAVE_HTSLIB
+CXXFLAGS += -DHAVE_HTSLIB
+LIBS += -lhts
+endif
 
 ifdef OPT
 CXXFLAGS += $(OPTFLAGS)
@@ -78,22 +63,14 @@ endif
 all: $(PROGS)
 
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
-          smithlab_os.o smithlab_utils.o GenomicRegion.o OptionParser.o RNG.o MappedRead.o)
+	smithlab_os.o smithlab_utils.o GenomicRegion.o \
+	OptionParser.o RNG.o MappedRead.o)
 
 preseq: continued_fraction.o load_data_for_complexity.o moment_sequence.o
 
-ifdef SAMTOOLS_DIR
-ifdef LIBBAM
-LIBS += -pthread
-bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
-        $(LIBBAM)
-else
-bam2mr preseq: $(addprefix $(SMITHLAB_CPP)/, SAM.o) \
-        $(addprefix $(SAMTOOLS_DIR)/, sam.o bam.o bam_import.o bam_pileup.o \
-        faidx.o bam_aux.o kstring.o knetfile.o sam_header.o razf.o bgzf.o)
+ifdef HAVE_HTSLIB
+preseq to-mr: $(addprefix $(SMITHLAB_CPP)/, htslib_wrapper.o)
 endif
-endif # SAMTOOLS_DIR
-
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
@@ -108,6 +85,5 @@ install: $(PROGS)
 clean:
 	@-rm -f $(PROGS) *.o *~
 	@-rm -f $(SMITHLAB_CPP)*.o $(SMITHLAB_CPP)*~
-	@-rm -f $(SAMTOOLS_DIR)*.o $(SAMTOOLS_DIR)*~
 
 .PHONY: clean
