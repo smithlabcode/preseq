@@ -45,14 +45,14 @@ size_t
 load_counts(const std::string &input_file_name, std::vector<double> &counts_hist);
 
 size_t
-load_counts_BED_pe(const std::string input_file_name, 
+load_counts_BED_pe(const std::string input_file_name,
                    std::vector<double> &counts_hist);
 
 size_t
-load_counts_BED_se(const std::string input_file_name, 
+load_counts_BED_se(const std::string input_file_name,
                    std::vector<double> &counts_hist);
 
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
 size_t
 load_counts_BAM_pe(const bool VERBOSE,
                    const std::string &input_file_name,
@@ -61,11 +61,11 @@ load_counts_BAM_pe(const bool VERBOSE,
                    size_t &n_paired,
                    size_t &n_mates,
                    std::vector<double> &counts_hist);
- 
+
 size_t
-load_counts_BAM_se(const std::string &input_file_name, 
+load_counts_BAM_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist);
-#endif // HAVE_SAMTOOLS
+#endif // HAVE_HTSLIB
 
 
 #endif

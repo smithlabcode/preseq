@@ -22,12 +22,7 @@
 #include <queue>
 #include <sstream>
 #include <unistd.h>
-
-#ifdef _WIN32
-  #include <unordered_map>
-#else
-  #include <tr1/unordered_map>
-#endif
+#include <unordered_map>
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"
@@ -40,8 +35,8 @@ using std::min;
 using std::endl;
 using std::max;
 using std::cerr;
-using std::tr1::unordered_map;
-
+using std::unordered_map;
+using std::runtime_error;
 
 //////////////////////////////////////////////////////////////////////
 // Data imputation
@@ -58,7 +53,7 @@ update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
       curr_gr.get_end() < prev_gr.get_end()) {
     return false;
   }
-  
+
   // check if next read is new, and if so update counts_hist to
   // include current_count
   if (!curr_gr.same_chrom(prev_gr) ||
@@ -73,7 +68,7 @@ update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
   }
   else // next read is same, update current_count
     ++current_count;
-  
+
   return true;
 }
 
@@ -87,8 +82,8 @@ update_se_duplicate_counts_hist(const GenomicRegion &curr_gr,
   // check if reads are sorted
   if (curr_gr.same_chrom(prev_gr) &&
       curr_gr.get_start() < prev_gr.get_start())
-    throw SMITHLABException("locations unsorted in: " 
-                            + input_file_name);
+    throw runtime_error("locations unsorted in: "
+                        + input_file_name);
 
   if (!curr_gr.same_chrom(prev_gr) ||
       curr_gr.get_start() != prev_gr.get_start())
@@ -142,16 +137,16 @@ struct GenomicRegionOrderChecker {
 };
 
 
-typedef priority_queue<GenomicRegion, 
+typedef priority_queue<GenomicRegion,
                        vector<GenomicRegion>,
                        GenomicRegionOrderChecker> ReadPQ;
 
 
 static bool
-is_ready_to_pop(const ReadPQ &pq, 
+is_ready_to_pop(const ReadPQ &pq,
                 const GenomicRegion &gr,
                 const size_t max_width) {
-  return !pq.top().same_chrom(gr) || 
+  return !pq.top().same_chrom(gr) ||
     pq.top().get_end() + max_width < gr.get_start();
 }
 
@@ -160,10 +155,10 @@ static void
 empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
          size_t &current_count, vector<double> &counts_hist,
          ReadPQ &read_pq, const string &input_file_name) {
-  
+
   curr_gr = read_pq.top();
   read_pq.pop();
-  
+
   // update counts hist
   const bool UPDATE_SUCCESS =
     update_pe_duplicate_counts_hist(curr_gr, prev_gr, counts_hist,
@@ -174,7 +169,7 @@ empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
         << "prev = \t" << prev_gr << "\n"
         << "curr = \t" << curr_gr << "\n"
         << "Increase seg_len if in paired end mode";
-    throw SMITHLABException(oss.str());
+    throw runtime_error(oss.str());
   }
   prev_gr = curr_gr;
 }
@@ -183,19 +178,19 @@ empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
 /*
  * This code is used to deal with read data in BAM format.
  */
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
 // switching dependency on bamtools to samtools
-#include <SAM.hpp>
+#include <htslib_wrapper.hpp>
 
 
 size_t
-load_counts_BAM_se(const string &input_file_name, 
+load_counts_BAM_se(const string &input_file_name,
                    vector<double> &counts_hist) {
   const string mapper = "general";
   SAMReader sam_reader(input_file_name, mapper);
-  if(!(sam_reader.is_good()))
-    throw SMITHLABException("problem opening input file " 
-                            + input_file_name);
+  if(!sam_reader)
+    throw runtime_error("problem opening input file "
+                        + input_file_name);
 
   SAMRecord samr;
   sam_reader >> samr;
@@ -208,7 +203,7 @@ load_counts_BAM_se(const string &input_file_name,
   MappedRead prev_mr, curr_mr;
   prev_mr = samr.mr;
 
-  while (sam_reader >> samr, sam_reader.is_good()) {
+  while (sam_reader >> samr) {
     // only convert mapped and primary reads
     if (samr.is_primary && samr.is_mapped) {
 
@@ -216,25 +211,25 @@ load_counts_BAM_se(const string &input_file_name,
       if (!(samr.is_mapping_paired) ||
           (samr.is_mapping_paired && samr.is_Trich)){
         //only count unpaired reads or the left mate of paired reads
-        
+
         curr_mr = samr.mr;
-        update_se_duplicate_counts_hist(curr_mr.r, prev_mr.r, 
+        update_se_duplicate_counts_hist(curr_mr.r, prev_mr.r,
                                         input_file_name,
-                                        counts_hist, 
+                                        counts_hist,
                                         current_count);
-        
+
         // update number of reads and prev read
         ++n_reads;
         prev_mr = samr.mr;
       }
     }
   }
-  
+
   // to account for the last read compared to the one before it.
   if (counts_hist.size() < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
-  
+
   return n_reads;
 }
 
@@ -293,9 +288,9 @@ GenomicRegionIsNull(const GenomicRegion &gr){
 static void
 empty_pq(GenomicRegion &prev_gr,
          priority_queue<GenomicRegion,
-                        vector<GenomicRegion>,
-                        GenomicRegionOrderChecker> &read_pq,
-           const string &input_file_name,
+         vector<GenomicRegion>,
+         GenomicRegionOrderChecker> &read_pq,
+         const string &input_file_name,
          vector<double> &counts_hist,
          size_t &current_count) {
 
@@ -311,7 +306,7 @@ empty_pq(GenomicRegion &prev_gr,
         << "prev = \t" << prev_gr << "\n"
         << "curr = \t" << curr_gr << "\n"
         << "Increase seg_len if in paired end mode";
-    throw SMITHLABException(oss.str());
+    throw runtime_error(oss.str());
   }
 
   if (GenomicRegionIsNull(prev_gr))
@@ -319,13 +314,13 @@ empty_pq(GenomicRegion &prev_gr,
   else {
     std::ostringstream oss;
     bool UPDATE_HIST =
-      update_pe_duplicate_counts_hist(curr_gr, prev_gr, 
+      update_pe_duplicate_counts_hist(curr_gr, prev_gr,
                                       counts_hist, current_count);
     if (!UPDATE_HIST) {
       oss << "locations unsorted in: " << input_file_name << "\n"
           << "prev = \t" << prev_gr << "\n"
           << "curr = \t" << curr_gr << "\n";
-      throw SMITHLABException(oss.str());
+      throw runtime_error(oss.str());
     }
   }
   prev_gr = curr_gr;
@@ -340,14 +335,14 @@ load_counts_BAM_pe(const bool VERBOSE,
                    size_t &n_paired,
                    size_t &n_mates,
                    vector<double> &counts_hist) {
-  
+
   const string mapper = "general";
   SAMReader sam_reader(input_file_name, mapper);
 
   // check sam_reader
-  if(!(sam_reader.is_good()))
-    throw SMITHLABException("problem opening input file " + input_file_name);
-  
+  if(!sam_reader)
+    throw runtime_error("problem opening input file " + input_file_name);
+
   SAMRecord samr;
   // resize vals_hist, make sure it starts out empty
   counts_hist.clear();
@@ -363,24 +358,24 @@ load_counts_BAM_pe(const bool VERBOSE,
 
   std::priority_queue<GenomicRegion, vector<GenomicRegion>,
                       GenomicRegionOrderChecker> read_pq;
-  
+
   unordered_map<string, SAMRecord> dangling_mates;
-  
-  while ((sam_reader >> samr, sam_reader.is_good())) {
-    
+
+  while (sam_reader >> samr) {
+
     // only convert mapped and primary reads
     if (samr.is_primary && samr.is_mapped) {
       ++n_mates;
-      
+
       // deal with paired-end stuff
       if (samr.is_mapping_paired) {
-        
+
         const size_t name_len = samr.mr.r.get_name().size() - suffix_len;
         const string read_name(samr.mr.r.get_name().substr(0, name_len));
-        
+
         if (dangling_mates.find(read_name) != dangling_mates.end()) {
           // other end is in dangling mates, merge the two mates
-          if(same_read(suffix_len, samr.mr, 
+          if(same_read(suffix_len, samr.mr,
                        dangling_mates[read_name].mr)) {
             if (samr.is_Trich)
               std::swap(samr, dangling_mates[read_name]);
@@ -402,8 +397,8 @@ load_counts_BAM_pe(const bool VERBOSE,
                 cerr << "problem merging read "
                      << read_name << ", splitting read" << endl
                      << samr.mr << "\t" << samr.is_mapping_paired << endl
-                     << dangling_mates[read_name].mr << "\t" 
-		     << dangling_mates[read_name].is_mapping_paired << endl
+                     << dangling_mates[read_name].mr << "\t"
+                     << dangling_mates[read_name].is_mapping_paired << endl
                      << "To merge, set max segement "
                      << "length (seg_len) higher." << endl;
               }
@@ -427,8 +422,8 @@ load_counts_BAM_pe(const bool VERBOSE,
         read_pq.push(samr.mr.r);
         ++n_unpaired;
       }
-      
-      
+
+
       // dangling mates is too large, flush dangling_mates of reads
       // on different chroms and too far away
       if (dangling_mates.size() > MAX_READS_TO_HOLD) {
@@ -437,7 +432,7 @@ load_counts_BAM_pe(const bool VERBOSE,
                dangling_mates.begin(); itr != dangling_mates.end(); ++itr) {
           if (itr->second.mr.r.get_chrom() != samr.mr.r.get_chrom()
               || (itr->second.mr.r.get_chrom() == samr.mr.r.get_chrom()
-                  && itr->second.mr.r.get_end() 
+                  && itr->second.mr.r.get_end()
                   + MAX_SEGMENT_LENGTH < samr.mr.r.get_start())) {
             if(itr->second.seg_len >= 0) {
               read_pq.push(itr->second.mr.r);
@@ -450,7 +445,7 @@ load_counts_BAM_pe(const bool VERBOSE,
         tmp.clear();
       }
 
-      
+
       // now empty the priority queue
       if (!(read_pq.empty()) &&
           is_ready_to_pop(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
@@ -460,7 +455,7 @@ load_counts_BAM_pe(const bool VERBOSE,
           empty_pq(prev_gr, read_pq, input_file_name, counts_hist, current_count);
         }
       }
-      
+
       if (VERBOSE && n_mates % progress_step == 0)
         cerr << "Processed " << n_mates << " records" << endl;
     }
@@ -472,20 +467,20 @@ load_counts_BAM_pe(const bool VERBOSE,
     dangling_mates.erase(dangling_mates.begin());
     ++n_unpaired;
   }
-  
+
   //final iteration
   while(!read_pq.empty())
     empty_pq(prev_gr, read_pq, input_file_name, counts_hist, current_count);
-  
+
   if (counts_hist.size() < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
-  
+
   ++counts_hist[current_count];
 
   assert((read_pq.empty()));
-  
+
   size_t n_reads = n_unpaired + n_paired;
-  
+
   if (VERBOSE)
     cerr << "paired = " << n_paired << endl
          << "unpaired = " << n_unpaired << endl;
@@ -499,7 +494,7 @@ load_counts_BAM_pe(const bool VERBOSE,
 /* this code is for BED file input */
 
 size_t
-load_counts_BED_se(const string input_file_name, 
+load_counts_BED_se(const string input_file_name,
                    vector<double> &counts_hist) {
   // resize vals_hist
   counts_hist.clear();
@@ -507,12 +502,12 @@ load_counts_BED_se(const string input_file_name,
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
-    throw SMITHLABException("problem opening file: " + input_file_name);
-  
+    throw runtime_error("problem opening file: " + input_file_name);
+
   GenomicRegion curr_gr, prev_gr;
   if (!(in >> prev_gr))
-    throw SMITHLABException("problem opening file: " + input_file_name);
-  
+    throw runtime_error("problem opening file: " + input_file_name);
+
   size_t n_reads = 1;
   size_t current_count = 1;
   while (in >> curr_gr) {
@@ -521,18 +516,18 @@ load_counts_BED_se(const string input_file_name,
     ++n_reads;
     prev_gr.swap(curr_gr);
   }
-  
+
   // to account for the last read compared to the one before it.
   if(counts_hist.size() < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
-  
+
   return n_reads;
 }
 
 
 size_t
-load_counts_BED_pe(const string input_file_name, 
+load_counts_BED_pe(const string input_file_name,
                    vector<double> &counts_hist) {
 
   // resize vals_hist
@@ -541,13 +536,13 @@ load_counts_BED_pe(const string input_file_name,
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
-    throw SMITHLABException("problem opening file: " 
-                            + input_file_name);
+    throw runtime_error("problem opening file: "
+                        + input_file_name);
 
   GenomicRegion curr_gr, prev_gr;
   if (!(in >> prev_gr))
-    throw SMITHLABException("problem opening file: " 
-                            + input_file_name);
+    throw runtime_error("problem opening file: "
+                        + input_file_name);
 
   size_t n_reads = 1;
   size_t current_count = 1;
@@ -558,18 +553,18 @@ load_counts_BED_pe(const string input_file_name,
       update_pe_duplicate_counts_hist(curr_gr, prev_gr,
                                       counts_hist, current_count);
     if (!UPDATE_SUCCESS)
-      throw SMITHLABException("reads unsorted in " + input_file_name);
-    
+      throw runtime_error("reads unsorted in " + input_file_name);
+
     ++n_reads;
     prev_gr.swap(curr_gr);
   }
 
   if (counts_hist.size() < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
-  
+
   // to account for the last read compared to the one before it.
   ++counts_hist[current_count];
-  
+
   return n_reads;
 
 }
@@ -577,17 +572,17 @@ load_counts_BED_pe(const string input_file_name,
 /* text file input */
 size_t
 load_counts(const string &input_file_name, vector<double> &counts_hist) {
-  
+
   std::ifstream in(input_file_name.c_str());
   if (!in) // if file doesn't open
-    throw SMITHLABException("problem opening file: " 
-                            + input_file_name);
-  
+    throw runtime_error("problem opening file: "
+                        + input_file_name);
+
   size_t n_reads = 0;
   while(!in.eof()){
     string buffer;
     getline(in, buffer);
-    
+
     std::istringstream iss(buffer);
     if (iss.good()) {
       double val;
@@ -601,8 +596,8 @@ load_counts(const string &input_file_name, vector<double> &counts_hist) {
         n_reads += count;
       }
       else if (val != 0)
-        throw SMITHLABException("problem reading file at line " 
-                                + toa(n_reads + 1));
+        throw runtime_error("problem reading file at line "
+                            + toa(n_reads + 1));
     }
     in.peek();
   }
@@ -613,13 +608,13 @@ load_counts(const string &input_file_name, vector<double> &counts_hist) {
 //returns number of reads from file containing counts histogram
 size_t
 load_histogram(const string &filename, vector<double> &counts_hist) {
-  
+
   counts_hist.clear();
-  
+
   std::ifstream in(filename.c_str());
   if (!in) //if file doesn't open
-    throw SMITHLABException("could not open histogram: " + filename);
-  
+    throw runtime_error("could not open histogram: " + filename);
+
   size_t n_reads = 0;
   size_t line_count = 0ul, prev_read_count = 0ul;
   string buffer;
@@ -630,13 +625,13 @@ load_histogram(const string &filename, vector<double> &counts_hist) {
     std::istringstream is(buffer);
     // error reading input
     if (!(is >> read_count >> frequency))
-      throw SMITHLABException("bad histogram line format:\n" + buffer + "\n" +
-                              "(line " + toa(line_count) + ")");
+      throw runtime_error("bad histogram line format:\n" + buffer + "\n" +
+                          "(line " + toa(line_count) + ")");
 
     // histogram is out of order?
     if (read_count < prev_read_count)
-      throw SMITHLABException("bad line order in file " + filename + "\n" +
-                              "(line " + toa(line_count) + ")");
+      throw runtime_error("bad line order in file " + filename + "\n" +
+                          "(line " + toa(line_count) + ")");
     counts_hist.resize(read_count + 1, 0.0);
     counts_hist[read_count] = frequency;
     prev_read_count = read_count;
@@ -658,13 +653,13 @@ static void
 SplitGenomicRegion(const GenomicRegion &inputGR,
                    Runif &runif, const size_t bin_size,
                    vector<GenomicRegion> &outputGRs){
-  
+
   outputGRs.clear();
   GenomicRegion gr(inputGR);
 
   double frac = static_cast<double>(gr.get_start() % bin_size)/bin_size;
   const size_t width = gr.get_width();
-  
+
   // ADS: this seems like a bunch of duplicated code just for a single
   // function difference
   if (runif.runif(0.0, 1.0) > frac) {
@@ -681,12 +676,12 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
   for(size_t i = 0; i < gr.get_width(); i += bin_size){
 
     const size_t curr_start = gr.get_start() + i;
-    const size_t curr_end 
+    const size_t curr_end
       = std::min(gr.get_end(), curr_start + bin_size);
     frac = static_cast<double>(curr_end - curr_start)/bin_size;
 
     if(runif.runif(0.0, 1.0) <= frac){
-      GenomicRegion binned_gr(gr.get_chrom(), curr_start, 
+      GenomicRegion binned_gr(gr.get_chrom(), curr_start,
                               curr_start + bin_size,
                               gr.get_name(), gr.get_score(),
                               gr.get_strand());
@@ -705,18 +700,18 @@ SplitMappedRead(const bool VERBOSE,
                 Runif &runif,
                 const size_t bin_size,
                 vector<GenomicRegion> &outputGRs){
-  
+
   outputGRs.clear();
 
   size_t covered_bases = 0;
   size_t read_iterator = inputMR.r.get_start();
   size_t seq_iterator = 0;
   size_t total_covered_bases = 0;
-  
+
   while (seq_iterator < inputMR.seq.size()) {
     if (inputMR.seq[seq_iterator] != 'N')
       covered_bases++;
-    
+
     // if we reach the end of a bin, probabilistically create a binned read
     // with probability proportional to the number of covered bases
     if (read_iterator % bin_size == bin_size - 1) {
@@ -760,12 +755,12 @@ load_coverage_counts_MR(const bool VERBOSE,
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
-    throw SMITHLABException("problem opening file: " + input_file_name);
-  
+    throw runtime_error("problem opening file: " + input_file_name);
+
   MappedRead mr;
   if (!(in >> mr))
-    throw SMITHLABException("problem reading from: " + input_file_name);
-  
+    throw runtime_error("problem reading from: " + input_file_name);
+
   // initialize prioirty queue to reorder the split reads
   ReadPQ PQ;
 
@@ -773,14 +768,14 @@ load_coverage_counts_MR(const bool VERBOSE,
   size_t n_bins = 0;
   GenomicRegion curr_gr, prev_gr;
   size_t current_count = 1;
-  
+
   do {
-    
+
     if (mr.r.get_width() > max_width)
-      throw SMITHLABException("Encountered read of width " + 
-                              toa(mr.r.get_width()) +
-                              "max_width set too small");
-    
+      throw runtime_error("Encountered read of width " +
+                          toa(mr.r.get_width()) +
+                          "max_width set too small");
+
     vector<GenomicRegion> splitGRs;
     SplitMappedRead(VERBOSE, mr, runif, bin_size, splitGRs);
 
@@ -794,17 +789,17 @@ load_coverage_counts_MR(const bool VERBOSE,
     // remove Genomic Regions from the priority queue
     if (splitGRs.size() > 0)
       while (!PQ.empty() && is_ready_to_pop(PQ, splitGRs.back(), max_width))
-        empty_pq(curr_gr, prev_gr, current_count, 
+        empty_pq(curr_gr, prev_gr, current_count,
                  coverage_hist, PQ, input_file_name);
-    
-  } 
+
+  }
   while (in >> mr);
 
   // done adding reads, now spit the rest out
   while (!PQ.empty())
     empty_pq(curr_gr, prev_gr, current_count,
              coverage_hist, PQ, input_file_name);
-  
+
   return n_reads;
 }
 
@@ -835,14 +830,14 @@ load_coverage_counts_GR(const string input_file_name,
   size_t current_count = 1;
 
   do {
-    
+
     vector<GenomicRegion> splitGRs;
     SplitGenomicRegion(inputGR, runif, bin_size, splitGRs);
-    
+
     // add split Genomic Regions to the priority queue
     for(size_t i = 0; i < splitGRs.size(); i++)
       PQ.push(splitGRs[i]);
-    
+
     if (splitGRs.size() > 0) {
       // remove Genomic Regions from the priority queue
       while (!PQ.empty() && is_ready_to_pop(PQ, splitGRs.back(), max_width))
@@ -850,13 +845,13 @@ load_coverage_counts_GR(const string input_file_name,
                  coverage_hist, PQ, input_file_name);
     }
     n_reads++;
-  } 
+  }
   while (in >> inputGR);
-  
+
   // done adding reads, now spit the rest out
   while (!PQ.empty())
     empty_pq(curr_gr, prev_gr, current_count,
              coverage_hist, PQ, input_file_name);
-  
+
   return n_reads;
 }
