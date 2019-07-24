@@ -96,21 +96,21 @@ median_and_ci(const vector<double> &estimates,
   vector<double> sorted_estimates(estimates);
   sort(sorted_estimates.begin(), sorted_estimates.end());
   median_estimate =
-    gsl_stats_median_from_sorted_data(&sorted_estimates[0], 
+    gsl_stats_median_from_sorted_data(&sorted_estimates[0],
                                       1, n_est);
 
-  lower_ci_estimate = 
+  lower_ci_estimate =
     gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
-					1, n_est, alpha/2);
-  upper_ci_estimate = 
+                                        1, n_est, alpha/2);
+  upper_ci_estimate =
     gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
-					1, n_est, 1.0 - alpha/2);
+                                        1, n_est, 1.0 - alpha/2);
 
 }
 
 static void
 vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
-                     const double ci_level, 
+                     const double ci_level,
                      vector<double> &yield_estimates,
                      vector<double> &lower_ci_lognormal,
                      vector<double> &upper_ci_lognormal) {
@@ -141,20 +141,20 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
 
 void
 log_mean(const bool VERBOSE,
-	 const vector<double> &estimates,
-	 const double c_level,
-	 double &log_mean, 
-	 double &log_lower_ci,
-	 double &log_upper_ci){
+         const vector<double> &estimates,
+         const double c_level,
+         double &log_mean,
+         double &log_lower_ci,
+         double &log_upper_ci){
   vector<double> log_estimates(estimates);
   for(size_t i = 0; i < log_estimates.size(); i++)
     log_estimates[i] = log(log_estimates[i]);
 
   log_mean = exp(gsl_stats_mean(&log_estimates[0], 1,
-				log_estimates.size()) );
+                                log_estimates.size()) );
 
-  double log_std_dev = std::sqrt(gsl_stats_variance(&log_estimates[0], 1, 
-						    log_estimates.size()) );
+  double log_std_dev = std::sqrt(gsl_stats_variance(&log_estimates[0], 1,
+                                                    log_estimates.size()) );
 
   const double inv_norm_alpha = gsl_cdf_ugaussian_Qinv((1.0 - c_level)/2.0);
   log_lower_ci = exp(log(log_mean) - inv_norm_alpha*log_std_dev);
@@ -163,10 +163,10 @@ log_mean(const bool VERBOSE,
 
 void
 mean_and_ci(const vector<double> &estimates,
-	const double ci_level,
-	double &mean_estimate,
-	double &lower_ci_estimate,
-	double &upper_ci_estimate){
+        const double ci_level,
+        double &mean_estimate,
+        double &lower_ci_estimate,
+        double &upper_ci_estimate){
   assert(!estimates.empty());
   const double alpha = 1.0 - ci_level;
   const size_t n_est = estimates.size();
@@ -175,12 +175,12 @@ mean_and_ci(const vector<double> &estimates,
   mean_estimate =
     gsl_stats_mean(&sorted_estimates[0], 1, n_est);
 
-  lower_ci_estimate = 
+  lower_ci_estimate =
     gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
-					1, n_est, alpha/2);
-  upper_ci_estimate = 
+                                        1, n_est, alpha/2);
+  upper_ci_estimate =
     gsl_stats_quantile_from_sorted_data(&sorted_estimates[0],
-					1, n_est, 1.0 - alpha/2);
+                                        1, n_est, 1.0 - alpha/2);
 }
 
 
@@ -221,8 +221,8 @@ resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_count
       static_cast<double>(sample_distinct_counts_hist[i]);
 }
 
-// interpolate by explicit calculating the expectation 
-// for sampling without replacement; 
+// interpolate by explicit calculating the expectation
+// for sampling without replacement;
 // see K.L Heck 1975
 // N total sample size; S the total number of distincts
 // n sub sample size
@@ -230,15 +230,15 @@ static double
 interpolate_distinct(vector<double> &hist, size_t N,
                       size_t S, const size_t n) {
   double denom = gsl_sf_lngamma(N + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - n + 1);
-  vector<double> numer(hist.size(), 0); 
+  vector<double> numer(hist.size(), 0);
   for (size_t i = 1; i < hist.size(); i++) {
-	// N - i -n + 1 should be greater than 0
-	if (N < i + n) {
-	  numer[i] = 0;
-	} else {
-	  numer[i] = gsl_sf_lngamma(N - i + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - i - n + 1);
-	  numer[i] = exp(numer[i] - denom) * hist[i];
-	}
+        // N - i -n + 1 should be greater than 0
+        if (N < i + n) {
+          numer[i] = 0;
+        } else {
+          numer[i] = gsl_sf_lngamma(N - i + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - i - n + 1);
+          numer[i] = exp(numer[i] - denom) * hist[i];
+        }
   }
   return S - accumulate(numer.begin(), numer.end(), 0);
 }
@@ -269,8 +269,8 @@ check_yield_estimates(const vector<double> &estimates) {
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
-		 const unsigned long int seed,
-		 const vector<double> &orig_hist,
+                 const unsigned long int seed,
+                 const vector<double> &orig_hist,
                  const size_t bootstraps, const size_t orig_max_terms,
                  const int diagonal, const double bin_step_size,
                  const double max_extrapolation, const size_t max_iter,
@@ -288,7 +288,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
   for(size_t i = 0; i < orig_hist.size(); i++)
     vals_sum += orig_hist[i]*i;
 
-  const double initial_distinct 
+  const double initial_distinct
     = accumulate(orig_hist.begin(), orig_hist.end(), 0.0);
 
 
@@ -300,7 +300,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
       distinct_orig_hist.push_back(orig_hist[i]);
     }
   }
-  
+
   for (size_t iter = 0;
        (iter < max_iter && bootstrap_estimates.size() < bootstraps);
        ++iter) {
@@ -319,7 +319,7 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
 
     // compute complexity curve by random sampling w/out replacement
     const size_t upper_limit = static_cast<size_t>(sample_vals_sum);
-	const size_t distinct = static_cast<size_t>(accumulate(hist.begin(), hist.end(), 0.0));
+        const size_t distinct = static_cast<size_t>(accumulate(hist.begin(), hist.end(), 0.0));
     const size_t step = static_cast<size_t>(bin_step_size);
     size_t sample = step;
     while(sample < upper_limit){
@@ -332,27 +332,27 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
     while (counts_before_first_zero < hist.size() &&
            hist[counts_before_first_zero] > 0)
       ++counts_before_first_zero;
-    
+
     size_t max_terms = std::min(orig_max_terms, counts_before_first_zero - 1);
     // refit curve for lower bound (degree of approx is 1 less than
     // max_terms)
     max_terms = max_terms - (max_terms % 2 == 1);
-    
+
     // defect mode, simple extrapolation
     if(DEFECTS){
       vector<double> ps_coeffs;
       for (size_t j = 1; j <= max_terms; j++)
-	ps_coeffs.push_back(hist[j]*std::pow((double)(-1), (int)(j + 1)) );
-    
+        ps_coeffs.push_back(hist[j]*std::pow((double)(-1), (int)(j + 1)) );
+
       const ContinuedFraction
-	defect_cf(ps_coeffs, diagonal, max_terms);
+        defect_cf(ps_coeffs, diagonal, max_terms);
 
       double sample_size = static_cast<double>(sample);
       while(sample_size < max_extrapolation){
-	double t = (sample_size - sample_vals_sum)/sample_vals_sum;
-	assert(t >= 0.0);
-	yield_vector.push_back(initial_distinct + t*defect_cf(t));
-	sample_size += bin_step_size;
+        double t = (sample_size - sample_vals_sum)/sample_vals_sum;
+        assert(t >= 0.0);
+        yield_vector.push_back(initial_distinct + t*defect_cf(t));
+        sample_size += bin_step_size;
       }
       // no checking of curve in defect mode
       bootstrap_estimates.push_back(yield_vector);
@@ -361,32 +361,32 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
     else{
       //refit curve for lower bound
       const ContinuedFractionApproximation
-	lower_cfa(diagonal, max_terms);
+        lower_cfa(diagonal, max_terms);
 
       const ContinuedFraction
-	lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
+        lower_cf(lower_cfa.optimal_cont_frac_distinct(hist));
 
       //extrapolate the curve start
       if (lower_cf.is_valid()){
-	double sample_size = static_cast<double>(sample);
-	while(sample_size < max_extrapolation){
-	  double t = (sample_size - sample_vals_sum)/sample_vals_sum;
-	  assert(t >= 0.0);
-	  yield_vector.push_back(initial_distinct + t*lower_cf(t));
-	  sample_size += bin_step_size;
-	}
+        double sample_size = static_cast<double>(sample);
+        while(sample_size < max_extrapolation){
+          double t = (sample_size - sample_vals_sum)/sample_vals_sum;
+          assert(t >= 0.0);
+          yield_vector.push_back(initial_distinct + t*lower_cf(t));
+          sample_size += bin_step_size;
+        }
 
-	// SANITY CHECK
-	if (check_yield_estimates(yield_vector)) {
-	  bootstrap_estimates.push_back(yield_vector);
-	  if (VERBOSE) cerr << '.';
-	}
-	else if (VERBOSE){
-	  cerr << "_";
-	}
+        // SANITY CHECK
+        if (check_yield_estimates(yield_vector)) {
+          bootstrap_estimates.push_back(yield_vector);
+          if (VERBOSE) cerr << '.';
+        }
+        else if (VERBOSE){
+          cerr << "_";
+        }
       }
       else if (VERBOSE){
-	cerr << "_";
+        cerr << "_";
       }
 
     }
@@ -399,9 +399,9 @@ extrap_bootstrap(const bool VERBOSE, const bool DEFECTS,
 
 static bool
 extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
-		       vector<double> &hist,
+                       vector<double> &hist,
                        size_t max_terms, const int diagonal,
-                       const double step_size, 
+                       const double step_size,
                        const double max_extrapolation,
                        vector<double> &yield_estimate) {
 
@@ -409,7 +409,7 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
   double vals_sum = 0.0;
   for(size_t i = 0; i < hist.size(); i++)
     vals_sum += i*hist[i];
-  const double initial_distinct 
+  const double initial_distinct
     = accumulate(hist.begin(), hist.end(), 0.0);
 
   // interpolate complexity curve by random sampling w/out replacement
@@ -418,8 +418,8 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
   size_t sample = step;
   while (sample < upper_limit){
     yield_estimate.push_back(
-		interpolate_distinct(hist, upper_limit, 
-		                      static_cast<size_t>(initial_distinct), sample));
+                interpolate_distinct(hist, upper_limit,
+                                      static_cast<size_t>(initial_distinct), sample));
     sample += step;
   }
 
@@ -441,14 +441,14 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
     vector<double> ps_coeffs;
     for (size_t j = 1; j <= max_terms; j++)
       ps_coeffs.push_back(hist[j]*std::pow((double)(-1), (int)(j + 1)) );
-    
+
     const ContinuedFraction
       defect_cf(ps_coeffs, diagonal, max_terms);
 
     double sample_size = static_cast<double>(sample);
     while(sample_size < max_extrapolation){
-      const double one_minus_fold_extrap 
-	= (sample_size - vals_sum)/vals_sum;
+      const double one_minus_fold_extrap
+        = (sample_size - vals_sum)/vals_sum;
       assert(one_minus_fold_extrap >= 0.0);
       double tmp = one_minus_fold_extrap*defect_cf(one_minus_fold_extrap);
       yield_estimate.push_back(initial_distinct + tmp);
@@ -457,14 +457,14 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
 
     if (VERBOSE) {
       if(defect_cf.offset_coeffs.size() > 0){
-	cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
-	copy(defect_cf.offset_coeffs.begin(), defect_cf.offset_coeffs.end(),
-	     std::ostream_iterator<double>(cerr, "\n"));
+        cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
+        copy(defect_cf.offset_coeffs.begin(), defect_cf.offset_coeffs.end(),
+             std::ostream_iterator<double>(cerr, "\n"));
       }
       if(defect_cf.cf_coeffs.size() > 0){
-	cerr << "CF_COEFF_ESTIMATES" << endl;
-	copy(defect_cf.cf_coeffs.begin(), defect_cf.cf_coeffs.end(),
-	     std::ostream_iterator<double>(cerr, "\n"));
+        cerr << "CF_COEFF_ESTIMATES" << endl;
+        copy(defect_cf.cf_coeffs.begin(), defect_cf.cf_coeffs.end(),
+             std::ostream_iterator<double>(cerr, "\n"));
       }
     }
 
@@ -481,12 +481,12 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
     if (lower_cf.is_valid()){
       double sample_size = static_cast<double>(sample);
       while(sample_size < max_extrapolation){
-	const double one_minus_fold_extrap 
-	  = (sample_size - vals_sum)/vals_sum;
-	assert(one_minus_fold_extrap >= 0.0);
-	double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
-	yield_estimate.push_back(initial_distinct + tmp);
-	sample_size += step_size;
+        const double one_minus_fold_extrap
+          = (sample_size - vals_sum)/vals_sum;
+        assert(one_minus_fold_extrap >= 0.0);
+        double tmp = one_minus_fold_extrap*lower_cf(one_minus_fold_extrap);
+        yield_estimate.push_back(initial_distinct + tmp);
+        sample_size += step_size;
       }
     }
     else{
@@ -497,14 +497,14 @@ extrap_single_estimate(const bool VERBOSE, const bool DEFECTS,
 
     if (VERBOSE) {
       if(lower_cf.offset_coeffs.size() > 0){
-	cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
-	copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
-	     std::ostream_iterator<double>(cerr, "\n"));
+        cerr << "CF_OFFSET_COEFF_ESTIMATES" << endl;
+        copy(lower_cf.offset_coeffs.begin(), lower_cf.offset_coeffs.end(),
+             std::ostream_iterator<double>(cerr, "\n"));
       }
       if(lower_cf.cf_coeffs.size() > 0){
-	cerr << "CF_COEFF_ESTIMATES" << endl;
-	copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
-	     std::ostream_iterator<double>(cerr, "\n"));
+        cerr << "CF_COEFF_ESTIMATES" << endl;
+        copy(lower_cf.cf_coeffs.begin(), lower_cf.cf_coeffs.end(),
+             std::ostream_iterator<double>(cerr, "\n"));
       }
     }
   }
@@ -578,13 +578,13 @@ write_predicted_coverage_curve(const string outfile,
 
 static int
 lc_extrap(const int argc, const char **argv) {
-  
+
   try {
     const size_t MIN_REQUIRED_COUNTS = 4;
-    
+
     /* FILES */
     string outfile;
-    
+
     size_t orig_max_terms = 100;
     double max_extrapolation = 1.0e10;
     double step_size = 1e6;
@@ -592,7 +592,7 @@ lc_extrap(const int argc, const char **argv) {
     int diagonal = 0;
     double c_level = 0.95;
     unsigned long int seed = 0;
-      
+
     /* FLAGS */
     bool VERBOSE = false;
     bool VALS_INPUT = false;
@@ -600,12 +600,12 @@ lc_extrap(const int argc, const char **argv) {
     bool HIST_INPUT = false;
     bool SINGLE_ESTIMATE = false;
     bool DEFECTS = false;
-      
-#ifdef HAVE_SAMTOOLS
+
+#ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
-      
+
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
     OptionParser opt_parse(strip_path(argv[1]),
                            "", "<sorted-bed-file>");
@@ -626,7 +626,7 @@ lc_extrap(const int argc, const char **argv) {
                       orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information",
                       false, VERBOSE);
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
     opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
@@ -645,11 +645,11 @@ lc_extrap(const int argc, const char **argv) {
     opt_parse.add_opt("quick",'Q',
                       "quick mode, estimate yield without bootstrapping for confidence intervals",
                       false, SINGLE_ESTIMATE);
-    opt_parse.add_opt("defects", 'D', 
-		      "defects mode to extrapolate without testing for defects",
-		      false, DEFECTS);
+    opt_parse.add_opt("defects", 'D',
+                      "defects mode to extrapolate without testing for defects",
+                      false, DEFECTS);
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
-		      false, seed);
+                      false, seed);
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -691,16 +691,16 @@ lc_extrap(const int argc, const char **argv) {
         cerr << "VALS_INPUT" << endl;
       n_reads = load_counts(input_file_name, counts_hist);
     }
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END){
       if(VERBOSE)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
       const size_t MAX_READS_TO_HOLD = 5000000;
       size_t n_paired = 0;
       size_t n_mates = 0;
-      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, 
-                                   MAX_SEGMENT_LENGTH, 
-                                   MAX_READS_TO_HOLD, n_paired, 
+      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name,
+                                   MAX_SEGMENT_LENGTH,
+                                   MAX_READS_TO_HOLD, n_paired,
                                    n_mates, counts_hist);
       if(VERBOSE){
         cerr << "MERGED PAIRED END READS = " << n_paired << endl;
@@ -789,8 +789,8 @@ lc_extrap(const int argc, const char **argv) {
 
     if(SINGLE_ESTIMATE){
       bool SINGLE_ESTIMATE_SUCCESS =
-        extrap_single_estimate(VERBOSE, DEFECTS, counts_hist, orig_max_terms, 
-                               diagonal, step_size, max_extrapolation, 
+        extrap_single_estimate(VERBOSE, DEFECTS, counts_hist, orig_max_terms,
+                               diagonal, step_size, max_extrapolation,
                                yield_estimates);
       // IF FAILURE, EXIT
       if(!SINGLE_ESTIMATE_SUCCESS)
@@ -819,9 +819,9 @@ lc_extrap(const int argc, const char **argv) {
       const size_t max_iter = 10*bootstraps;
 
       vector<vector <double> > bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, DEFECTS, seed, counts_hist, bootstraps, 
-		       orig_max_terms, diagonal, step_size, max_extrapolation, 
-		       max_iter, bootstrap_estimates);
+      extrap_bootstrap(VERBOSE, DEFECTS, seed, counts_hist, bootstraps,
+                       orig_max_terms, diagonal, step_size, max_extrapolation,
+                       max_iter, bootstrap_estimates);
 
 
       /////////////////////////////////////////////////////////////////////
@@ -866,7 +866,7 @@ gc_extrap(const int argc, const char **argv) {
   try {
 
     const size_t MIN_REQUIRED_COUNTS = 4;
-    
+
     int diagonal = 0;
     size_t orig_max_terms = 100;
     size_t bin_size = 10;
@@ -916,11 +916,11 @@ gc_extrap(const int argc, const char **argv) {
                       "quick mode: run gc_extrap without "
                       "bootstrapping for confidence intervals",
                       false, SINGLE_ESTIMATE);
-    opt_parse.add_opt("defects", 'D', 
-		      "defects mode to extrapolate without testing for defects",
-		      false, DEFECTS);
+    opt_parse.add_opt("defects", 'D',
+                      "defects mode to extrapolate without testing for defects",
+                      false, DEFECTS);
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
-		      false, seed);
+                      false, seed);
 
 
 
@@ -971,9 +971,9 @@ gc_extrap(const int argc, const char **argv) {
     double total_bins = 0.0;
     for(size_t i = 0; i < coverage_hist.size(); i++)
       total_bins += coverage_hist[i]*i;
-    const double distinct_bins = 
+    const double distinct_bins =
       accumulate(coverage_hist.begin(), coverage_hist.end(), 0.0);
-    
+
     const double avg_bins_per_read = total_bins/n_reads;
     double bin_step_size = base_step_size/bin_size;
 
@@ -1032,54 +1032,54 @@ gc_extrap(const int argc, const char **argv) {
 
 
     if (SINGLE_ESTIMATE) {
-      
+
       bool SINGLE_ESTIMATE_SUCCESS =
         extrap_single_estimate(VERBOSE, DEFECTS, coverage_hist, orig_max_terms, diagonal,
                                bin_step_size, max_extrapolation/bin_size,
                                coverage_estimates);
-      
-      
+
+
       // IF FAILURE, EXIT
       if (!SINGLE_ESTIMATE_SUCCESS)
         throw SMITHLABException("SINGLE ESTIMATE FAILED, NEED TO RUN IN "
                                 "FULL MODE FOR ESTIMATES");
-      
+
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-      
+
       out << "TOTAL_BASES\tEXPECTED_DISTINCT" << endl;
-      
+
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
       out.precision(1);
-      
+
       out << 0 << '\t' << 0 << endl;
       for (size_t i = 0; i < coverage_estimates.size(); ++i)
         out << (i + 1)*base_step_size << '\t'
             << coverage_estimates[i]*bin_size << endl;
     }
     else {
-      
+
       if (VERBOSE)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
-      
+
       const size_t max_iter = 10*bootstraps;
-      
+
       vector<vector <double> > bootstrap_estimates;
       extrap_bootstrap(VERBOSE, DEFECTS, seed, coverage_hist, bootstraps, orig_max_terms,
                        diagonal, bin_step_size, max_extrapolation/bin_size,
                        max_iter, bootstrap_estimates);
-      
-      
+
+
       /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
-      
+
       vector<double> coverage_upper_ci_lognormal, coverage_lower_ci_lognormal;
-      vector_median_and_ci(bootstrap_estimates, c_level, 
-                           coverage_estimates, coverage_lower_ci_lognormal, 
+      vector_median_and_ci(bootstrap_estimates, c_level,
+                           coverage_estimates, coverage_lower_ci_lognormal,
                            coverage_upper_ci_lognormal);
-      
+
       /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[WRITING OUTPUT]" << endl;
@@ -1113,7 +1113,7 @@ gc_extrap(const int argc, const char **argv) {
 static int
 c_curve(const int argc, const char **argv) {
 
-  try {  
+  try {
 
     bool VERBOSE = false;
     bool PAIRED_END = false;
@@ -1125,8 +1125,8 @@ c_curve(const int argc, const char **argv) {
 
     size_t upper_limit = 0;
     double step_size = 1e6;
-  
-#ifdef HAVE_SAMTOOLS
+
+#ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
@@ -1149,7 +1149,7 @@ c_curve(const int argc, const char **argv) {
     opt_parse.add_opt("vals", 'V',
                       "input is a text file containing only the observed counts",
                       false, VALS_INPUT);
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
     opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
@@ -1158,9 +1158,9 @@ c_curve(const int argc, const char **argv) {
                       false, MAX_SEGMENT_LENGTH);
 #endif
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
-		      false, seed);
+                      false, seed);
 
-  
+
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
@@ -1181,7 +1181,7 @@ c_curve(const int argc, const char **argv) {
     }
     const string input_file_name = leftover_args.front();
     /******************************************************************/
-  
+
     if(seed == 0){
       seed = rand();
     }
@@ -1205,15 +1205,15 @@ c_curve(const int argc, const char **argv) {
         cerr << "VALS_INPUT" << endl;
       n_reads = load_counts(input_file_name, counts_hist);
     }
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END){
       if(VERBOSE)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
       const size_t MAX_READS_TO_HOLD = 5000000;
       size_t n_paired = 0;
       size_t n_mates = 0;
-      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name, 
-                                   MAX_SEGMENT_LENGTH, MAX_READS_TO_HOLD, 
+      n_reads = load_counts_BAM_pe(VERBOSE, input_file_name,
+                                   MAX_SEGMENT_LENGTH, MAX_READS_TO_HOLD,
                                    n_paired, n_mates, counts_hist);
       if (VERBOSE)
         cerr << "MERGED PAIRED END READS = " << n_paired << endl
@@ -1236,15 +1236,15 @@ c_curve(const int argc, const char **argv) {
         cerr << "BED_INPUT" << endl;
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
-  
+
     const size_t max_observed_count = counts_hist.size() - 1;
     const double distinct_reads = accumulate(counts_hist.begin(),
                                              counts_hist.end(), 0.0);
-  
+
     size_t total_reads = 0;
     for(size_t i = 0; i < counts_hist.size(); i++)
       total_reads += i*counts_hist[i];
-  
+
     const size_t distinct_counts =
       static_cast<size_t>(std::count_if(counts_hist.begin(), counts_hist.end(),
                                         bind2nd(std::greater<double>(), 0.0)));
@@ -1256,8 +1256,8 @@ c_curve(const int argc, const char **argv) {
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl;
-  
-  
+
+
     if (VERBOSE) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
@@ -1281,9 +1281,9 @@ c_curve(const int argc, const char **argv) {
     for (size_t i = step_size; i <= upper_limit; i += step_size) {
       if (VERBOSE)
         cerr << "sample size: " << i << endl;
-      out << i << "\t" 
-		  << interpolate_distinct(counts_hist, total_reads, distinct_reads, i) 
-		  << endl;
+      out << i << "\t"
+                  << interpolate_distinct(counts_hist, total_reads, distinct_reads, i)
+                  << endl;
     }
   }
   catch (SMITHLABException &e) {
@@ -1315,7 +1315,7 @@ bound_pop(const int argc, const char **argv) {
 
     string outfile;
 
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
@@ -1338,10 +1338,10 @@ bound_pop(const int argc, const char **argv) {
                       false, max_num_points);
     opt_parse.add_opt("tolerance", 't', "numerical tolerance "
                       "(default: " + toa(tolerance) + ")",
-		      false, tolerance);
+                      false, tolerance);
     opt_parse.add_opt("bootstraps", 'n', "number of bootstraps "
                       "(default: " + toa(bootstraps) + ")",
-		      false, bootstraps);
+                      false, bootstraps);
     opt_parse.add_opt("clevel", 'c', "level for confidence intervals "
                       "(default: " + toa(c_level) + ")", false, c_level);
     opt_parse.add_opt("verbose", 'v', "print more information",
@@ -1354,7 +1354,7 @@ bound_pop(const int argc, const char **argv) {
     opt_parse.add_opt("vals", 'V',
                       "input is a text file containing only the observed duplicate counts",
                       false, VALS_INPUT);
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
     opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
@@ -1363,9 +1363,9 @@ bound_pop(const int argc, const char **argv) {
                       false, MAX_SEGMENT_LENGTH);
 #endif
     opt_parse.add_opt("quick", 'Q', "quick mode, estimate without bootstrapping",
-		      false, QUICK_MODE);
+                      false, QUICK_MODE);
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
-		      false, seed);
+                      false, seed);
 
 
     vector<string> leftover_args;
@@ -1403,16 +1403,16 @@ bound_pop(const int argc, const char **argv) {
         cerr << "VALS_INPUT" << endl;
       n_obs = load_counts(input_file_name, counts_hist);
     }
-#ifdef HAVE_SAMTOOLS
+#ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END){
       if(VERBOSE)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
       const size_t MAX_READS_TO_HOLD = 5000000;
       size_t n_paired = 0;
       size_t n_mates = 0;
-      n_obs = load_counts_BAM_pe(VERBOSE, input_file_name, 
-                                   MAX_SEGMENT_LENGTH, 
-                                   MAX_READS_TO_HOLD, n_paired, 
+      n_obs = load_counts_BAM_pe(VERBOSE, input_file_name,
+                                   MAX_SEGMENT_LENGTH,
+                                   MAX_READS_TO_HOLD, n_paired,
                                    n_mates, counts_hist);
       if(VERBOSE){
         cerr << "MERGED PAIRED END READS = " << n_paired << endl;
@@ -1436,8 +1436,8 @@ bound_pop(const int argc, const char **argv) {
       n_obs = load_counts_BED_se(input_file_name, counts_hist);
     }
 
-    const double distinct_obs = accumulate(counts_hist.begin(), 
-					   counts_hist.end(), 0.0);
+    const double distinct_obs = accumulate(counts_hist.begin(),
+                                           counts_hist.end(), 0.0);
 
 
     vector<double> measure_moments;
@@ -1445,15 +1445,15 @@ bound_pop(const int argc, const char **argv) {
     size_t indx = 1;
     while(counts_hist[indx] > 0  && indx <= counts_hist.size()){
       measure_moments.push_back(exp(gsl_sf_lnfact(indx)
-				    + log(counts_hist[indx])
-				    - log(counts_hist[1])));
+                                    + log(counts_hist[indx])
+                                    - log(counts_hist[1])));
       if(!std::isfinite(measure_moments.back())){
-	measure_moments.pop_back();
-	break;
+        measure_moments.pop_back();
+        break;
       }
       indx++;
     }
-    
+
 
     if (VERBOSE){
       cerr << "TOTAL OBSERVATIONS     = " << n_obs << endl
@@ -1463,75 +1463,75 @@ bound_pop(const int argc, const char **argv) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
       for (size_t i = 0; i < counts_hist.size(); i++)
-	if (counts_hist[i] > 0)
-	  cerr << i << '\t' << setprecision(16) << counts_hist[i] << endl;
+        if (counts_hist[i] > 0)
+          cerr << i << '\t' << setprecision(16) << counts_hist[i] << endl;
 
       cerr << "OBSERVED MOMENTS" << endl;
       for(size_t i = 0; i < measure_moments.size(); i++)
-	cerr << std::setprecision(16) << measure_moments[i] << endl;  
+        cerr << std::setprecision(16) << measure_moments[i] << endl;
     }
 
 
     if(QUICK_MODE){
       if(measure_moments.size() < 2*max_num_points)
-	max_num_points = static_cast<size_t>(floor(measure_moments.size()/2));
+        max_num_points = static_cast<size_t>(floor(measure_moments.size()/2));
       else
-	measure_moments.resize(2*max_num_points);
+        measure_moments.resize(2*max_num_points);
       size_t n_points = 0;
       n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
       if(VERBOSE)
-	cerr << "n_points = " << n_points << endl;    
+        cerr << "n_points = " << n_points << endl;
 
       MomentSequence obs_mom_seq(measure_moments);
-    
-      if(VERBOSE){
-	for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
-	  cerr << "alpha_" << k << '\t';
-	cerr << endl;
-	for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
-	  cerr << obs_mom_seq.alpha[k] << '\t';
-	cerr << endl;
 
-	for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
-	  cerr << "beta_" << k << '\t';
-	cerr << endl;
-	for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
-	  cerr << obs_mom_seq.beta[k] << '\t';
-	cerr << endl;
+      if(VERBOSE){
+        for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
+          cerr << "alpha_" << k << '\t';
+        cerr << endl;
+        for(size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
+          cerr << obs_mom_seq.alpha[k] << '\t';
+        cerr << endl;
+
+        for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
+          cerr << "beta_" << k << '\t';
+        cerr << endl;
+        for(size_t k = 0; k < obs_mom_seq.beta.size(); k++)
+          cerr << obs_mom_seq.beta[k] << '\t';
+        cerr << endl;
       }
-    
+
       vector<double> points, weights;
       obs_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance,
-					 max_iter, points, weights);
+                                         max_iter, points, weights);
 
       const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
       if(weights_sum != 1.0){
-	for(size_t i = 0; i < weights.size(); i++)
-	  weights[i] = weights[i]/weights_sum;
+        for(size_t i = 0; i < weights.size(); i++)
+          weights[i] = weights[i]/weights_sum;
       }
 
       if(VERBOSE){
-	cerr << "points = " << endl;
-	for(size_t i = 0; i < points.size(); i++)
-	  cerr << points[i] << '\t';
-	cerr << endl;
+        cerr << "points = " << endl;
+        for(size_t i = 0; i < points.size(); i++)
+          cerr << points[i] << '\t';
+        cerr << endl;
 
-	cerr << "weights = " << endl;
-	for(size_t i = 0; i < weights.size(); i++)
-	  cerr << weights[i] << '\t';
-	cerr << endl;
+        cerr << "weights = " << endl;
+        for(size_t i = 0; i < weights.size(); i++)
+          cerr << weights[i] << '\t';
+        cerr << endl;
       }
 
       double estimated_unobs = 0.0;
-    
+
       for(size_t i = 0; i < weights.size(); i++)
-	estimated_unobs += counts_hist[1]*weights[i]/points[i];
+        estimated_unobs += counts_hist[1]*weights[i]/points[i];
 
       if(estimated_unobs > 0.0)
-	estimated_unobs += distinct_obs;
+        estimated_unobs += distinct_obs;
       else{
-	estimated_unobs = distinct_obs;
-	n_points = 0;
+        estimated_unobs = distinct_obs;
+        n_points = 0;
       }
 
       std::ofstream of;
@@ -1543,7 +1543,7 @@ bound_pop(const int argc, const char **argv) {
 
       out << "quadrature_estimated_unobs" << '\t' << "n_points" << endl;
       out << estimated_unobs << '\t' << n_points << endl;
-    
+
     }
     // NOT QUICK MODE, BOOTSTRAP
    else{
@@ -1551,7 +1551,7 @@ bound_pop(const int argc, const char **argv) {
 
   //setup rng
       if(seed == 0){
-	seed = rand();
+        seed = rand();
       }
       srand(time(0) + getpid());
       gsl_rng_env_setup();
@@ -1563,100 +1563,100 @@ bound_pop(const int argc, const char **argv) {
       vector<size_t> counts_hist_distinct_counts;
       vector<double> distinct_counts_hist;
       for (size_t i = 0; i < counts_hist.size(); i++){
-	if (counts_hist[i] > 0) {
-	  counts_hist_distinct_counts.push_back(i);
-	  distinct_counts_hist.push_back(counts_hist[i]);
-	}
+        if (counts_hist[i] > 0) {
+          counts_hist_distinct_counts.push_back(i);
+          distinct_counts_hist.push_back(counts_hist[i]);
+        }
       }
 
-      for(size_t iter = 0; 
-	  iter < max_iter && quad_estimates.size() < bootstraps; 
-	  ++iter){
-	if(VERBOSE)
-	  cerr << "iter=" << "\t" << iter << endl;
+      for(size_t iter = 0;
+          iter < max_iter && quad_estimates.size() < bootstraps;
+          ++iter){
+        if(VERBOSE)
+          cerr << "iter=" << "\t" << iter << endl;
 
-	vector<double> sample_hist;
-	resample_hist(rng, counts_hist_distinct_counts, 
-		      distinct_counts_hist, sample_hist);
+        vector<double> sample_hist;
+        resample_hist(rng, counts_hist_distinct_counts,
+                      distinct_counts_hist, sample_hist);
 
-	const double sampled_distinct = accumulate(sample_hist.begin(), sample_hist.end(), 0.0);
-	// initialize moments, 0th moment is 1
-	vector<double> bootstrap_moments(1, 1.0);
-	// moments[r] = (r + 1)! n_{r+1} / n_1
-	for(size_t i = 0; i < 2*max_num_points; i++)
-	  bootstrap_moments.push_back(exp(gsl_sf_lnfact(i + 2) 
-					  + log(sample_hist[i + 2])
-					  - log(sample_hist[1])) );
+        const double sampled_distinct = accumulate(sample_hist.begin(), sample_hist.end(), 0.0);
+        // initialize moments, 0th moment is 1
+        vector<double> bootstrap_moments(1, 1.0);
+        // moments[r] = (r + 1)! n_{r+1} / n_1
+        for(size_t i = 0; i < 2*max_num_points; i++)
+          bootstrap_moments.push_back(exp(gsl_sf_lnfact(i + 2)
+                                          + log(sample_hist[i + 2])
+                                          - log(sample_hist[1])) );
 
-	size_t n_points = 0;
-	n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
-	n_points = std::min(n_points, max_num_points);
-	if(VERBOSE)
-	  cerr << "n_points = " << n_points << endl;    
+        size_t n_points = 0;
+        n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
+        n_points = std::min(n_points, max_num_points);
+        if(VERBOSE)
+          cerr << "n_points = " << n_points << endl;
 
 
-	MomentSequence bootstrap_mom_seq(bootstrap_moments);
+        MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
-   	vector<double> points, weights;
-	bootstrap_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance,
-						 max_iter, points, weights);
+        vector<double> points, weights;
+        bootstrap_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance,
+                                                 max_iter, points, weights);
 
-	const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
-	if(weights_sum != 1.0){
-	  for(size_t i = 0; i < weights.size(); i++)
-	    weights[i] = weights[i]/weights_sum;
-	}
+        const double weights_sum = accumulate(weights.begin(), weights.end(), 0.0);
+        if(weights_sum != 1.0){
+          for(size_t i = 0; i < weights.size(); i++)
+            weights[i] = weights[i]/weights_sum;
+        }
 
-	double estimated_unobs = 0.0;
-    
-	for(size_t i = 0; i < weights.size(); i++)
-	  estimated_unobs += counts_hist[1]*weights[i]/points[i];
+        double estimated_unobs = 0.0;
 
-	if(estimated_unobs > 0.0)
-	  estimated_unobs += sampled_distinct;
-	else{
-	  estimated_unobs = sampled_distinct;
-	  n_points = 0;
-	}
+        for(size_t i = 0; i < weights.size(); i++)
+          estimated_unobs += counts_hist[1]*weights[i]/points[i];
 
-	if(VERBOSE){
-	  cerr << "bootstrapped_moments=" << endl;
-	  for(size_t i = 0; i < bootstrap_moments.size(); i++)
-	    cerr << bootstrap_moments[i] << endl;
-	}
-	if(VERBOSE){
-	  for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-	    cerr << "alpha_" << k << '\t';
-	  cerr << endl;
-	  for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-	    cerr << bootstrap_mom_seq.alpha[k] << '\t';
-	  cerr << endl;
+        if(estimated_unobs > 0.0)
+          estimated_unobs += sampled_distinct;
+        else{
+          estimated_unobs = sampled_distinct;
+          n_points = 0;
+        }
 
-	  for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-	    cerr << "beta_" << k << '\t';
-	  cerr << endl;
-	  for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-	    cerr << bootstrap_mom_seq.beta[k] << '\t';
-	  cerr << endl;
-	}
-	if(VERBOSE){
-	  cerr << "points=" << "\t";
-	  for(size_t i = 0; i < points.size(); i++)
-	    cerr << points[i] << "\t";
-	  cerr << endl;
-	  cerr << "weights=" << "\t";
-	  for(size_t i = 0; i < weights.size(); i++)
-	    cerr << weights[i] << "\t";
-	  cerr << endl;
-	  cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
-	}
+        if(VERBOSE){
+          cerr << "bootstrapped_moments=" << endl;
+          for(size_t i = 0; i < bootstrap_moments.size(); i++)
+            cerr << bootstrap_moments[i] << endl;
+        }
+        if(VERBOSE){
+          for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+            cerr << "alpha_" << k << '\t';
+          cerr << endl;
+          for(size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+            cerr << bootstrap_mom_seq.alpha[k] << '\t';
+          cerr << endl;
 
-	quad_estimates.push_back(estimated_unobs);
+          for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+            cerr << "beta_" << k << '\t';
+          cerr << endl;
+          for(size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+            cerr << bootstrap_mom_seq.beta[k] << '\t';
+          cerr << endl;
+        }
+        if(VERBOSE){
+          cerr << "points=" << "\t";
+          for(size_t i = 0; i < points.size(); i++)
+            cerr << points[i] << "\t";
+          cerr << endl;
+          cerr << "weights=" << "\t";
+          for(size_t i = 0; i < weights.size(); i++)
+            cerr << weights[i] << "\t";
+          cerr << endl;
+          cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
+        }
+
+        quad_estimates.push_back(estimated_unobs);
       }
 
       double median_estimate, lower_ci, upper_ci;
       median_and_ci(quad_estimates, c_level, median_estimate,
-		    lower_ci, upper_ci);
+                    lower_ci, upper_ci);
 
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
@@ -1666,16 +1666,16 @@ bound_pop(const int argc, const char **argv) {
       out.precision(1);
 
       out << "median_estimated_unobs" << '\t'
-	  << "lower_ci" << '\t'
-	  << "upper_ci" << endl;
+          << "lower_ci" << '\t'
+          << "upper_ci" << endl;
       out << median_estimate << '\t'
-	  << lower_ci << '\t'
-	  << upper_ci << endl;
+          << lower_ci << '\t'
+          << upper_ci << endl;
       /*
       double log_mean_estimate, lower_log_ci, upper_log_ci;
 
-      log_mean(VERBOSE, quad_estimates, c_level, log_mean_estimate, 
-	       lower_log_ci, upper_log_ci);
+      log_mean(VERBOSE, quad_estimates, c_level, log_mean_estimate,
+               lower_log_ci, upper_log_ci);
 
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
@@ -1685,11 +1685,11 @@ bound_pop(const int argc, const char **argv) {
       out.precision(1);
 
       out << "log_mean_estimated_unobs" << '\t'
-	  << "log_lower_ci" << '\t'
-	  << "log_upper_ci" << endl;
+          << "log_lower_ci" << '\t'
+          << "log_upper_ci" << endl;
       out << log_mean_estimate << '\t'
-	  << lower_log_ci << '\t'
-	  << upper_log_ci << endl;
+          << lower_log_ci << '\t'
+          << upper_log_ci << endl;
       */
 
    }
@@ -1711,8 +1711,8 @@ bound_pop(const int argc, const char **argv) {
 
 int
 main(const int argc, const char **argv) {
-  
-  static const string 
+
+  static const string
     USAGE_MESSAGE("preseq:  a program for analyzing library complexity\n"
                   "Version: " + toa(PRESEQ_VERSION) + "\n\n"
                   "Usage:   preseq <command> [OPTIONS]\n\n"
@@ -1720,36 +1720,36 @@ main(const int argc, const char **argv) {
                   "           lc_extrap  predict the yield for future experiments\n"
                   "           gc_extrap  predict genome coverage low input\n"
                   "                      sequencing experiments\n"
-		  "           bound_pop  lower bound on population size\n"
+                  "           bound_pop  lower bound on population size\n"
                   );
-  
+
   if (argc < 2)
     cerr << USAGE_MESSAGE << endl;
 
   else if (strcmp(argv[1], "lc_extrap") == 0) {
-    
+
     return lc_extrap(argc, argv);
-    
+
   }
   else if (strcmp(argv[1], "c_curve") == 0) {
-    
+
     return c_curve(argc, argv);
-    
+
   }
   else if (strcmp(argv[1], "gc_extrap") == 0) {
-    
+
     return gc_extrap(argc, argv);
-    
+
   }
   else if (strcmp(argv[1], "bound_pop") == 0) {
 
     return bound_pop(argc, argv);
-  
+
   }
   else {
     cerr << "unrecognized command: " << argv[1] << endl
          << USAGE_MESSAGE << endl;
     return EXIT_SUCCESS;
-    
+
   }
 }
