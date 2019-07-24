@@ -1,24 +1,20 @@
-/*    to-mr: a program for converting SAM and BAM format to MappedRead
- *    format.
- *    Currently supported mappers: bs_seeker, bismark.
+/* to-mr: a program for converting SAM and BAM format to MappedRead
+ * format.
  *
- *    Copyright (C) 2009-2019 University of Southern California and
+ * Copyright (C) 2009-2019 University of Southern California and
  *                            Andrew D. Smith
  *
- *    Authors: Meng Zhou, Qiang Song, Andrew Smith
+ * Authors: Meng Zhou, Qiang Song, Andrew Smith
  *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <cmath>
@@ -164,13 +160,13 @@ main(int argc, const char **argv) {
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]),
                            "Convert the SAM/BAM output from "
-                           "bismark or bs_seeker to MethPipe mapped read format",
+                           "to MethPipe mapped read format",
                            "sam/bam_file");
     opt_parse.add_opt("output", 'o', "Name of output file",
                       false, outfile);
-    opt_parse.add_opt("mapper", 'm',
-                      "Original mapper: bismark, bs_seeker or general",
-                      true, mapper);
+    // opt_parse.add_opt("mapper", 'm',
+    //                   "Original mapper: bismark, bs_seeker or general",
+    //                   true, mapper);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 1)",
                       false, suffix_len);
     opt_parse.add_opt("max-frag", 'L', "maximum allowed insert size",
