@@ -64,7 +64,7 @@ all: $(PROGS)
 
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
 	smithlab_os.o smithlab_utils.o GenomicRegion.o \
-	OptionParser.o RNG.o MappedRead.o)
+	OptionParser.o MappedRead.o)
 
 preseq: continued_fraction.o load_data_for_complexity.o moment_sequence.o
 
