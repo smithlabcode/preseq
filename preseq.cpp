@@ -42,7 +42,7 @@
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
 #include <GenomicRegion.hpp>
-#include <RNG.hpp>
+//#include <RNG.hpp>
 #include <smithlab_os.hpp>
 
 #define PRESEQ_VERSION "2.0.3"

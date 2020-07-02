@@ -26,7 +26,8 @@
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"
-#include "RNG.hpp"
+#include <random>
+//#include "RNG.hpp"
 
 using std::string;
 using std::vector;
@@ -37,6 +38,7 @@ using std::max;
 using std::cerr;
 using std::unordered_map;
 using std::runtime_error;
+using std::mt19937;
 
 //////////////////////////////////////////////////////////////////////
 // Data imputation
@@ -651,7 +653,7 @@ load_histogram(const string &filename, vector<double> &counts_hist) {
 // genomic regions of width equal to bin_size
 static void
 SplitGenomicRegion(const GenomicRegion &inputGR,
-                   Runif &runif, const size_t bin_size,
+                   mt19937 &generator, const size_t bin_size,
                    vector<GenomicRegion> &outputGRs){
 
   outputGRs.clear();
@@ -662,7 +664,8 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
 
   // ADS: this seems like a bunch of duplicated code just for a single
   // function difference
-  if (runif.runif(0.0, 1.0) > frac) {
+  std::uniform_real_distribution<double> dist(0.0,1.0); 
+  if (dist(generator) > frac) {
     gr.set_start(std::floor(static_cast<double>(gr.get_start())/
                             bin_size)*bin_size);
     gr.set_end(gr.get_start() + width);
@@ -680,7 +683,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
       = std::min(gr.get_end(), curr_start + bin_size);
     frac = static_cast<double>(curr_end - curr_start)/bin_size;
 
-    if(runif.runif(0.0, 1.0) <= frac){
+    if(dist(generator) <= frac){
       GenomicRegion binned_gr(gr.get_chrom(), curr_start,
                               curr_start + bin_size,
                               gr.get_name(), gr.get_score(),
@@ -697,7 +700,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
 static void
 SplitMappedRead(const bool VERBOSE,
                 const MappedRead &inputMR,
-                Runif &runif,
+                mt19937 &generator,
                 const size_t bin_size,
                 vector<GenomicRegion> &outputGRs){
 
@@ -716,7 +719,8 @@ SplitMappedRead(const bool VERBOSE,
     // with probability proportional to the number of covered bases
     if (read_iterator % bin_size == bin_size - 1) {
       const double frac = static_cast<double>(covered_bases)/bin_size;
-      if (runif.runif(0.0, 1.0) <= frac) {
+      std::uniform_real_distribution<double> dist(0.0,1.0);
+      if (dist(generator) <= frac) {
         const size_t curr_start = read_iterator - (read_iterator % bin_size);
         const size_t curr_end = curr_start + bin_size;
         const GenomicRegion binned_gr(inputMR.r.get_chrom(), curr_start, curr_end,
@@ -732,7 +736,8 @@ SplitMappedRead(const bool VERBOSE,
   }
 
   const double frac = static_cast<double>(covered_bases)/bin_size;
-  if (runif.runif(0.0, 1.0) <= frac) {
+  std::uniform_real_distribution<double> dist(0.0,1.0);
+  if (dist(generator) <= frac) {
     const size_t curr_start = read_iterator - (read_iterator % bin_size);
     const size_t curr_end = curr_start + bin_size;
     const GenomicRegion binned_gr(inputMR.r.get_chrom(), curr_start, curr_end,
@@ -751,7 +756,9 @@ load_coverage_counts_MR(const bool VERBOSE,
                         vector<double> &coverage_hist) {
 
   srand(time(0) + getpid());
-  Runif runif(rand());
+  //Runif runif(rand());
+  std::random_device rd;
+  std::mt19937 generator(rd());
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -777,7 +784,7 @@ load_coverage_counts_MR(const bool VERBOSE,
                           "max_width set too small");
 
     vector<GenomicRegion> splitGRs;
-    SplitMappedRead(VERBOSE, mr, runif, bin_size, splitGRs);
+    SplitMappedRead(VERBOSE, mr, generator, bin_size, splitGRs);
 
     n_reads++;
     n_bins += splitGRs.size();
@@ -811,7 +818,9 @@ load_coverage_counts_GR(const string input_file_name,
                         vector<double> &coverage_hist) {
 
   srand(time(0) + getpid());
-  Runif runif(rand());
+  //Runif runif(rand());
+  std::random_device rd;
+  std::mt19937 generator(rd());
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -832,7 +841,7 @@ load_coverage_counts_GR(const string input_file_name,
   do {
 
     vector<GenomicRegion> splitGRs;
-    SplitGenomicRegion(inputGR, runif, bin_size, splitGRs);
+    SplitGenomicRegion(inputGR, generator, bin_size, splitGRs);
 
     // add split Genomic Regions to the priority queue
     for(size_t i = 0; i < splitGRs.size(); i++)
