@@ -18,305 +18,173 @@
  */
 
 #include "continued_fraction.hpp"
+
 #include <vector>
 #include <cmath>
-
+#include <cassert>
 
 using std::vector;
 using std::min;
 using std::isfinite;
+using std::pow;
+using std::fabs;
 
-const double TOLERANCE = 1e-20;
+// ADS: the std::pow function is used frequently to get (-1)^x for
+// integer x. This doesn't make sense, and should be replaced at some
+// point.
 
-static double
-get_rescale_value(const double numerator, const double denominator) {
-  const double rescale_val = fabs(numerator) + fabs(denominator);
-  if (rescale_val > 1.0/TOLERANCE)
-    return 1.0/rescale_val;
-  else if (rescale_val < TOLERANCE)
-    return 1.0/rescale_val;
-  return 1.0;
-}
-
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////
-////  QUOTIENT DIFFERENCE ALGORITHMS
-////
-
-/* 
- * quotient-difference algorithm to compute continued fraction coefficients
- * vector for power series coefficients & vector for continued fraction 
- * coefficients
+/* QUOTIENT DIFFERENCE ALGORITHM: compute continued fraction
+ * coefficients vector for power series coefficients & vector for
+ * continued fraction coefficients
+ *
+ * The negative sign for coefficients in the final loop is because we
+ * evaluate a0/(1 + a1x/(1 + a2x/... while the algorithm is designed
+ * for the a0/(1 - a1x/(1 - a2x/... see https://dlmf.nist.gov/3.10
  */
-
 static void
 quotdiff_algorithm(const vector<double> &ps_coeffs, vector<double> &cf_coeffs) {
-  const size_t depth = ps_coeffs.size(); //degree of power series
-  vector< vector<double> > q_table(depth, vector<double>(depth+1, 0.0));
-  vector< vector<double> > e_table(depth, vector<double>(depth+1, 0.0));
 
-  for (size_t j = 0; j < depth-1; j++) 
+  const size_t depth = ps_coeffs.size(); // degree of power series
+
+  // q_table[0] never used, and undefined
+  vector<vector<double> > q_table(depth, vector<double>(depth + 1, 0.0));
+  // q_table[1][j] = ratio of ps coefficients
+  for (size_t j = 0; j < depth - 1; j++)
     q_table[1][j] = ps_coeffs[j + 1]/ps_coeffs[j];
-  
-  for (size_t j = 0; j < depth-1; j++) 
-    e_table[1][j] = q_table[1][j + 1] - q_table[1][j] + e_table[0][j + 1];
-    
-  //using intial values of E(i)(j)'s and Q(i)(j)'s, fill rest of the q table and
-  //e table
+
+  // e_table[0] is always 0
+  vector<vector<double> > e_table(depth, vector<double>(depth + 1, 0.0));
+  // e_table[1] follows the general recurrence (same as in loop below)
+  for (size_t j = 0; j < depth - 1; j++)
+    e_table[1][j] = q_table[1][j+1] - q_table[1][j] + e_table[0][j+1];
+
+  // using intial values of E(i)(j)'s and Q(i)(j)'s, fill rest of the
+  // q table and e table
   for (size_t i = 2; i < depth; i++) {
+
     for (size_t j = 0; j < depth; j++)
-      q_table[i][j] = q_table[i - 1][j + 1]*e_table[i - 1][j + 1]/e_table[i - 1][j];
-    
+      q_table[i][j] = q_table[i-1][j+1]*e_table[i-1][j+1]/e_table[i-1][j];
+
     for (size_t j = 0; j < depth; j++)
-      e_table[i][j] = q_table[i][j + 1] - q_table[i][j] + e_table[i - 1][j + 1];
+      e_table[i][j] = q_table[i][j+1] - q_table[i][j] + e_table[i-1][j+1];
   }
 
-  //add first power series coefficient to end of vector for continued fraction 
-  //coefficients
-  cf_coeffs.push_back(ps_coeffs[0]); 
-  //setting coefficients for continued fraction 
-  for (size_t i = 1; i < depth; ++i) {
-    if (i % 2 == 0) 
-      cf_coeffs.push_back(-e_table[i/2][0]);
-    else
-      cf_coeffs.push_back(-q_table[(i + 1)/2][0]);
-  }
-}  
+  cf_coeffs.resize(depth);
+  // first CT coefficient is first PS coefficient
+  cf_coeffs[0] = ps_coeffs[0];
+  // set remaining CF coefficients from e and q table values
+  for (size_t i = 1; i < depth; ++i)
+    cf_coeffs[i] = (i % 2 == 0) ? -e_table[i/2][0] : -q_table[(i + 1)/2][0];
+}
 
 
-/*
- * compute CF coeffs when upper_offset > 0 above the diagonal referring to 
- * degree of polynomial in numerator of Pade approximant is greater than degree
- *  of polynomial in the denominator 
+/* compute CF coeffs when upper_offset > 0 above the diagonal; this
+ * means degree of polynomial in numerator of Pade approximant is
+ * greater than degree of polynomial in the denominator
  */
 static void
-quotdiff_above_diagonal(const vector<double> &coeffs, const size_t offset,
-                        vector<double> &cf_coeffs, vector<double> &offset_coeffs)
-{  
-  //first offset coefficients set to first offset coeffs
-  vector<double> holding_coeffs; 
-  for (size_t i = offset; i < coeffs.size(); i++)
-    holding_coeffs.push_back(coeffs[i]);
-  
-  // qd to determine cf_coeffs
-  quotdiff_algorithm(holding_coeffs, cf_coeffs);
-  for (size_t i = 0; i < offset; i++)
-    offset_coeffs.push_back(coeffs[i]);
+quotdiff_above_diagonal(const vector<double> &ps_coeffs, const size_t offset,
+                        vector<double> &cf_coeffs,
+                        vector<double> &offset_coeffs) {
+
+  // get the high order PS coeffs for approximation by CF
+  vector<double> high_ps_coeffs(begin(ps_coeffs) + offset, end(ps_coeffs));
+
+  // use QD algorithm to determine CF coefficients
+  quotdiff_algorithm(high_ps_coeffs, cf_coeffs);
+
+  // first "offset" coeffs are equal to PS coeffs
+  offset_coeffs = ps_coeffs;
+  offset_coeffs.resize(offset);
 }
 
 
 // calculate CF coeffs when lower_offset > 0
 static void
-quotdiff_below_diagonal(const vector<double> &coeffs, const size_t offset, 
-                        vector<double> &cf_coeffs, vector<double> &offset_coeffs)
-{
-  //need to work with reciprocal series g = 1/f, then invert
-  vector<double> reciprocal_coeffs;
-  reciprocal_coeffs.push_back(1.0/coeffs[0]);
-  for (size_t i = 1; i < coeffs.size(); i++) {
-    double holding_val = 0.0;
+quotdiff_below_diagonal(const vector<double> &ps_coeffs, const size_t offset,
+                        vector<double> &cf_coeffs,
+                        vector<double> &offset_coeffs) {
+
+  // need to work with reciprocal series g = 1/f, then invert
+  vector<double> recip_ps_coeffs(ps_coeffs.size());
+  recip_ps_coeffs[0] = 1.0/ps_coeffs[0];
+  for (size_t i = 1; i < ps_coeffs.size(); ++i) {
+
+    double x = 0.0;
     for (size_t j = 0; j < i; ++j)
-      holding_val += coeffs[i - j]*reciprocal_coeffs[j];
-    reciprocal_coeffs.push_back(-holding_val/coeffs[0]);
+      x += ps_coeffs[i - j]*recip_ps_coeffs[j];
+
+    recip_ps_coeffs[i] = -x/ps_coeffs[0];
   }
-  
-  //set offset_coeffs to 1st offset coeffs of 1/f 
-  for (size_t i = 0; i < offset; i++)
-    offset_coeffs.push_back(reciprocal_coeffs[i]);
-  
+
   // qd to compute cf_coeffs using remaining coeffs
-  vector<double> holding_coeffs;
-  for (size_t i = offset; i < coeffs.size(); i++)
-    holding_coeffs.push_back(reciprocal_coeffs[i]);
-  
-  quotdiff_algorithm(holding_coeffs, cf_coeffs);
+  vector<double> high_recip_ps_coeffs(begin(recip_ps_coeffs) + offset,
+                                      end(recip_ps_coeffs));
+  quotdiff_algorithm(high_recip_ps_coeffs, cf_coeffs);
+
+  // set offset coeffs to 1st "offset" PS coeffs of 1/f (reciprocal)
+  offset_coeffs = recip_ps_coeffs;
+  offset_coeffs.resize(offset);
 }
 
-/*
- * output new ContinuedFraction with decreased degree
- * and coeffs equal to the old, but decreased in degree
- */
-ContinuedFraction
-ContinuedFraction::decrease_degree(const ContinuedFraction &CF,
-                                   const size_t decrement) {
-  // create return ContinuedFraction
-  ContinuedFraction decreasedCF;
-  // properties of orig CF to decrement
-  vector<double> decreased_ps_coeffs(CF.ps_coeffs);
-  vector<double> decreased_cf_coeffs(CF.cf_coeffs);
-  // decrease order
-  for(size_t i = 0; i < decrement; i++) {
-    decreased_ps_coeffs.pop_back();
-    decreased_cf_coeffs.pop_back();
+
+/* decrease degree of CF keeping coeffs equal to original */
+void
+decrease_degree(const size_t decrement, ContinuedFraction &the_cf) {
+  assert(decrement < the_cf.degree);
+  the_cf.ps_coeffs.resize(the_cf.ps_coeffs.size() - decrement);
+  the_cf.cf_coeffs.resize(the_cf.cf_coeffs.size() - decrement);
+  the_cf.degree -= decrement;
+}
+
+
+void
+truncate_degree(const size_t n_terms, ContinuedFraction &the_cf) {
+  if (the_cf.degree < n_terms) {
+    the_cf = ContinuedFraction();
   }
-
-  // just a copy
-  vector<double> decreased_offset_coeffs(CF.offset_coeffs);
-
-  // set return ContinuedFraction
-  decreasedCF.ps_coeffs = decreased_ps_coeffs;
-  decreasedCF.cf_coeffs = decreased_cf_coeffs;
-  decreasedCF.offset_coeffs = decreased_offset_coeffs;
-  decreasedCF.diagonal_idx = CF.diagonal_idx;
-  decreasedCF.degree = CF.degree - decrement;
-
-  return decreasedCF;
-}
-
-ContinuedFraction
-ContinuedFraction::truncate_degree(const ContinuedFraction &CF,
-				   const size_t n_terms){
-  ContinuedFraction truncated_CF;
-  if(CF.degree < n_terms){
-  // return a empty continued fraction if the degree < n_terms
-	return truncated_CF;
+  else {
+    the_cf.ps_coeffs.resize(n_terms);
+    the_cf.cf_coeffs.resize(n_terms - the_cf.offset_coeffs.size());
+    the_cf.degree = n_terms;
   }
-
-  vector<double> truncated_ps_coeffs(CF.ps_coeffs);
-  vector<double> truncated_cf_coeffs(CF.cf_coeffs);
-  vector<double> truncated_offset_coeffs(CF.offset_coeffs);
-
-  truncated_ps_coeffs.resize(n_terms);
-  truncated_cf_coeffs.resize(n_terms - truncated_offset_coeffs.size());
-
-  truncated_CF.ps_coeffs = truncated_ps_coeffs;
-  truncated_CF.cf_coeffs = truncated_cf_coeffs;
-  truncated_CF.offset_coeffs = truncated_offset_coeffs;
-  truncated_CF.diagonal_idx = CF.diagonal_idx;
-  truncated_CF.degree = n_terms;
-
-  return truncated_CF;
 }
 
-ContinuedFraction::ContinuedFraction(const vector<double> &ps_cf, 
+
+ContinuedFraction::ContinuedFraction(const vector<double> &ps_cf,
                                      const int di, const size_t dg) :
   ps_coeffs(ps_cf), diagonal_idx(di), degree(dg) {
-
   if (diagonal_idx == 0)
     quotdiff_algorithm(ps_coeffs, cf_coeffs);
   else if (diagonal_idx > 0)
     quotdiff_above_diagonal(ps_coeffs, diagonal_idx, cf_coeffs, offset_coeffs);
-  else // if(cont_frac_estimate.lower_offset > 0) {
+  else // if (cont_frac_estimate.lower_offset > 0) {
     quotdiff_below_diagonal(ps_coeffs, -diagonal_idx, cf_coeffs, offset_coeffs);
-  // notice the "-" above so that -diagonal_idx > 0
+  // NOTE: negative sign "-" (-diagonal_idx > 0) for below diagonal
 }
 
-
 ////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////
-////  FUNCTIONS TO EVALUATE CONTINUED FRACTIONS AT A POINT
-////
+//// FUNCTIONS TO EVALUATE CONTINUED FRACTIONS AT A POINT
 
-/* 
- * evaluate CF when upper_offset > 0 using Euler's recursion
- */
 static double
-evaluate_above_diagonal(const vector<double> &cf_coeffs,
-                        const vector<double> &offset_coeffs,
-                        const double val, const size_t depth) {
-  
-  double current_num = 0.0;
-  double prev_num1 = cf_coeffs[0];
-  double prev_num2 = 0.0;
-  
-  double current_denom = 0.0;
-  double prev_denom1 = 1.0;
-  double prev_denom2 = 1.0; 
-  
-  for (size_t i = 1; i < min(cf_coeffs.size(),
-                             depth - offset_coeffs.size()); i++) {
-    // initialize
-    current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
-    current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
-    
-    prev_num2 = prev_num1;
-    prev_num1 = current_num;
-    
-    prev_denom2= prev_denom1;
-    prev_denom1 = current_denom;
-    
-    //rescale to avoid over- and underflow
-    const double rescale_val = get_rescale_value(current_num, current_denom);
-    
-    current_num = current_num*rescale_val;
-    current_denom = current_denom*rescale_val;
-    
-    prev_num1 = prev_num1*rescale_val;
-    prev_num2 = prev_num2*rescale_val;
-
-    prev_denom1 = prev_denom1*rescale_val;
-    prev_denom2 = prev_denom2*rescale_val;
-  }
-
-  double offset_part = 0.0;
-  for (size_t i = 0; i < offset_coeffs.size(); i++)
-    offset_part += offset_coeffs[i]*std::pow(val, (int)i);
-  
-  return offset_part + std::pow(val, (int)min(depth, offset_coeffs.size()))*
-    current_num/current_denom;
-} 
-
-
-// calculate ContinuedFraction approx when lower_offdiag > 0
-static double 
-evaluate_below_diagonal(const vector<double> &cf_coeffs,
-                        const vector<double> &offset_coeffs,
-                        const double val, const size_t depth) {
-  
-  //initialize
-  double current_num = 0.0;
-  double prev_num1 = cf_coeffs[0];
-  double prev_num2 = 0.0;
-
-  double current_denom = 0.0;
-  double prev_denom1 = 1.0;
-  double prev_denom2 = 1.0; 
-
-  for (size_t i = 1; i < min(cf_coeffs.size(),
-                             depth - offset_coeffs.size()); i++) {
-
-    // recursion
-    current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
-    current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
-
-    prev_num2 = prev_num1;
-    prev_num1 = current_num;
-
-    prev_denom2= prev_denom1;
-    prev_denom1 = current_denom;
-
-    const double rescale_val = get_rescale_value(current_num, current_denom);
-
-    current_num = current_num*rescale_val;
-    current_denom = current_denom*rescale_val;
-
-    prev_num1 = prev_num1*rescale_val;
-    prev_num2 = prev_num2*rescale_val;
-    
-    prev_denom1 = prev_denom1*rescale_val;
-    prev_denom2 = prev_denom2*rescale_val;
-  }
-  
-  double offset_terms = 0.0;
-  for (size_t i = 0; i < min(offset_coeffs.size(), depth); i++)
-    offset_terms += offset_coeffs[i]*std::pow(val, (int)i);
-  
-  // recall that if lower_offset > 0, we are working with 1/f, invert approx
-  return 1.0/(offset_terms + std::pow(val, (int)min(offset_coeffs.size(),depth))*
-              current_num/current_denom);
+get_rescale_value(const double numerator, const double denominator) {
+  static const double tolerance = 1e-20; // magic
+  const double rescale_val = fabs(numerator) + fabs(denominator);
+  if (rescale_val > 1.0/tolerance)
+    return 1.0/rescale_val;
+  else if (rescale_val < tolerance)
+    return 1.0/rescale_val;
+  return 1.0;
 }
 
 
-/*
- * calculate ContinuedFraction approx when there is no offset uses euler's
+/* calculate ContinuedFraction approx when there is no offset uses euler's
  * recursion
  */
 static double
-evaluate_on_diagonal(const vector<double> &cf_coeffs, 
+evaluate_on_diagonal(const vector<double> &cf_coeffs,
                      const double val, const size_t depth) {
-  
+
   // initialize
   double current_num = 0.0;
   double prev_num1 = cf_coeffs[0];
@@ -324,68 +192,113 @@ evaluate_on_diagonal(const vector<double> &cf_coeffs,
 
   double current_denom = 0.0;
   double prev_denom1 = 1.0;
-  double prev_denom2 = 1.0; 
+  double prev_denom2 = 1.0;
 
   for (size_t i = 1; i < min(cf_coeffs.size(), depth); i++) {
-    // recursion
+
+    // calculate current values
     current_num = prev_num1 + cf_coeffs[i]*val*prev_num2;
     current_denom = prev_denom1 + cf_coeffs[i]*val*prev_denom2;
 
+    // update previous values
     prev_num2 = prev_num1;
     prev_num1 = current_num;
 
-    prev_denom2= prev_denom1;
+    prev_denom2 = prev_denom1;
     prev_denom1 = current_denom;
 
+    // now rescale all values
     const double rescale_val = get_rescale_value(current_num, current_denom);
-    
-    current_num = current_num*rescale_val;
-    current_denom = current_denom*rescale_val;
-    
-    prev_num1 = prev_num1*rescale_val;
-    prev_num2 = prev_num2*rescale_val;
 
-    prev_denom1 = prev_denom1*rescale_val;
-    prev_denom2 = prev_denom2*rescale_val;
+    current_num *= rescale_val;
+    current_denom *= rescale_val;
+
+    prev_num1 *= rescale_val;
+    prev_num2 *= rescale_val;
+
+    prev_denom1 *= rescale_val;
+    prev_denom2 *= rescale_val;
   }
   return current_num/current_denom;
 }
 
+static double
+evaluate_power_series(const vector<double> &ps_coeffs, const double val) {
+  double x = 0.0;
+  for (size_t i = 0; i < ps_coeffs.size(); i++)
+    x += ps_coeffs[i]*pow(val, i);
+  return x;
+}
 
-// calculate cont_frac approx depending on offset
+
+/* evaluate CF when upper_offset > 0 using Euler's recursion */
+static double
+evaluate_above_diagonal(const vector<double> &cf_coeffs,
+                        const vector<double> &offset_coeffs,
+                        const double val, const size_t depth) {
+
+  const double cf_part =
+    evaluate_on_diagonal(cf_coeffs, val, depth - offset_coeffs.size());
+
+  const double ps_part = evaluate_power_series(offset_coeffs, val);
+
+  return ps_part + pow(val, offset_coeffs.size())*cf_part;
+}
+
+
+// calculate ContinuedFraction approx when lower_offdiag > 0
+static double
+evaluate_below_diagonal(const vector<double> &cf_coeffs,
+                        const vector<double> &offset_coeffs,
+                        const double val, const size_t depth) {
+
+  const double cf_part =
+    evaluate_on_diagonal(cf_coeffs, val, depth - offset_coeffs.size());
+
+  const double ps_part = evaluate_power_series(offset_coeffs, val);
+
+  // recall that if lower_offset > 0, we are working with 1/f, invert approx
+  return 1.0/(ps_part + pow(val, offset_coeffs.size())*cf_part);
+}
+
+
+// evaluate CF at a given point
 double
 ContinuedFraction::operator()(const double val) const {
   if (diagonal_idx > 0)
     return evaluate_above_diagonal(cf_coeffs, offset_coeffs, val, degree);
-  
-  if (diagonal_idx < 0)
+  else if (diagonal_idx < 0)
     return evaluate_below_diagonal(cf_coeffs, offset_coeffs, val, degree);
-  
-  return evaluate_on_diagonal(cf_coeffs, val, degree);
+  else
+    return evaluate_on_diagonal(cf_coeffs, val, degree);
 }
+
 
 std::ostream&
 operator<<(std::ostream& the_stream, const ContinuedFraction &cf) {
-  std::ios_base::fmtflags orig_flags = the_stream.flags();
-  the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
+  using std::ios_base;
+  using std::setw;
+
+  ios_base::fmtflags orig_flags = the_stream.flags();
+  the_stream.setf(ios_base::fixed, ios_base::floatfield);
   the_stream.precision(2);
   the_stream << "OFFSET_COEFFS" << '\t' << "PS_COEFFS" << '\n';
   const size_t offset = cf.offset_coeffs.size();
   for (size_t i = 0; i < offset; ++i)
-    the_stream << std::setw(12) << cf.offset_coeffs[i] << '\t'
-               << std::setw(12) << cf.ps_coeffs[i] << '\n';
+    the_stream << setw(12) << cf.offset_coeffs[i] << '\t'
+               << setw(12) << cf.ps_coeffs[i] << '\n';
   the_stream << "CF_COEFFS" << '\n';
   for (size_t i = 0; i < cf.cf_coeffs.size(); ++i)
-    the_stream << std::setw(12) << cf.cf_coeffs[i] << '\t'
-               << std::setw(12) << cf.ps_coeffs[i + offset] << '\n';
+    the_stream << setw(12) << cf.cf_coeffs[i] << '\t'
+               << setw(12) << cf.ps_coeffs[i + offset] << '\n';
   the_stream.flags(orig_flags);
   return the_stream;
 }
 
 
-//Extrapolates the curve without adding the result from the initial experiment
+// estimate yields by evaluating the CF at given points
 void
-ContinuedFraction::extrapolate_distinct(const double max_value, 
+ContinuedFraction::extrapolate_distinct(const double max_value,
                                         const double step_size,
                                         vector<double> &estimates) const {
   estimates.clear();
@@ -394,121 +307,77 @@ ContinuedFraction::extrapolate_distinct(const double max_value,
     estimates.push_back(t*operator()(t));
 }
 
-
 ////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-//////////////////
-/////////////////
 ////////////////  CONTINUED FRACTION APPROXIMATION CLASS BELOW
-///////////////
-//////////////
-/////////////
-////////////
 
-const size_t ContinuedFractionApproximation::MIN_ALLOWED_DEGREE = 4;
+typedef ContinuedFractionApproximation CFA;
 
-const double ContinuedFractionApproximation::SEARCH_MAX_VAL = 100;
+const size_t CFA::min_allowed_degree = 4;
+const double CFA::search_max_val = 100;
+const double CFA::search_step_size = 0.05;
 
-const double ContinuedFractionApproximation::SEARCH_STEP_SIZE = 0.05;
-
-
-// calculate cf_coeffs depending on offset
-ContinuedFractionApproximation::ContinuedFractionApproximation(const int di, 
-							       const size_t mt) :
-  diagonal_idx(di), max_terms(mt) {}
-
-
-/* 
- * Checks if estimates are stable (derivative large) for the
- * particular approximation (degrees of num and denom) at a specific
- * point
+/* check if a sequence of estimates are "stable": in [0, infty,
+ * increasing, negative 2nd deriv
  */
-static bool
+bool
 check_yield_estimates_stability(const vector<double> &estimates) {
-  
-  // make sure that the estimate is increasing in the time_step and
-  // is below the initial distinct per step_size
+
+  // require estimates are non-negative and finite
   for (size_t i = 0; i < estimates.size(); ++i)
-	  if (!std::isfinite(estimates[i]) || estimates[i] < 0)
-		  return false;
-  for (size_t i = 1; i < estimates.size(); ++i){
-    if (estimates[i] < estimates[i - 1] ){
+    if (!std::isfinite(estimates[i]) || estimates[i] < 0.0)
       return false;
-    }
-    if(i >= 2 && (estimates[i] - estimates[i - 1] >
-                  estimates[i - 1] - estimates[i - 2])){
+
+  // require estimate to be increasing
+  for (size_t i = 1; i < estimates.size(); ++i)
+    if (estimates[i] < estimates[i - 1])
       return false;
-    }
-  }
-    
-  return true;
+
+  // require negative second derivative
+  for (size_t i = 2; i < estimates.size(); ++i)
+    if (estimates[i-1] - estimates[i-2] < estimates[i] - estimates[i-1])
+      return false;
+
+  return !estimates.empty();
 }
 
-/*
- * Finds the optimal number of terms (i.e. degree, depth, etc.) of the
+/* Finds the optimal number of terms (i.e. degree, depth, etc.) of the
  * continued fraction by checking for stability of estimates at
- * specific points for yield.
- * New way for searching for optimal CF
+ * specific points for yield. New way for searching for optimal CF
  */
 ContinuedFraction
-ContinuedFractionApproximation::optimal_cont_frac_distinct(const vector<double> 
-		                                                   &counts_hist) const {
-  // ensure that we will use an underestimate
-  // const size_t local_max_terms = max_terms - (max_terms % 2 == 1); 
-  // above stuff should be done outside
-  if(max_terms >= counts_hist.size()) {
-	  ContinuedFraction empty;
-	  return empty;
-  }
+CFA::optimal_cont_frac_distinct(const vector<double> &counts_hist) const {
 
-  vector<double> full_ps_coeffs;
+  // we expect to use an underestimate, but this is dealt with outside
+  // by ensuring we have an even number of max terms
+
+  if (max_terms >= counts_hist.size())
+    return ContinuedFraction();
+
+  vector<double> ps_coeffs;
   for (size_t j = 1; j <= max_terms; j++)
-    full_ps_coeffs.push_back( counts_hist[j]*std::pow((double)(-1), (int)(j + 1)) );
+    ps_coeffs.push_back(counts_hist[j]*pow(-1.0, j + 1));
 
-  ContinuedFraction full_CF(full_ps_coeffs, diagonal_idx, max_terms);  
+  ContinuedFraction full_cf(ps_coeffs, diagonal_idx, max_terms);
 
-  // counts_sum = number of total captures
-  double counts_sum  = 0.0;
-  for(size_t i = 0; i < counts_hist.size(); i++)
-    counts_sum += i*counts_hist[i];
-  
-  // if max terms = 4, check only that degree
-  if(max_terms == 4 || max_terms == 3 
-     || max_terms == 5 || max_terms == 6){   
+  // if max terms in {3,4,5,6}, check only that degree
+  if (max_terms >= 3 && max_terms <= 6) {
     vector<double> estimates;
-    full_CF.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE, 
-			                     estimates);
-    // return the continued fraction if it is stable
+    full_cf.extrapolate_distinct(search_max_val, search_step_size, estimates);
     if (check_yield_estimates_stability(estimates))
-      return full_CF;
+      return full_cf;
   }
-  else{
-    //if max terms >= 8, start at 8 and check increasing cont frac's
-    size_t curr_terms = 0;
-    if(max_terms % 2 == 0)
-      curr_terms = 8;
-    else
-      curr_terms = 7;
-    while (curr_terms <= max_terms) {    
-      ContinuedFraction curr_cf 
-	= ContinuedFraction::truncate_degree(full_CF, curr_terms);
+  else {
+
+    // if max terms >= 7, start at 7 and check increasing cont frac's
+    for (size_t i = 7 + (max_terms % 2 == 0); i <= max_terms; i += 2) {
+      ContinuedFraction trunc_cf(full_cf);
+      truncate_degree(i, trunc_cf);
       vector<double> estimates;
-      curr_cf.extrapolate_distinct(SEARCH_MAX_VAL, SEARCH_STEP_SIZE,
-			                       estimates);
-          
-    // return the continued fraction if it is stable
+      trunc_cf.extrapolate_distinct(search_max_val, search_step_size, estimates);
       if (check_yield_estimates_stability(estimates))
-	return curr_cf;
-    
-      curr_terms += 2;
-    // if not cf not acceptable, increase degree
+        return trunc_cf;
     }
   }
-   // no stable continued fraction: return null
-  return ContinuedFraction();  
+  // no stable continued fraction: return null
+  return ContinuedFraction();
 }

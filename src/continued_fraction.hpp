@@ -25,12 +25,10 @@
 #include <fstream>
 #include <iomanip>
 
-
-
 struct ContinuedFraction {
   // Constructors
-  ContinuedFraction() {}
-  ContinuedFraction(const std::vector<double> &ps_cf, 
+  ContinuedFraction() : diagonal_idx(0), degree(0ul) {}
+  ContinuedFraction(const std::vector<double> &ps_cf,
                     const int di, const size_t dg);
 
   // Evaluate the continued fraction
@@ -44,17 +42,10 @@ struct ContinuedFraction {
   void
   extrapolate_distinct(const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
-  
+
   bool is_valid() const {return !cf_coeffs.empty();}
   size_t return_degree() const {return degree;}
 
-  // Return new ContinuedFraction with degree decrement less than CF
-  static ContinuedFraction decrease_degree(const ContinuedFraction &CF,
-                                           const size_t decrement);
-
-  static ContinuedFraction truncate_degree(const ContinuedFraction &fullCF,
-					   const size_t truncated_degree);
-  
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;
@@ -62,34 +53,42 @@ struct ContinuedFraction {
   size_t degree;
 };
 
-std::ostream& 
-operator<<(std::ostream& the_stream, const ContinuedFraction &cf);
+  // get continued fraction with lower degree
+void decrease_degree(const size_t decrement, ContinuedFraction &cf);
+void truncate_degree(const size_t truncated_degree, ContinuedFraction &cf);
+
+std::ostream &
+operator<<(std::ostream &out, const ContinuedFraction &cf);
 
 
 class ContinuedFractionApproximation {
 public:
-  // Constructor
-  ContinuedFractionApproximation(const int di, const size_t mt);
-  
-  //find best cont frac approx for estimating distinct
+  ContinuedFractionApproximation(const int di, const size_t mt) :
+    diagonal_idx(di), max_terms(mt) {}
+
+  // find best cont frac approx for estimating distinct
   ContinuedFraction
   optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
 
   int get_diagonal() const {return diagonal_idx;}
 
 private:
-  
+
   int diagonal_idx; // the diagonal to work with for estimates
   size_t max_terms; // the maximum number of terms to try for a CF
 
-  static const size_t MIN_ALLOWED_DEGREE;
-  
+  /* note: these never change */
+  static const size_t min_allowed_degree;
+
   // largest value to search for lowerbound and stability
-  static const double SEARCH_MAX_VAL; 
-  
+  static const double search_max_val;
+
   //step size for search of lowerbound and stability
-  static const double SEARCH_STEP_SIZE; 
+  static const double search_step_size;
 
 };
+
+bool
+check_yield_estimates_stability(const std::vector<double> &estimates);
 
 #endif

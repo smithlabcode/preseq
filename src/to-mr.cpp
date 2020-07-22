@@ -2,7 +2,7 @@
  * format.
  *
  * Copyright (C) 2009-2019 University of Southern California and
- *                            Andrew D. Smith
+ *                         Andrew D. Smith
  *
  * Authors: Meng Zhou, Qiang Song, Andrew Smith
  *
