@@ -33,8 +33,11 @@ endif
 
 preseq_SOURCES = \
 	src/preseq.cpp \
+	src/continued_fraction.hpp \
 	src/continued_fraction.cpp \
+	src/load_data_for_complexity.hpp \
 	src/load_data_for_complexity.cpp \
+	src/moment_sequence.hpp \
 	src/moment_sequence.cpp
 
 to_mr_SOURCES = \
