@@ -22,7 +22,7 @@ INCLUDEDIRS = smithlab_cpp
 INCLUDEARGS = $(addprefix -I, $(INCLUDEDIRS))
 LIBS = -lgsl -lgslcblas -lz
 CXX = g++
-CXXFLAGS = -std=c++11
+CXXFLAGS = -std=c++11 -Wall
 
 ifdef DEBUG
 CXXFLAGS += -g
