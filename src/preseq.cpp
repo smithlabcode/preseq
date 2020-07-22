@@ -217,8 +217,9 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
   gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(rng, seed);
 
-  const double vals_sum = get_counts_from_hist(orig_hist);
-  const double initial_distinct = accumulate(begin(orig_hist), end(orig_hist), 0.0);
+  // const double vals_sum = get_counts_from_hist(orig_hist);
+  const double initial_distinct =
+    accumulate(begin(orig_hist), end(orig_hist), 0.0);
 
   vector<size_t> orig_hist_distinct_counts;
   vector<double> distinct_orig_hist;
@@ -483,7 +484,6 @@ lc_extrap(const int argc, const char **argv) {
       sequencing library would yield upon deeper sequencing. This      \
       method has been used for many different purposes since then.";
 
-
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
     OptionParser opt_parse(strip_path(argv[1]), description, "<input-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
@@ -630,7 +630,7 @@ lc_extrap(const int argc, const char **argv) {
       throw runtime_error("Saturation expected at double initial sample size."
                           " Unable to extrapolate");
 
-    const size_t total_reads = get_counts_from_hist(counts_hist);
+    // const size_t total_reads = get_counts_from_hist(counts_hist);
 
     //assert(total_reads == n_reads); // ADS: why commented out?
 
@@ -732,28 +732,32 @@ gc_extrap(const int argc, const char **argv) {
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
 
+    const string description =
+      "Extrapolate the size of the covered genome by mapped reads. This \
+      approach is described in Daley & Smith (2014). The method is the  \
+      same as for lc_extrap: using rational function approximation to   \
+      a power-series expansion for the number of \"unobserved\" bases   \
+      in the initial sample. The gc_extrap method is adapted to deal    \
+      with individual nucleotides rather than distinct reads.";
+
     // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
-    OptionParser opt_parse(strip_path(argv[1]),
-                           "", "<sorted-mapped-read-file>");
+    OptionParser opt_parse(strip_path(argv[1]), description,
+                           "<input-file>");
     opt_parse.add_opt("output", 'o', "coverage yield output file (default: stdout)",
                       false , outfile);
     opt_parse.add_opt("max_width", 'w', "max fragment length, "
                       "set equal to read length for single end reads",
                       false, max_width);
-    opt_parse.add_opt("bin_size", 'b', "bin size "
-                      "(default: " + to_string(bin_size) + ")",
+    opt_parse.add_opt("bin_size", 'b', "bin size",
                       false, bin_size);
-    opt_parse.add_opt("extrap",'e',"maximum extrapolation in base pairs"
-                      "(default: " + to_string(max_extrap) + ")",
+    opt_parse.add_opt("extrap",'e',"maximum extrapolation in base pairs",
                       false, max_extrap);
-    opt_parse.add_opt("step",'s',"step size in bases between extrapolations "
-                      "(default: " + to_string(base_step_size) + ")",
+    opt_parse.add_opt("step",'s',"step size in bases between extrapolations",
                       false, base_step_size);
-    opt_parse.add_opt("bootstraps",'n',"number of bootstraps "
-                      "(default: " + to_string(n_bootstraps) + "), ",
+    opt_parse.add_opt("bootstraps",'n',"number of bootstraps",
                       false, n_bootstraps);
-    opt_parse.add_opt("cval", 'c', "level for confidence intervals "
-                      "(default: " + to_string(c_level) + ")", false, c_level);
+    opt_parse.add_opt("cval", 'c', "level for confidence intervals",
+                      false, c_level);
     opt_parse.add_opt("terms",'x',"maximum number of terms",
                       false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more information",
@@ -770,6 +774,7 @@ gc_extrap(const int argc, const char **argv) {
                       false, allow_defects);
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
                       false, seed);
+    opt_parse.set_show_defaults();
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
@@ -936,12 +941,7 @@ gc_extrap(const int argc, const char **argv) {
 
 
 ////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-/////
 /////  C_CURVE BELOW HERE
-/////
 
 static int
 c_curve(const int argc, const char **argv) {
@@ -964,13 +964,15 @@ c_curve(const int argc, const char **argv) {
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
 
+    const string description =
+      "Generate the complexity curve for data. This does not extrapolate, \
+      but instead resamples from the given data.";
+
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
-    OptionParser opt_parse(strip_path(argv[1]),
-                           "", "<sorted-bed-file>");
+    OptionParser opt_parse(strip_path(argv[1]), description, "<input-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
                       false , outfile);
-    opt_parse.add_opt("step",'s',"step size in extrapolations "
-                      "(default: " + to_string(step_size) + ")",
+    opt_parse.add_opt("step",'s',"step size in extrapolations",
                       false, step_size);
     opt_parse.add_opt("verbose", 'v', "print more information",
                       false, VERBOSE);
@@ -986,12 +988,13 @@ c_curve(const int argc, const char **argv) {
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
     opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
-                      "paired end bam reads (default: "
-                      + to_string(MAX_SEGMENT_LENGTH) + ")",
+                      "paired end bam reads",
                       false, MAX_SEGMENT_LENGTH);
 #endif
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
                       false, seed);
+    opt_parse.set_show_defaults();
+
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
@@ -1155,46 +1158,43 @@ bound_pop(const int argc, const char **argv) {
     size_t max_iter = 100;
     unsigned long int seed = 0;
 
+    const string description =
+      "Estimate the size of the underlying population based on counts \
+      of observed species in an initial sample.";
 
     /********** GET COMMAND LINE ARGUMENTS FOR BOUND_POP ***********/
     OptionParser opt_parse(strip_path(argv[1]),
-                           "", "<sorted-bed-file>");
-    opt_parse.add_opt("output", 'o', "species richness output file (default: stdout)",
-                      false , outfile);
-    opt_parse.add_opt("max_num_points",'p',"maximum number of points in quadrature "
-                      "estimates (default: " + to_string(max_num_points) + ")",
-                      false, max_num_points);
-    opt_parse.add_opt("tolerance", 't', "numerical tolerance "
-                      "(default: " + to_string(tolerance) + ")",
+                           description, "<input-file>");
+    opt_parse.add_opt("output", 'o', "species richness output file "
+                      "(default: stdout)", false , outfile);
+    opt_parse.add_opt("max_num_points",'p',"maximum number of points in "
+                      "quadrature estimates", false, max_num_points);
+    opt_parse.add_opt("tolerance", 't', "numerical tolerance",
                       false, tolerance);
-    opt_parse.add_opt("bootstraps", 'n', "number of bootstraps "
-                      "(default: " + to_string(n_bootstraps) + ")",
+    opt_parse.add_opt("bootstraps", 'n', "number of bootstraps",
                       false, n_bootstraps);
-    opt_parse.add_opt("clevel", 'c', "level for confidence intervals "
-                      "(default: " + to_string(c_level) + ")", false, c_level);
+    opt_parse.add_opt("clevel", 'c', "level for confidence intervals",
+                      false, c_level);
     opt_parse.add_opt("verbose", 'v', "print more information",
                       false, VERBOSE);
     opt_parse.add_opt("pe", 'P', "input is paired end read file",
                       false, PAIRED_END);
-    opt_parse.add_opt("hist", 'H',
-                      "input is a text file containing the observed histogram",
-                      false, HIST_INPUT);
-    opt_parse.add_opt("vals", 'V',
-                      "input is a text file containing only the observed duplicate counts",
-                      false, VALS_INPUT);
+    opt_parse.add_opt("hist", 'H', "input is a text file containing the "
+                      "observed histogram", false, HIST_INPUT);
+    opt_parse.add_opt("vals", 'V', "input is a text file containing only the "
+                      "observed duplicate counts", false, VALS_INPUT);
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
                       false, BAM_FORMAT_INPUT);
     opt_parse.add_opt("seg_len", 'l', "maximum segment length when merging "
-                      "paired end bam reads (default: "
-                      + to_string(MAX_SEGMENT_LENGTH) + ")",
+                      "paired end bam reads",
                       false, MAX_SEGMENT_LENGTH);
 #endif
     opt_parse.add_opt("quick", 'Q', "quick mode, estimate without bootstrapping",
                       false, QUICK_MODE);
     opt_parse.add_opt("seed", 'r', "seed for random number generator",
                       false, seed);
-
+    opt_parse.set_show_defaults();
 
     vector<string> leftover_args;
     opt_parse.parse(argc-1, argv+1, leftover_args);
