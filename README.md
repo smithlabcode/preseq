@@ -5,49 +5,6 @@ to examine the utility of further sequencing, optimize the sequencing
 depth, or to screen multiple libraries to avoid low complexity
 samples.
 
-UPDATES TO VERSION 3.0
-========================================================================
-The main change to this version is that if BAM/SAM format will be used
-as input, the HTSLib library must be installed on the system when
-preseq is built. Installation instructions below have been updated
-correspondingly. We also updated to use C++11, so a more recent
-compiler is required, but these days C++11 is usually supported.
-
-UPDATES TO VERSION 2.0.3
-========================================================================
-A bug in defect mode was fixed and a rng seed was added to allow for
-reproducibility.
-
-UPDATES TO VERSION 2.0.0
-========================================================================
-We have added a new module, `bound_pop`, to estimate a lower bound of
-the population sampled from.  Interpolation is calculated by
-expectation rather than subsampling, dramatically improving the speed.
-
-UPDATES TO VERSION 1.0.2
-========================================================================
-We have switched the dependency on the BamTools API to SAMTools, which
-we believe will be more convenient for most users of preseq. Minor
-bugs have been fixed, and algorithms have been refined to more
-accurately construct counts histograms and extrapolate the complexity
-curve. More options have been added to `lc_extrap`. `c_curve` and
-`lc_extrap` are now both under a single binary for easier use, and
-commands will now be written as `preseq lc_extrap [OPTIONS]`
-Furthermore, there are updates to the manual for any minor issues
-encountered when compiling the preseq binary.
-
-We released an R package called
-[preseqR](http://cran.r-project.org/web/packages/preseqR/index.html)
-along with the preseq. It makes the preseq available in the R statistical
-environment. The submodule preseqR contains all required source code
-to build the R package.
-
-CONTACT INFORMATION:
-========================================================================
-Timothy Daley
-tdaley@stanford.edu
-http://smithlabresearch.org
-
 SYSTEM REQUIREMENTS:
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
@@ -56,17 +13,57 @@ requires a C++ compiler that supports C++11.
 
 INSTALLATION:
 ========================================================================
-This should be easy: unpack the archive and change into the archive
-directory. Then type `make`. The programs will be in the archive
-directory. These can be moved around, and also do not depend on any
-dynamic libraries, so they should simply work when executed. If the
-desired input is in `.bam` format, `htslib` is required. Type
-```
-make HAVE_HTSLIB=1 all
-```
-to make the programs.
+### Installing from a release
 
-The HTSLib library can be obtained here: http://www.htslib.org/download
+1. Download preseq-3.0.tar.gz from the releases tab of this repository.
+2. Unpack the archive:
+```
+$ tar -zxvf preseq-3.0.tar.gz
+```
+3. Move into the methpipe directory and create a build directory:
+```
+$ cd preseq-3.0
+$ mkdir build && cd build
+```
+4. Run the configuration script:
+```
+$ ../configure
+```
+If you do not want to install preseq system-wide, or if you do
+not have admin privileges, specify a prefix directory:
+```
+$ ../configure --prefix=/some/reasonable/place
+```
+Finally, if you want to build with HTSlib support (for the `to-mr`
+program) then you need to specify the following:
+```
+$ ../configure --enable-hts
+```
+And if you installed HTSlib yourself in some non-standard directory,
+you must specify the location like this:
+```
+$ ../configure --enable-hts CPPFLAGS='-I /path/to/htslib/headers' \
+    LDFLAGS='-L/path/to/htslib/lib'
+```
+5. Compile and install the tools:
+```
+$ make
+$ make install
+```
+
+### Installing from source
+
+Developers looking to use the latest commits can compile the cloned repository using the `Makefile`
+within the `src` directory. The process is simple:
+```
+$ cd src/
+$ make
+```
+If the desired input is in `.bam` format, `htslib` is required. Type
+```
+make HAVE_HTSLIB=1 all 
+```
+to make the programs. The HTSLib library can be obtained here: http://www.htslib.org/download
 
 INPUT FILE FORMATS:
 ========================================================================
@@ -118,6 +115,49 @@ The estimates will appear in estimates.txt with two columns.  The
 first column gives the total number of reads in a theoretically
 smaller experiment and the second gives the corresponding number of
 distinct reads.
+
+UPDATES TO VERSION 3.0
+========================================================================
+The main change to this version is that if BAM/SAM format will be used
+as input, the HTSLib library must be installed on the system when
+preseq is built. Installation instructions below have been updated
+correspondingly. We also updated to use C++11, so a more recent
+compiler is required, but these days C++11 is usually supported.
+
+UPDATES TO VERSION 2.0.3
+========================================================================
+A bug in defect mode was fixed and a rng seed was added to allow for
+reproducibility.
+
+UPDATES TO VERSION 2.0.0
+========================================================================
+We have added a new module, `bound_pop`, to estimate a lower bound of
+the population sampled from.  Interpolation is calculated by
+expectation rather than subsampling, dramatically improving the speed.
+
+UPDATES TO VERSION 1.0.2
+========================================================================
+We have switched the dependency on the BamTools API to SAMTools, which
+we believe will be more convenient for most users of preseq. Minor
+bugs have been fixed, and algorithms have been refined to more
+accurately construct counts histograms and extrapolate the complexity
+curve. More options have been added to `lc_extrap`. `c_curve` and
+`lc_extrap` are now both under a single binary for easier use, and
+commands will now be written as `preseq lc_extrap [OPTIONS]`
+Furthermore, there are updates to the manual for any minor issues
+encountered when compiling the preseq binary.
+
+We released an R package called
+[preseqR](http://cran.r-project.org/web/packages/preseqR/index.html)
+along with preseq. It makes preseq available in the R statistical
+environment. The submodule preseqR contains all required source code
+to build the R package.
+
+CONTACT INFORMATION:
+========================================================================
+Timothy Daley
+tdaley@stanford.edu
+http://smithlabresearch.org
 
 HISTORY
 ========================================================================
