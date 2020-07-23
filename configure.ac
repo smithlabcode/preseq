@@ -15,7 +15,7 @@ dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 dnl General Public License for more details.
 
 AC_INIT([preseq], [3.0], [andrewds@usc.edu],
-        [prestarted], [https://github.com/smithlabcode/preseq])
+        [preseq], [https://github.com/smithlabcode/preseq])
 dnl the config.h is not currently #included in the source, and only
 dnl used to keep command lines short.
 AC_CONFIG_HEADERS([config.h])
