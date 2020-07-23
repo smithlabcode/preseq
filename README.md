@@ -9,7 +9,9 @@ SYSTEM REQUIREMENTS:
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
 systems and was developed on both Linux and Mac. The preseq software
-requires a C++ compiler that supports C++11.
+requires a C++ compiler that supports C++11. The GNU Scientific Library
+is also required. It can be installed using `apt` on Linux, using `brew` 
+on macOS, or from source available [here](http://www.gnu.org/software/gsl).
 
 INSTALLATION:
 ========================================================================
