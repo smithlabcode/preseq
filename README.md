@@ -53,17 +53,19 @@ $ make install
 
 ### Installing from source
 
-Developers looking to use the latest commits can compile the cloned repository using the `Makefile`
-within the `src` directory. The process is simple:
+Developers looking to use the latest commits can compile the cloned
+repository using the `Makefile` within the `src` directory. The
+process is simple:
 ```
 $ cd src/
 $ make
 ```
 If the desired input is in `.bam` format, `htslib` is required. Type
 ```
-make HAVE_HTSLIB=1 all 
+make HAVE_HTSLIB=1 all
 ```
-to make the programs. The HTSLib library can be obtained here: http://www.htslib.org/download
+to make the programs. The HTSLib library can be obtained here:
+http://www.htslib.org/download
 
 INPUT FILE FORMATS:
 ========================================================================
@@ -149,26 +151,31 @@ encountered when compiling the preseq binary.
 
 We released an R package called
 [preseqR](http://cran.r-project.org/web/packages/preseqR/index.html)
-along with preseq. It makes preseq available in the R statistical
-environment. The submodule preseqR contains all required source code
-to build the R package.
+along with preseq. This makes most of the preseq functionality
+available in the R statistical environment, and includes some new
+functionality. The preseqR directory contains all required source code
+to build this R package.
 
 CONTACT INFORMATION:
 ========================================================================
+Andrew D. Smith
+andrewds@usc.edu
+
 Timothy Daley
 tdaley@stanford.edu
+
 http://smithlabresearch.org
 
 HISTORY
 ========================================================================
-preseq was originally developed by Timothy Daley and Andrew Smith
-at the University of Southern California.
+Preseq was originally developed by Timothy Daley and Andrew D. Smith
+at University of Southern California.
 
 LICENSE
 ========================================================================
-The preseq software for estimating complexity
-Copyright (C) 2014-2019 Timothy Daley and Andrew D Smith and Chao Deng and
-the University of Southern California
+The preseq software for estimating complexity Copyright (C) 2014-2020
+Timothy Daley and Andrew D Smith and Chao Deng and the University of
+Southern California
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
