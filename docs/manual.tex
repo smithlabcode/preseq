@@ -28,7 +28,7 @@
 \titleformat*{\paragraph}{\large\bfseries}
 
 \title{The \textbf{preseq} Manual}
-\author{Timothy Daley \and Victoria Helus \and Chao Deng \and Andrew Smith }
+\author{Timothy Daley \and Chao Deng \and Terence Li \and Andrew Smith }
 
 \begin{document}
 \maketitle
@@ -79,59 +79,27 @@ also called the species richness of the population that is sampled.
 \paragraph{Download}
 \label{sub:download}~\\~\\[-.2cm]
 \raggedright{\textbf{preseq} is available at }
-\url{http://smithlabresearch.org/software/preseq/}
-or \url{https://github.com/smithlabcode/preseq}.
+\url{http://smithlabresearch.org/software/preseq/} or
+\url{https://github.com/smithlabcode/preseq}.  Only clone the repo if
+you are planning to modify or reuse the code. Most users should
+download a release. The README.md file in the GitHub repo explains how
+to download a release, and not simply the source code files.
 
 
 \paragraph{System Requirements}
 \label{sub:require}
 ~\\~\\[-.2cm]
-\textbf{preseq} runs on Unix-type system
-with GNU Scientific Library (GSL), available
-at ~\url{http://www.gnu.org/software/gsl/}.
-If the input file is in BAM format, the HTSLib
-API is required but is included in all binaries and
-source code.
-If the input is a text file of counts in a single column or is
-in BED format,
-SAMTools is not required.
-It has been tested on Linux and
-Mac OS-X.
+\textbf{preseq} runs on Unix-type system with GNU Scientific Library
+(GSL), available at ~\url{http://www.gnu.org/software/gsl/}.  If the
+input file is in BAM format, the HTSLib API is required but is
+included in all binaries and source code.  If the input is a text file
+of counts in a single column or is in BED format, SAMTools is not
+required.  It has been tested on Linux and Mac OS-X.
 
-\paragraph{Installation}~\\~\\[-.2cm]
-\label{sub:install}
-If the source code was downloaded from the Smithlab
-website the first step is to decompress it using the
-command
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
- $ tar -jxvf preseq.tar.bz2
-\end{alltt} \endgroup
-To download the source code from GitHub, use
-the command
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
- $ git clone --recursive git://github.com/smithlabcode/preseq.git
-\end{alltt} \endgroup
-%
-In both cases, enter the \textbf{preseq/} directory and run
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ make all
-\end{alltt}\endgroup
-to compile all the code.
-
-If one wishes to link to HTSLib API not
-included with the source code, it should be installed
-system-wide or the preseq Makefile will need modifying.
-If HTSLib is available on the system, then instead run
-\begingroup \fontsize{9pt}{12pt}\selectfont \begin{alltt}
-$ make HAVE_HTSLIB=1 all
-\end{alltt}\endgroup
-Output after typing this command should include the flag
-\fn{-DHAVE\_SAMTOOLS} if the linking is successful. If compiled
-successfully, the executable file is available in \textbf{preseq/}.
-
-If a BAM file is used as input without successful linking to
-HTSLib, then the following error will occur:
-\begingroup \fontsize{9pt}{12pt}\selectfont \fn{terminate called after throwing an instance of 'std::string'}\endgroup.
+\paragraph{Installation:} Instructions on how to install preseq are
+included in the README.md file in root of the source tree for preseq.
+If you have problems installing preseq, please contact Andrew Smith at
+\href{mailto:andrewds@usc.edu}{\nolinkurl{andrewds@usc.edu}}
 
 \newpage
 
@@ -236,7 +204,7 @@ More complicated unique molecular identifiers
 can be used, such as mapping position plus a random barcode,
 but are too complicated to detail in this manual.
 For questions with such usage, please contact us at
-\href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
+\href{mailto:andrewds@usc.edu}{\nolinkurl{andrewds@usc.edu}}
 
 \paragraph{Mapped read format for \fn{gc\_extrap}}~\\~\\[-.2cm]
 
@@ -634,12 +602,13 @@ TOTAL\_BASES & EXPECTED\_COVERED\_BASES & LOWER\_95\%CI & UPPER\_95\%CI \\ \hlin
 \section{bound\_pop Example}
 \label{bound_pop_example}
 
-We examine T-Cell $\beta$ repertoire (TCR$\beta$) sampling
-data downloaded from \url{http://mitcr.milaboratory.com/datasets/aging2013/}
-and viewed through MiTCR (\url{http://mitcr.milaboratory.com/}).
-The first column corresponds to the observed TCR$\beta$ counts.
-This can be summarized in a duplicate counts histogram,
-easily formed by using the \fn{hist} function in R.
+We examine T-Cell $\beta$ repertoire (TCR$\beta$) sampling data
+downloaded from
+\url{http://mitcr.milaboratory.com/datasets/aging2013/} and viewed
+through MiTCR (\url{http://mitcr.milaboratory.com/}).  ({\bf note:
+  link seems to be dead}) The first column corresponds to the observed
+TCR$\beta$ counts.  This can be summarized in a duplicate counts
+histogram, easily formed by using the \fn{hist} function in R.
 
 We will first examine the experiment L1\_10\_M9.  The first
 ten entries of the duplicate counts histogram is as follows:
@@ -1001,16 +970,15 @@ or Zelterman's~\cite{zelterman1988robust}
 the number of remaining in the library.
 }
 
-\vspace{5mm}
-If none of these solutions worked, please email us at
-\href{mailto:tdaley@usc.edu}{\nolinkurl{tdaley@usc.edu}}
-and please include the standard output from running \textbf{preseq} in
-verbose mode (specifically the duplicate counts histogram) so
-that we can look into the problem and rectify problems in future
-versions.  Also, feel free to email us with any other questions or
-concerns.
-The \textbf{preseq} software is still under development so we would appreciate any
-advice, comments, or notification of any possible bugs. Thanks!
+\vspace{5mm} If none of these solutions worked, please email us at
+\href{mailto:andrewds@usc.edu}{\nolinkurl{andrewds@usc.edu}} and
+please include the standard output from running \textbf{preseq} in
+verbose mode (specifically the duplicate counts histogram) so that we
+can look into the problem and rectify problems in future versions.
+Also, feel free to email us with any other questions or concerns.  The
+\textbf{preseq} software is still under development so we would
+appreciate any advice, comments, or notification of any possible
+bugs. Thanks!
 
 \newpage
 
