@@ -1,10 +1,21 @@
+preseq release 3.0 (July 22, 2020)
+------------------------------------------------------------------
+
+Notable changes in preseq software:
+
+  * Added GNU autotools for building preseq
+
+  * Updated to use HTSLib directly, rather than source files from
+    HTSLib, when preseq is built with support for BAM/SAM input
+    format.
+
 preseq beta release 2.0.2 (December 1, 2015)
 ------------------------------------------------------------------
 
 Notable changes in preseq software:
 
   * Fix a bug in defect mode to allow for estimation without
-    checking the curves for defects.  In such case, more 
+    checking the curves for defects.  In such case, more
     bootstraps will help to smooth the curve.
 
 
@@ -14,7 +25,7 @@ preseq beta release 2.0.0 (October 29, 2015)
 
 Notable changes in preseq software:
 
-  * Include the module bound_pop.  This module constructs a 
+  * Include the module bound_pop.  This module constructs a
     nonparametric moment-based estimator of species richness,
     the total number of species or classes in the population.
 
@@ -54,12 +65,12 @@ Notable changes in preseq software:
     used the median estimate.  Bootstrapping is only done to compute
     confidence intervals.
 
-  * Addition of quick mode option with flag -Q.  The complexity is 
+  * Addition of quick mode option with flag -Q.  The complexity is
     predicted with the observed data and bootstrapping is not done,
     speeding up the computation time tremendously.
 
   * Fixed a bug associated with the unistd.h header for GCC versions
-    4.7+.  
+    4.7+.
 
   * Extensively updated the manual with examples and FAQ
 
@@ -72,5 +83,5 @@ preseq beta release 1.0.2 (Aug 25, 2014)
 
   * Fix samtools linking problem
 
-If you have any questions, comments or bugs, please contact us at 
+If you have any questions, comments or bugs, please contact us at
 tdaley@usc.edu.  Thank you for using preseq.
