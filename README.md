@@ -1,9 +1,17 @@
-This is the README file for the preseq package.  The preseq package is
+This is the README file for the preseq package. The preseq package is
 aimed at predicting the yield of distinct reads from a genomic library
 from an initial sequencing experiment. The estimates can then be used
 to examine the utility of further sequencing, optimize the sequencing
 depth, or to screen multiple libraries to avoid low complexity
 samples.
+
+UPDATES TO VERSION 3.0
+========================================================================
+The main change to this version is that if BAM/SAM format will be used
+as input, the HTSLib library must be installed on the system when
+preseq is built. Installation instructions below have been updated
+correspondingly. We also updated to use C++11, so a more recent
+compiler is required, but these days C++11 is usually supported.
 
 UPDATES TO VERSION 2.0.3
 ========================================================================
@@ -28,7 +36,7 @@ commands will now be written as `preseq lc_extrap [OPTIONS]`
 Furthermore, there are updates to the manual for any minor issues
 encountered when compiling the preseq binary.
 
-We release an R package called
+We released an R package called
 [preseqR](http://cran.r-project.org/web/packages/preseqR/index.html)
 along with the preseq. It makes the preseq available in the R statistical
 environment. The submodule preseqR contains all required source code
@@ -43,15 +51,13 @@ http://smithlabresearch.org
 SYSTEM REQUIREMENTS:
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
-systems and was developed on Linux systems. The preseq software
-requires a fairly recent C++ compiler (i.e. it must include tr1
-headers). preseq has been compiled and tested on Linux and Mac
-OS X operating systems using GCC v5.3 or greater.
+systems and was developed on both Linux and Mac. The preseq software
+requires a C++ compiler that supports C++11.
 
 INSTALLATION:
 ========================================================================
 This should be easy: unpack the archive and change into the archive
-directory. Then type `make all`. The programs will be in the archive
+directory. Then type `make`. The programs will be in the archive
 directory. These can be moved around, and also do not depend on any
 dynamic libraries, so they should simply work when executed. If the
 desired input is in `.bam` format, `htslib` is required. Type
@@ -62,13 +68,22 @@ to make the programs.
 
 The HTSLib library can be obtained here: http://www.htslib.org/download
 
-
-INPUT FILE FORMAT:
+INPUT FILE FORMATS:
 ========================================================================
-Input files can be either in BED or BAM file format.  The file should
-be sorted by chromosome, start position, strand position, and finally
-strand if in BED format. If the file is in BAM format, then the file
-should be sorted using `bamtools` or `samtools sort`.
+The input to preseq can be in 3 general formats:
+1. Mapped read locations in BED or BAM file format. The file should be
+   sorted by chromosome, start position, end position, and finally
+   strand if in BED format. If the file is in BAM format, then the
+   file should be sorted using `bamtools` or `samtools sort`.
+2. The "counts histogram" which will have, for each count 1,2,..., the
+   number of unique "species" (e.g. reads, or anything else) that
+   appear with that count. Examples can be found in the data directory
+   within the preseqR subdirectory. Note these should not have a count
+   for "0", and they should not have any header above the counts. Just
+   two columns of numbers, with the first column sorted and unique.
+3. The counts themselves, so just a file with one count on each
+   line. These will be made into the "counts histogram" inside preseq
+   right away.
 
 USAGE EXAMPLES:
 ========================================================================
