@@ -30,7 +30,6 @@ AC_LANG(C++)
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
 AC_PROG_RANLIB
-AC_OPENMP([C++]) dnl make sure we have openmp for multi-core in abismal
 
 dnl recursively configure smithlab_cpp
 AC_CONFIG_SUBDIRS([src/smithlab_cpp])
