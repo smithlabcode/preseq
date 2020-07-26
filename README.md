@@ -22,7 +22,7 @@ INSTALLATION:
 ```
 $ tar -zxvf preseq-3.0.tar.gz
 ```
-3. Move into the methpipe directory and create a build directory:
+3. Move into the preseq directory and create a build directory:
 ```
 $ cd preseq-3.0
 $ mkdir build && cd build
