@@ -34,11 +34,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-
-#include <gsl/gsl_cdf.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_statistics_double.h>
-#include <gsl/gsl_sf_gamma.h>
+#include <random>
 
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
@@ -65,7 +61,7 @@ using std::unordered_map;
 using std::runtime_error;
 using std::to_string;
 
-static const string preseq_version = "3.0.0";
+static const string preseq_version = "3.0.1";
 
 template <typename T> T
 get_counts_from_hist(const vector<T> &h) {
@@ -74,6 +70,40 @@ get_counts_from_hist(const vector<T> &h) {
     c += i*h[i];
   return c;
 }
+
+template<class T>
+T
+median_from_sorted_vector (const vector<T> sorted_data,
+                                    const size_t stride, const size_t n) {
+
+  if (n == 0 || sorted_data.empty()) return 0;
+
+  const size_t lhs = (n - 1) / 2;
+  const size_t rhs = n / 2;
+
+  if (lhs == rhs) return sorted_data[lhs * stride];
+
+  else return (sorted_data[lhs * stride] + sorted_data[rhs * stride])/2.0;
+}
+
+template<class T>
+T
+quantile_from_sorted_vector (const vector<T> sorted_data, 
+				const size_t stride, const size_t n,
+					const double f) {
+  const double index = f * (n - 1);
+  const size_t lhs = (int)index;
+  const double delta = index - lhs;
+  double result;
+
+  if (n == 0 || sorted_data.empty()) return 0.0;
+
+  if (lhs == n - 1) return sorted_data[lhs * stride];
+     
+  else return result = (1 - delta) * sorted_data[lhs * stride] 
+	  		+ delta * sorted_data[(lhs + 1) * stride];   
+}
+
 
 // Confidence interval stuff
 static void
@@ -86,14 +116,11 @@ median_and_ci(vector<double> estimates, // by val so we can sort them
 
   const double alpha = 1.0 - ci_level;
   const size_t N = estimates.size();
-  median_estimate =
-    gsl_stats_median_from_sorted_data(&estimates[0], 1, N);
-  lower_ci_estimate =
-    gsl_stats_quantile_from_sorted_data(&estimates[0], 1, N, alpha/2);
-  upper_ci_estimate =
-    gsl_stats_quantile_from_sorted_data(&estimates[0], 1, N, 1.0 - alpha/2);
-}
 
+  median_estimate = median_from_sorted_vector(estimates, 1, N);
+  lower_ci_estimate = quantile_from_sorted_vector(estimates, 1, N, alpha/2);
+  upper_ci_estimate = quantile_from_sorted_vector(estimates, 1, N, 1.0 - alpha/2);
+}
 
 static void
 vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
@@ -126,6 +153,67 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
   }
 }
 
+template <typename uint_type>
+void
+multinomial(std::mt19937 &gen, const vector<double> &mult_probs,
+            uint_type trials, vector<uint_type> &result) {
+
+  typedef std::binomial_distribution<unsigned int> binom_dist;
+
+  result.clear();
+  result.resize(mult_probs.size());
+
+  double remaining_prob = accumulate(begin(mult_probs), end(mult_probs), 0.0);
+
+  auto r(begin(result));
+  auto p(begin(mult_probs));
+
+  while (p != end(mult_probs)) { // iterate to sample for each category
+
+    *r = binom_dist(trials, (*p)/remaining_prob)(gen); // take the sample
+
+    remaining_prob -= *p++; // update remaining probability mass
+    trials -= *r++;         // update remaining trials needed
+  }
+
+  if (trials > 0)
+    throw runtime_error("multinomial sampling failed");
+}
+
+// Lanczos approximation for gamma function for x >= 0.5 - essentially an
+// approximation for (x-1)!
+static double
+factorial (double x) {
+
+  // constants
+  double LogRootTwoPi = 0.9189385332046727;
+  double Euler = 2.71828182845904523536028747135;
+
+  // Approximation for factorial is actually x-1
+  x -= 1.0;
+
+  vector<double> lanczos {
+  0.99999999999980993227684700473478,
+  676.520368121885098567009190444019,
+ -1259.13921672240287047156078755283,
+  771.3234287776530788486528258894,
+ -176.61502916214059906584551354,
+  12.507343278686904814458936853,
+ -0.13857109526572011689554707,
+  9.984369578019570859563e-6,
+  1.50563273514931155834e-7
+  };
+
+  double Ag = lanczos[0];
+
+  for (size_t k=1; k < lanczos.size(); k++) 
+    Ag += lanczos[k] / (x + k); 
+
+  double term1 = (x + 0.5) * log((x + 7.5) / Euler);
+  double term2 = LogRootTwoPi + log(Ag);
+
+  return term1 + (term2 - 7.0);
+}
 
 ////////////////////////////////////////////////////////////////////////
 /////  EXTRAP MODE BELOW HERE
@@ -136,19 +224,18 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
 // distinct_counts_hist[k] = vals_hist[vals_hist_distinct_counts[k]]
 // stores the kth positive value of vals_hist
 void
-resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_counts,
+resample_hist(std::mt19937 &gen, const vector<size_t> &vals_hist_distinct_counts,
               const vector<double> &distinct_counts_hist,
               vector<double> &out_hist) {
 
   const size_t hist_size = distinct_counts_hist.size();
   vector<unsigned int> sample_distinct_counts_hist(hist_size, 0);
 
-  const unsigned int distinct =
+  unsigned int distinct =
     accumulate(begin(distinct_counts_hist), end(distinct_counts_hist), 0.0);
-
-  gsl_ran_multinomial(rng, hist_size, distinct,
-                      &distinct_counts_hist.front(),
-                      &sample_distinct_counts_hist.front());
+  
+  multinomial(gen, distinct_counts_hist, distinct,
+                      sample_distinct_counts_hist);
 
   out_hist.clear();
   out_hist.resize(vals_hist_distinct_counts.back() + 1, 0.0);
@@ -164,8 +251,9 @@ resample_hist(const gsl_rng *rng, const vector<size_t> &vals_hist_distinct_count
 static double
 interpolate_distinct(const vector<double> &hist, const size_t N,
                      const size_t S, const size_t n) {
-  const double denom =
-    gsl_sf_lngamma(N + 1) - gsl_sf_lngamma(n + 1) - gsl_sf_lngamma(N - n + 1);
+
+  const double denom = factorial(N + 1) - factorial(n + 1) - factorial(N - n + 1);
+
   vector<double> numer(hist.size(), 0);
   for (size_t i = 1; i < hist.size(); i++) {
     // N - i -n + 1 should be greater than 0
@@ -173,8 +261,9 @@ interpolate_distinct(const vector<double> &hist, const size_t N,
       numer[i] = 0;
     }
     else {
-      const double x = (gsl_sf_lngamma(N - i + 1) - gsl_sf_lngamma(n + 1) -
-                        gsl_sf_lngamma(N - i - n + 1));
+
+      const double x = (factorial(N - i + 1) - factorial(n + 1) -
+                        factorial(N - i - n + 1));
       numer[i] = exp(x - denom)*hist[i];
     }
   }
@@ -213,9 +302,7 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
 
   //setup rng
   srand(time(0) + getpid());
-  gsl_rng_env_setup();
-  gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(rng, seed);
+  std::mt19937 rng(seed);
 
   // const double vals_sum = get_counts_from_hist(orig_hist);
   const double initial_distinct =
@@ -461,7 +548,7 @@ lc_extrap(const int argc, const char **argv) {
     size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    unsigned long int seed = 0;
+    unsigned long int seed = 408;
 
     /* FLAGS */
     bool VERBOSE = false;
@@ -537,11 +624,6 @@ lc_extrap(const int argc, const char **argv) {
     }
     const string input_file_name = leftover_args.front();
     /******************************************************************/
-
-    // if seed is not set, make it random
-    if (seed == 0) {
-      seed = rand();
-    }
 
     vector<double> counts_hist;
     size_t n_reads = 0;
@@ -726,7 +808,7 @@ gc_extrap(const int argc, const char **argv) {
     bool SINGLE_ESTIMATE = false;
     double max_extrap = 1.0e12;
     size_t n_bootstraps = 100;
-    unsigned long int seed = 0;
+    unsigned long int seed = 408;
     bool allow_defects = false;
 
     bool NO_SEQUENCE = false;
@@ -952,7 +1034,7 @@ c_curve(const int argc, const char **argv) {
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool VALS_INPUT = false;
-    unsigned long int seed = 0;
+    unsigned long int seed = 408;
 
     string outfile;
 
@@ -1016,14 +1098,9 @@ c_curve(const int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     /******************************************************************/
 
-    if (seed == 0) {
-      seed = rand();
-    }
     // Setup the random number generator
-    gsl_rng_env_setup();
-    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default); // use default type
     srand(time(0) + getpid()); //give the random fxn a new seed
-    gsl_rng_set(rng, seed); //initialize random number generator with the seed
+    std::mt19937 rng(seed);
 
     vector<double> counts_hist;
     size_t n_reads = 0;
@@ -1136,7 +1213,12 @@ c_curve(const int argc, const char **argv) {
 static int
 bound_pop(const int argc, const char **argv) {
 
-  try{
+  try {
+
+#ifndef HAVE_GSL
+    cerr << "GSL has not been installed for the bound_pop module. Please recompile with GSL support." << endl;
+    return EXIT_SUCCESS;
+#endif
 
     bool VERBOSE = false;
     bool PAIRED_END = false;
@@ -1156,7 +1238,7 @@ bound_pop(const int argc, const char **argv) {
     size_t n_bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
-    unsigned long int seed = 0;
+    unsigned long int seed = 408;
 
     const string description =
       "Estimate the size of the underlying population based on counts \
@@ -1270,7 +1352,8 @@ bound_pop(const int argc, const char **argv) {
     // mu_r = (r + 1)! n_{r+1} / n_1
     size_t idx = 1;
     while (counts_hist[idx] > 0 && idx <= counts_hist.size()) {
-      measure_moments.push_back(exp(gsl_sf_lnfact(idx) +
+      // idx + 1 because function calculates (x-1)!
+      measure_moments.push_back(exp(factorial(idx + 1) +
                                     log(counts_hist[idx]) -
                                     log(counts_hist[1])));
       if (!std::isfinite(measure_moments.back())) {
@@ -1303,7 +1386,9 @@ bound_pop(const int argc, const char **argv) {
       else
         measure_moments.resize(2*max_num_points);
       size_t n_points = 0;
+#ifdef HAVE_GSL
       n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
+#endif 
       if (VERBOSE)
         cerr << "n_points = " << n_points << endl;
 
@@ -1376,13 +1461,8 @@ bound_pop(const int argc, const char **argv) {
       vector<double> quad_estimates;
 
       //setup rng
-      if (seed == 0) {
-        seed = rand();
-      }
       srand(time(0) + getpid());
-      gsl_rng_env_setup();
-      gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-      gsl_rng_set(rng, seed);
+      std::mt19937 rng(seed);
 
       // hist may be sparse, to speed up bootstrapping
       // sample only from positive entries
@@ -1407,13 +1487,16 @@ bound_pop(const int argc, const char **argv) {
         // initialize moments, 0th moment is 1
         vector<double> bootstrap_moments(1, 1.0);
         // moments[r] = (r + 1)! n_{r+1} / n_1
-        for (size_t i = 0; i < 2*max_num_points; i++)
-          bootstrap_moments.push_back(exp(gsl_sf_lnfact(i + 2) +
+        for (size_t i = 0; i < 2*max_num_points; i++) {
+          bootstrap_moments.push_back(exp(factorial(i + 3) +
                                           log(sample_hist[i + 2]) -
                                           log(sample_hist[1])) );
+	}
 
         size_t n_points = 0;
+#ifdef HAVE_GSL
         n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
+#endif
         n_points = std::min(n_points, max_num_points);
         if (VERBOSE)
           cerr << "n_points = " << n_points << endl;

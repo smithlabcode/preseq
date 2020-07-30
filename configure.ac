@@ -14,7 +14,7 @@ dnl but WITHOUT ANY WARRANTY; without even the implied warranty of
 dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 dnl General Public License for more details.
 
-AC_INIT([preseq], [3.0], [andrewds@usc.edu],
+AC_INIT([preseq], [3.0.1], [andrewds@usc.edu],
         [preseq], [https://github.com/smithlabcode/preseq])
 dnl the config.h is not currently #included in the source, and only
 dnl used to keep command lines short.
@@ -50,9 +50,22 @@ AS_IF([test "x$enable_hts" = "xyes"],
 )
 AM_CONDITIONAL([ENABLE_HTS], [test "x$enable_hts" = "xyes"])
 
-dnl check for required libraries
-AC_SEARCH_LIBS([cblas_dgemm], [gslcblas])
-AC_SEARCH_LIBS([gsl_blas_dgemm], [gsl])
+dnl check for GSL if requested
+gsl_fail_msg="
+
+Failed to locate GSL on your system.
+"
+
+AC_ARG_ENABLE([gsl],
+  [AS_HELP_STRING([--enable-gsl], [Enable GSLLib @<:@yes@:>@])],
+  [enable_gsl=yes], [enable_gsl=no])
+AS_IF([test "x$enable_gsl" = "xyes"],
+  AC_CHECK_LIB([m],[cos])
+  AC_CHECK_LIB([gslcblas],[cblas_dgemm])    
+  [AC_CHECK_LIB([gsl], [gsl_blas_dgemm], [],
+  [AC_MSG_FAILURE([$gsl_fail_msg])])]
+)
+AM_CONDITIONAL([ENABLE_GSL], [test "x$enable_gsl" = "xyes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
