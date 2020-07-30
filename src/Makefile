@@ -20,7 +20,7 @@ endif
 
 INCLUDEDIRS = smithlab_cpp
 INCLUDEARGS = $(addprefix -I, $(INCLUDEDIRS))
-LIBS = -lgsl -lgslcblas -lz
+LIBS = -lz
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall
 
@@ -33,6 +33,11 @@ endif
 ifdef HAVE_HTSLIB
 CXXFLAGS += -DHAVE_HTSLIB
 LIBS += -lhts
+endif
+
+ifdef HAVE_GSL
+CXXFLAGS += -DHAVE_GSL
+LIBS += -lgsl -lgslcblas
 endif
 
 all: $(PROGS)

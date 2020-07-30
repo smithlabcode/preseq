@@ -18,6 +18,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_GSL
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -25,6 +26,7 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_poly.h>
 #include <gsl/gsl_randist.h>
+#endif 
 
 #include "moment_sequence.hpp"
 
@@ -35,6 +37,7 @@
 #include <iostream>
 #include <cassert>
 #include <algorithm>
+#include <cmath>
 
 using std::string;
 using std::vector;
@@ -45,8 +48,10 @@ using std::setprecision;
 using std::swap;
 using std::find_if;
 using std::transform;
+using std::isfinite;
+using std::isinf;
 
-
+#ifdef HAVE_GSL
 /////////////////////////////////////////////////////
 // test Hankel moment matrix
 // ensure moment sequence is positive definite
@@ -110,6 +115,7 @@ ensure_pos_def_mom_seq(vector <double> &moments,
 
   return max(hankel_dim - 1, min_hankel_dim);
 }
+#endif
 
 
 /////////////////////////////////////////////////////
