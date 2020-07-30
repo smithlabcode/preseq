@@ -31,6 +31,10 @@ bin_PROGRAMS += to-mr
 AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
+if ENABLE_GSL
+AM_CPPFLAGS += -DHAVE_GSL
+endif
+
 preseq_SOURCES = \
 	src/preseq.cpp \
 	src/continued_fraction.hpp \
