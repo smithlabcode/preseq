@@ -9,10 +9,11 @@ SYSTEM REQUIREMENTS:
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
 systems and was developed on both Linux and Mac. The preseq software
-requires a C++ compiler that supports C++11. The GNU Scientific Library
-(GSL) is **only required** if users would like to use the `bound_pop` module. 
-It can be installed using `apt` on Linux, using `brew` on macOS, or from 
-source available [here](http://www.gnu.org/software/gsl).
+requires a C++ compiler that supports C++11. The GNU Scientific
+Library (GSL) is **only required** if users would like to use the
+`bound_pop` module.  It can be installed using `apt` on Linux, using
+`brew` on macOS, or from source available
+[here](http://www.gnu.org/software/gsl).
 
 INSTALLATION:
 ========================================================================
@@ -48,8 +49,9 @@ you must specify the location like this:
 $ ../configure --enable-hts CPPFLAGS='-I /path/to/htslib/headers' \
     LDFLAGS='-L/path/to/htslib/lib'
 ```
-We no longer require the GNU Scientific Library (GSL) for all modules except for `bound_pop`. 
-To use `bound_pop`, please install GSL and configure with the following flag:
+We no longer require the GNU Scientific Library (GSL) for all modules
+except for `bound_pop`.  To use `bound_pop`, please install GSL and
+configure with the following flag:
 ```
 $ ../configure --enable-gsl
 ```
@@ -77,7 +79,7 @@ To use the `bound_pop` module, type
 make HAVE_GSL=1 all
 ```
 to make the programs. The HTSLib library can be obtained here:
-http://www.htslib.org/download. 
+http://www.htslib.org/download.
 
 INPUT FILE FORMATS:
 ========================================================================
@@ -132,9 +134,9 @@ distinct reads.
 
 UPDATES TO VERSION 3.0.1
 ========================================================================
-We no longer require users to have GSL for all modules except for `bound_pop`. Users
-interested in using `bound_pop` can install GSL and follow the instructions
-above to configure with GSL. 
+We no longer require users to have GSL for all modules except for
+`bound_pop`. Users interested in using `bound_pop` can install GSL and
+follow the instructions above to configure with GSL.
 
 UPDATES TO VERSION 3.0
 ========================================================================
