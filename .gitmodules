@@ -1,6 +1,6 @@
 [submodule "preseqR"]
 	path = preseqR
-	url = https://github.com/smithlabcode/preseqR
+	url = ../preseqR.git
 [submodule "src/smithlab_cpp"]
 	path = src/smithlab_cpp
-	url = https://github.com/smithlabcode/smithlab_cpp
+	url = ../smithlab_cpp.git
