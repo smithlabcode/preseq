@@ -18,26 +18,16 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef HAVE_GSL
-#include <gsl/gsl_sf_gamma.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_multiroots.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_poly.h>
-#include <gsl/gsl_randist.h>
-#endif 
-
 #include "moment_sequence.hpp"
 
 #include <fstream>
+#include <cmath>
 #include <numeric>
 #include <vector>
 #include <iomanip>
 #include <iostream>
 #include <cassert>
 #include <algorithm>
-#include <cmath>
 
 using std::string;
 using std::vector;
@@ -51,7 +41,66 @@ using std::transform;
 using std::isfinite;
 using std::isinf;
 
-#ifdef HAVE_GSL
+void 
+LU_decomp(vector<vector<double> > &A, vector<int> &P) {
+ 
+    const size_t N = A.size();
+    double absA;
+    size_t i, j, k;
+
+    P.clear();
+    for (size_t x = 0; x <= N; x++)
+        P.push_back(x);
+
+    for (i = 0; i < N; i++) {
+        double maxA = 0.0;
+        size_t imax = i;
+
+        for (k = i; k < N; k++)
+            if ((absA = fabs(A[k][i])) > maxA) {
+                maxA = absA;
+                imax = k;
+            }
+
+        if (imax != i) {
+            //pivoting P
+            size_t j = P[i];
+            P[i] = P[imax];
+            P[imax] = j;
+
+            //pivoting rows of A
+            vector<double> ptr(A[i]);
+            A[i] = A[imax];
+            A[imax] = ptr;
+
+            //counting pivots starting from N (for determinant)
+            P[N]++;
+        }
+
+        for (j = i + 1; j < N; j++) {
+            A[j][i] /= A[i][i];
+
+            for (k = i + 1; k < N; k++)
+                A[j][k] -= A[j][i] * A[i][k];
+        }
+    }
+}
+
+double 
+LU_determinant(vector<vector<double> > &A, vector<int> &P) {
+
+    const size_t N = A.size();
+
+    double det = A[0][0];
+
+    for (size_t i = 1; i < N; ++i)
+        det *= A[i][i];
+
+    if ((P[N] - N) % 2 == 0) return det;
+
+    return -det;
+}
+
 /////////////////////////////////////////////////////
 // test Hankel moment matrix
 // ensure moment sequence is positive definite
@@ -72,25 +121,23 @@ ensure_pos_def_mom_seq(vector <double> &moments,
   bool ACCEPT_HANKEL = true;
   while (ACCEPT_HANKEL && (2*hankel_dim - 1 < moments.size())) {
 
-    gsl_matrix *hankel_mat = gsl_matrix_alloc(hankel_dim, hankel_dim);
+    vector<vector<double> > hankel_mat(hankel_dim, vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
       for (size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-        gsl_matrix_set(hankel_mat, c_idx, r_idx, moments[c_idx + r_idx]);
+	hankel_mat[c_idx][r_idx] = moments[c_idx + r_idx];
 
-    int s = 0;
-    gsl_permutation *perm = gsl_permutation_alloc(hankel_dim);
-    gsl_linalg_LU_decomp(hankel_mat, perm, &s);
-    const double hankel_mat_det = gsl_linalg_LU_det(hankel_mat, s);
+    vector<int> perm;
+    LU_decomp(hankel_mat, perm);
+    const double hankel_mat_det = LU_determinant(hankel_mat, perm);
 
-    gsl_matrix *shift_hankel_mat = gsl_matrix_alloc(hankel_dim, hankel_dim);
+    vector<vector<double> > shift_hankel_matrix(hankel_dim, vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
       for (size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-        gsl_matrix_set(shift_hankel_mat, c_idx, r_idx,
-                       moments[c_idx + r_idx + 1]);
+	shift_hankel_matrix[c_idx][r_idx] = moments[c_idx + r_idx + 1];
 
-    gsl_permutation *s_perm = gsl_permutation_alloc(hankel_dim);
-    gsl_linalg_LU_decomp(shift_hankel_mat, s_perm, &s);
-    const double shift_hankel_mat_det = gsl_linalg_LU_det(shift_hankel_mat, s);
+    vector<int> s_perm;
+    LU_decomp(shift_hankel_matrix, s_perm);
+    const double shift_hankel_mat_det = LU_determinant(shift_hankel_matrix, s_perm);
 
     if (VERBOSE) {
       cerr << "dim" << '\t'
@@ -115,8 +162,6 @@ ensure_pos_def_mom_seq(vector <double> &moments,
 
   return max(hankel_dim - 1, min_hankel_dim);
 }
-#endif
-
 
 /////////////////////////////////////////////////////
 // 3 term relations

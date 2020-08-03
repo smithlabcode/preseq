@@ -1215,11 +1215,6 @@ bound_pop(const int argc, const char **argv) {
 
   try {
 
-#ifndef HAVE_GSL
-    cerr << "GSL has not been installed for the bound_pop module. Please recompile with GSL support." << endl;
-    return EXIT_SUCCESS;
-#endif
-
     bool VERBOSE = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
@@ -1386,9 +1381,7 @@ bound_pop(const int argc, const char **argv) {
       else
         measure_moments.resize(2*max_num_points);
       size_t n_points = 0;
-#ifdef HAVE_GSL
       n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
-#endif 
       if (VERBOSE)
         cerr << "n_points = " << n_points << endl;
 
@@ -1494,9 +1487,7 @@ bound_pop(const int argc, const char **argv) {
 	}
 
         size_t n_points = 0;
-#ifdef HAVE_GSL
         n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
-#endif
         n_points = std::min(n_points, max_num_points);
         if (VERBOSE)
           cerr << "n_points = " << n_points << endl;

@@ -35,11 +35,6 @@ CXXFLAGS += -DHAVE_HTSLIB
 LIBS += -lhts
 endif
 
-ifdef HAVE_GSL
-CXXFLAGS += -DHAVE_GSL
-LIBS += -lgsl -lgslcblas
-endif
-
 all: $(PROGS)
 
 $(PROGS): $(addprefix smithlab_cpp/, \

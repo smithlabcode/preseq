@@ -50,22 +50,5 @@ AS_IF([test "x$enable_hts" = "xyes"],
 )
 AM_CONDITIONAL([ENABLE_HTS], [test "x$enable_hts" = "xyes"])
 
-dnl check for GSL if requested
-gsl_fail_msg="
-
-Failed to locate GSL on your system.
-"
-
-AC_ARG_ENABLE([gsl],
-  [AS_HELP_STRING([--enable-gsl], [Enable GSLLib @<:@yes@:>@])],
-  [enable_gsl=yes], [enable_gsl=no])
-AS_IF([test "x$enable_gsl" = "xyes"],
-  AC_CHECK_LIB([m],[cos])
-  AC_CHECK_LIB([gslcblas],[cblas_dgemm])    
-  [AC_CHECK_LIB([gsl], [gsl_blas_dgemm], [],
-  [AC_MSG_FAILURE([$gsl_fail_msg])])]
-)
-AM_CONDITIONAL([ENABLE_GSL], [test "x$enable_gsl" = "xyes"])
-
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
