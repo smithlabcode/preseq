@@ -71,39 +71,35 @@ get_counts_from_hist(const vector<T> &h) {
   return c;
 }
 
-template<class T>
-T
+template<typename T> T
 median_from_sorted_vector (const vector<T> sorted_data,
                                     const size_t stride, const size_t n) {
 
-  if (n == 0 || sorted_data.empty()) return 0;
+  if (n == 0 || sorted_data.empty()) return 0.0;
 
   const size_t lhs = (n - 1) / 2;
   const size_t rhs = n / 2;
 
   if (lhs == rhs) return sorted_data[lhs * stride];
 
-  else return (sorted_data[lhs * stride] + sorted_data[rhs * stride])/2.0;
+  return (sorted_data[lhs * stride] + sorted_data[rhs * stride]) / 2.0;
 }
 
-template<class T>
-T
+template<typename T> T
 quantile_from_sorted_vector (const vector<T> sorted_data, 
 				const size_t stride, const size_t n,
 					const double f) {
   const double index = f * (n - 1);
   const size_t lhs = (int)index;
   const double delta = index - lhs;
-  double result;
 
   if (n == 0 || sorted_data.empty()) return 0.0;
 
   if (lhs == n - 1) return sorted_data[lhs * stride];
      
-  else return result = (1 - delta) * sorted_data[lhs * stride] 
+  return (1 - delta) * sorted_data[lhs * stride] 
 	  		+ delta * sorted_data[(lhs + 1) * stride];   
 }
-
 
 // Confidence interval stuff
 static void
