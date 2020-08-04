@@ -879,11 +879,6 @@ gc_extrap(const int argc, const char **argv) {
     const string input_file_name = leftover_args.front();
     // ****************************************************************
 
-    // if seed is not set, set it to random
-    if (seed == 0) {
-      seed = rand();
-    }
-
     vector<double> coverage_hist;
     size_t n_reads = 0;
     if (VERBOSE)
