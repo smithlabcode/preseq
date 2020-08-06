@@ -1,0 +1,8 @@
+If you would like additional data, please use the following links:
+
+http://smithlabresearch.org/downloads/preseq/library_complex_test_data/SRR1003759.tar.bz2
+http://smithlabresearch.org/downloads/preseq/library_complex_test_data/SRR1041830.tar.bz2
+http://smithlabresearch.org/downloads/preseq/library_complex_test_data/SRR1106616.tar.bz2
+http://smithlabresearch.org/downloads/preseq/library_complex_test_data/SRR975260.tar.bz2
+http://smithlabresearch.org/downloads/preseq/library_complex_test_data/SRX314956.tar.bz2
+
