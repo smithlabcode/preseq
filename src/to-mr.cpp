@@ -151,7 +151,7 @@ main(int argc, const char **argv) {
   try {
 
     string outfile;
-    string mapper;
+    string mapper = "general";
     size_t max_frag_len = 1000;
     size_t max_dangling = 500;
     size_t suffix_len = 1;
