@@ -103,7 +103,7 @@ If the input file is in `.bam` format, use the `-B` flag:
 ```
 preseq lc_extrap -B -o yield_estimates.txt SRR1106616_5M_subset.bam
 ```
-For the counts histogram format, use the '-H' flag:
+For the counts histogram format, use the `-H` flag:
 ```
 preseq lc_extrap -H -o yield_estimates.txt SRR1301329_1M_read.txt 
 ```
