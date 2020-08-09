@@ -61,7 +61,7 @@ using std::unordered_map;
 using std::runtime_error;
 using std::to_string;
 
-static const string preseq_version = "3.0.1";
+static const string preseq_version = "3.0.2";
 
 template <typename T> T
 get_counts_from_hist(const vector<T> &h) {
