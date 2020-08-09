@@ -883,13 +883,13 @@ gc_extrap(const int argc, const char **argv) {
     if (NO_SEQUENCE) {
       if (VERBOSE)
         cerr << "BED FORMAT" << endl;
-      n_reads = load_coverage_counts_GR(input_file_name, bin_size,
+      n_reads = load_coverage_counts_GR(input_file_name, seed, bin_size,
                                         max_width, coverage_hist);
     }
     else {
       if (VERBOSE)
         cerr << "MAPPED READ FORMAT" << endl;
-      n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, bin_size,
+      n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, seed, bin_size,
                                         max_width, coverage_hist);
     }
 

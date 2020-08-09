@@ -751,14 +751,14 @@ SplitMappedRead(const bool VERBOSE,
 size_t
 load_coverage_counts_MR(const bool VERBOSE,
                         const string input_file_name,
+			const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         vector<double> &coverage_hist) {
 
   srand(time(0) + getpid());
   //Runif runif(rand());
-  std::random_device rd;
-  std::mt19937 generator(rd());
+  std::mt19937 generator(seed);
 
   std::ifstream in(input_file_name.c_str());
   if (!in)
@@ -813,14 +813,14 @@ load_coverage_counts_MR(const bool VERBOSE,
 
 size_t
 load_coverage_counts_GR(const string input_file_name,
+			const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         vector<double> &coverage_hist) {
 
   srand(time(0) + getpid());
   //Runif runif(rand());
-  std::random_device rd;
-  std::mt19937 generator(rd());
+  std::mt19937 generator(seed);
 
   std::ifstream in(input_file_name.c_str());
   if (!in)

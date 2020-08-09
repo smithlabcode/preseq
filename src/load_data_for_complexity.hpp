@@ -26,6 +26,7 @@
 size_t
 load_coverage_counts_MR(const bool VERBOSE,
                         const std::string input_file_name,
+			const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         std::vector<double> &coverage_hist);
@@ -33,6 +34,7 @@ load_coverage_counts_MR(const bool VERBOSE,
 
 size_t
 load_coverage_counts_GR(const std::string input_file_name,
+			const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         std::vector<double> &coverage_hist);
