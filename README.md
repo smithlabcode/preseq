@@ -9,11 +9,7 @@ SYSTEM REQUIREMENTS:
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
 systems and was developed on both Linux and Mac. The preseq software
-requires a C++ compiler that supports C++11. The GNU Scientific
-Library (GSL) is **only required** if users would like to use the
-`bound_pop` module.  It can be installed using `apt` on Linux, using
-`brew` on macOS, or from source available
-[here](http://www.gnu.org/software/gsl).
+requires a C++ compiler that supports C++11. 
 
 INSTALLATION:
 ========================================================================
@@ -49,12 +45,6 @@ you must specify the location like this:
 $ ../configure --enable-hts CPPFLAGS='-I /path/to/htslib/headers' \
     LDFLAGS='-L/path/to/htslib/lib'
 ```
-We no longer require the GNU Scientific Library (GSL) for all modules
-except for `bound_pop`.  To use `bound_pop`, please install GSL and
-configure with the following flag:
-```
-$ ../configure --enable-gsl
-```
 5. Compile and install the tools:
 ```
 $ make
@@ -74,11 +64,7 @@ If the desired input is in `.bam` format, `htslib` is required. Type
 ```
 make HAVE_HTSLIB=1 all
 ```
-To use the `bound_pop` module, type
-```
-make HAVE_GSL=1 all
-```
-to make the programs. The HTSLib library can be obtained here:
+The HTSLib library can be obtained here:
 http://www.htslib.org/download.
 
 INPUT FILE FORMATS:
@@ -103,34 +89,59 @@ USAGE EXAMPLES:
 Each program included in this software package will print a list of
 options if executed without any command line arguments. Many of the
 programs use similar options (for example, output files are specified
-with '-o'). To predict the yield of a future experiment, use `lc_extrap`.
-For the most basic usage of `lc_extrap` to compute the expected yield,
-use the command:
+with '-o'). 
+
+We have provided a data directory to test each of our programs.
+Change to the `data` directory and try some of our commands. 
+To predict the yield of a future experiment, use `lc_extrap`.
+For the most basic usage of `lc_extrap` to compute the expected yield, 
+use the command on the following data:
 ```
-preseq lc_extrap -o yield_estimates.txt input.bed
+preseq lc_extrap -o yield_estimates.txt SRR1003759_5M_subset.mr 
 ```
-If the input file is in .bam format, use the command:
+If the input file is in `.bam` format, use the `-B` flag:
 ```
-preseq lc_extrap -B -o yield_estimates.txt input.bam
+preseq lc_extrap -B -o yield_estimates.txt SRR1106616_5M_subset.bam
 ```
+For the counts histogram format, use the '-H' flag:
+```
+preseq lc_extrap -H -o yield_estimates.txt SRR1301329_1M_read.txt 
+```
+
 The yield estimates will appear in yield_estimates.txt, and will be a
 column of future experiment sizes in `TOTAL_READS`, a column of the
 corresponding expected distinct reads in `EXPECTED_DISTINCT`, followed
 by two columns giving the corresponding confidence intervals.
 
-To investigate the past yield of an experiment, use `c_curve`.  For the
-most basic usage, use the command:
+To investigate the past yield of an experiment, use `c_curve`.
+`c_curve` can take in the same file formats as `lc_extrap` by using
+the same flags. The estimates will appear in estimates.txt with two 
+columns.  The first column gives the total number of reads in a 
+theoretically smaller experiment and the second gives the corresponding 
+number of distinct reads.
+
+`bound_pop` provides an estimate for the species richness
+of the sampled population. The input file formats and corresponding flags
+are identical to `c_curve` and `lc_extrap`. The output provides the median 
+species richness in the first column and the confidence intervals
+in the next two columns.
+
+Finally, `gc_extrap` predicts the expected genomic coverage for a future experiment.
+It produces the coverage in an output format identical to `lc_extrap`. `gc_extrap` 
+can only take in files in BED and mapped reads format (using the `-B` flag for BED):
+
 ```
-preseq c_curve -o estimates.txt input.bed
+preseq gc_extrap -B -o coverage_estimates.txt SRR1003759_5M_subset.mr 
 ```
-If the input file is in .bam format, use the command:
-```
-preseq c_curve -B -o estimates.txt input.bam
-```
-The estimates will appear in estimates.txt with two columns.  The
-first column gives the total number of reads in a theoretically
-smaller experiment and the second gives the corresponding number of
-distinct reads.
+
+More data is available in the `additional_data.txt` file in the `data` directory.
+For an extended write-up on our programs, please read the manual in the `docs`
+directory. 
+
+UPDATES TO VERSION 3.0.2
+========================================================================
+GSL has been completely removed, and a data directory has been added for
+users to test our programs. 
 
 UPDATES TO VERSION 3.0.1
 ========================================================================
