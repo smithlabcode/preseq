@@ -575,15 +575,17 @@ load_counts_BED_pe(const string input_file_name,
 size_t
 load_counts(const string &input_file_name, vector<double> &counts_hist) {
 
-  std::ifstream in(input_file_name.c_str());
-  if (!in) // if file doesn't open
-    throw runtime_error("problem opening file: "
-                        + input_file_name);
+  std::ifstream in(input_file_name);
+  if (!in)
+    throw runtime_error("problem opening file: " + input_file_name);
 
-  size_t n_reads = 0;
-  while(!in.eof()){
-    string buffer;
-    getline(in, buffer);
+  size_t n_counts = 0;
+  string buffer;
+  while (getline(in, buffer)) {
+
+    if (find(begin(buffer), end(buffer), '\r') != end(buffer))
+      throw runtime_error("carriage returns in values file "
+                          "(suggests dos or mac formatting)");
 
     std::istringstream iss(buffer);
     if (iss.good()) {
@@ -595,15 +597,15 @@ load_counts(const string &input_file_name, vector<double> &counts_hist) {
         if (counts_hist.size() < count + 1)
           counts_hist.resize(count + 1, 0.0);
         ++counts_hist[count];
-        n_reads += count;
+        n_counts += count;
       }
       else if (val != 0)
         throw runtime_error("problem reading file at line "
-                            + toa(n_reads + 1));
+                            + toa(n_counts + 1));
     }
     in.peek();
   }
-  return n_reads;
+  return n_counts;
 }
 
 
@@ -621,6 +623,11 @@ load_histogram(const string &filename, vector<double> &counts_hist) {
   size_t line_count = 0ul, prev_read_count = 0ul;
   string buffer;
   while (getline(in, buffer)) {
+
+    if (find(begin(buffer), end(buffer), '\r') != end(buffer))
+      throw runtime_error("carriage returns in histogram file "
+                          "(suggests dos or mac formatting)");
+
     ++line_count;
     size_t read_count = 0ul;
     double frequency = 0.0;
@@ -664,7 +671,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR,
 
   // ADS: this seems like a bunch of duplicated code just for a single
   // function difference
-  std::uniform_real_distribution<double> dist(0.0,1.0); 
+  std::uniform_real_distribution<double> dist(0.0,1.0);
   if (dist(generator) > frac) {
     gr.set_start(std::floor(static_cast<double>(gr.get_start())/
                             bin_size)*bin_size);
@@ -751,7 +758,7 @@ SplitMappedRead(const bool VERBOSE,
 size_t
 load_coverage_counts_MR(const bool VERBOSE,
                         const string input_file_name,
-			const unsigned long int seed,
+      const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         vector<double> &coverage_hist) {
@@ -813,7 +820,7 @@ load_coverage_counts_MR(const bool VERBOSE,
 
 size_t
 load_coverage_counts_GR(const string input_file_name,
-			const unsigned long int seed,
+      const unsigned long int seed,
                         const size_t bin_size,
                         const size_t max_width,
                         vector<double> &coverage_hist) {
