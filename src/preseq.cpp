@@ -54,6 +54,7 @@ using std::unordered_map;
 using std::runtime_error;
 using std::to_string;
 using std::mt19937;
+using std::max;
 
 static const string preseq_version = "3.0.2";
 
@@ -126,6 +127,7 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
 
   const size_t n_est = bootstrap_estimates.size();
   vector<double> estimates_row(n_est, 0.0);
+  double prev_estimate = 0;
   for (size_t i = 0; i < bootstrap_estimates[0].size(); i++) {
 
     // estimates is in wrong order, work locally on const val
@@ -137,9 +139,14 @@ vector_median_and_ci(const vector<vector<double> > &bootstrap_estimates,
                   lower_ci_estimate, upper_ci_estimate);
     sort(begin(estimates_row), end(estimates_row));
 
+    if(median_estimate - prev_estimate < 1.0)
+      break;
+
     yield_estimates.push_back(median_estimate);
     lower_ci_lognorm.push_back(lower_ci_estimate);
     upper_ci_lognorm.push_back(upper_ci_estimate);
+
+    prev_estimate = median_estimate;
   }
 }
 
@@ -350,7 +357,6 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
       extrapolate_curve(defect_cf, initial_distinct, sample_vals_sum,
                         curr_sample_sz, bin_step_size,
                         max_extrap, yield_vector);
-
       // no checking of curve in defect mode
       bootstrap_estimates.push_back(yield_vector);
       successful_bootstrap = true;
