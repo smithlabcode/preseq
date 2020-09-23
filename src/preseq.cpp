@@ -68,7 +68,7 @@ get_counts_from_hist(const vector<T> &h) {
 
 template<typename T> T
 median_from_sorted_vector (const vector<T> sorted_data,
-                                    const size_t stride, const size_t n) {
+                           const size_t stride, const size_t n) {
 
   if (n == 0 || sorted_data.empty()) return 0.0;
 
@@ -81,9 +81,9 @@ median_from_sorted_vector (const vector<T> sorted_data,
 }
 
 template<typename T> T
-quantile_from_sorted_vector (const vector<T> sorted_data, 
-				const size_t stride, const size_t n,
-					const double f) {
+quantile_from_sorted_vector (const vector<T> sorted_data,
+                             const size_t stride, const size_t n,
+                             const double f) {
   const double index = f * (n - 1);
   const size_t lhs = (int)index;
   const double delta = index - lhs;
@@ -91,9 +91,9 @@ quantile_from_sorted_vector (const vector<T> sorted_data,
   if (n == 0 || sorted_data.empty()) return 0.0;
 
   if (lhs == n - 1) return sorted_data[lhs * stride];
-     
-  return (1 - delta) * sorted_data[lhs * stride] 
-	  		+ delta * sorted_data[(lhs + 1) * stride];   
+
+  return (1 - delta) * sorted_data[lhs * stride]
+    + delta * sorted_data[(lhs + 1) * stride];
 }
 
 // Confidence interval stuff
@@ -190,21 +190,21 @@ factorial (double x) {
   x -= 1.0;
 
   vector<double> lanczos {
-  0.99999999999980993227684700473478,
-  676.520368121885098567009190444019,
- -1259.13921672240287047156078755283,
-  771.3234287776530788486528258894,
- -176.61502916214059906584551354,
-  12.507343278686904814458936853,
- -0.13857109526572011689554707,
-  9.984369578019570859563e-6,
-  1.50563273514931155834e-7
+                          0.99999999999980993227684700473478,
+                          676.520368121885098567009190444019,
+                          -1259.13921672240287047156078755283,
+                          771.3234287776530788486528258894,
+                          -176.61502916214059906584551354,
+                          12.507343278686904814458936853,
+                          -0.13857109526572011689554707,
+                          9.984369578019570859563e-6,
+                          1.50563273514931155834e-7
   };
 
   double Ag = lanczos[0];
 
-  for (size_t k=1; k < lanczos.size(); k++) 
-    Ag += lanczos[k] / (x + k); 
+  for (size_t k=1; k < lanczos.size(); k++)
+    Ag += lanczos[k] / (x + k);
 
   double term1 = (x + 0.5) * log((x + 7.5) / Euler);
   double term2 = LogRootTwoPi + log(Ag);
@@ -230,9 +230,9 @@ resample_hist(mt19937 &gen, const vector<size_t> &vals_hist_distinct_counts,
 
   unsigned int distinct =
     accumulate(begin(distinct_counts_hist), end(distinct_counts_hist), 0.0);
-  
+
   multinomial(gen, distinct_counts_hist, distinct,
-                      sample_distinct_counts_hist);
+              sample_distinct_counts_hist);
 
   out_hist.clear();
   out_hist.resize(vals_hist_distinct_counts.back() + 1, 0.0);
@@ -546,6 +546,12 @@ lc_extrap(const bool pop_size, const int argc, const char **argv) {
     double c_level = 0.95;
     unsigned long int seed = 408;
 
+    if (pop_size) {
+      // ADS: extrapolate far, without too many steps...
+      max_extrap = 1.0e20;
+      step_size = 1.0e18;
+    }
+
     /* FLAGS */
     bool VERBOSE = false;
     bool VALS_INPUT = false;
@@ -558,20 +564,20 @@ lc_extrap(const bool pop_size, const int argc, const char **argv) {
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
-    
+
     string description;
     if (!pop_size) {
-	description =
-      	"Extrapolate the complexity of a library. This is the approach   \
-      	described in Daley & Smith (2013). The method applies rational   \
-      	function approximation via continued fractions with the          \
-      	original goal of estimating the number of distinct reads that a  \
-      	sequencing library would yield upon deeper sequencing. This      \
-      	method has been used for many different purposes since then.";
+      description =
+        "Extrapolate the complexity of a library. This is the approach   \
+        described in Daley & Smith (2013). The method applies rational   \
+        function approximation via continued fractions with the          \
+        original goal of estimating the number of distinct reads that a  \
+        sequencing library would yield upon deeper sequencing. This      \
+        method has been used for many different purposes since then.";
     }
     else {
-	description = 
-	"Determine the estimate of the number of unique classes in a library.";
+      description =
+        "Determine the estimate of the number of unique classes in a library.";
     }
 
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
@@ -774,24 +780,27 @@ lc_extrap(const bool pop_size, const int argc, const char **argv) {
         cerr << "[WRITING OUTPUT]" << endl;
 
       if (!pop_size) {
-	write_predicted_complexity_curve(outfile, c_level, step_size,
-                                       yield_estimates, yield_lower_ci_lognorm,
-                                       yield_upper_ci_lognorm);
+        write_predicted_complexity_curve(outfile, c_level, step_size,
+                                         yield_estimates, yield_lower_ci_lognorm,
+                                         yield_upper_ci_lognorm);
       }
       else {
-	std::ofstream of;
+        std::ofstream of;
         if (!outfile.empty()) of.open(outfile.c_str());
         std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
         out.setf(std::ios_base::fixed, std::ios_base::floatfield);
         out.precision(1);
 
-        out << "pop_size_estimate" << '\t' 
+        out << "pop_size_estimate" << '\t'
             << "lower_ci" << '\t' << "upper_ci" << endl;
-        out << yield_estimates.back() << '\t' 
-            << yield_lower_ci_lognorm.back() << '\t' 
+        out << yield_estimates[yield_estimates.size() - 2] << '\t'
+            << yield_lower_ci_lognorm[yield_estimates.size() - 2] << '\t'
+            << yield_upper_ci_lognorm[yield_estimates.size() - 2] << endl;
+        out << yield_estimates.back() << '\t'
+            << yield_lower_ci_lognorm.back() << '\t'
             << yield_upper_ci_lognorm.back() << endl;
-      }    
+      }
     }
   }
   catch (runtime_error &e) {
@@ -1023,7 +1032,7 @@ gc_extrap(const int argc, const char **argv) {
                                      bin_size, coverage_estimates,
                                      coverage_lower_ci_lognorm,
                                      coverage_upper_ci_lognorm);
-	
+
     }
   }
   catch (runtime_error &e) {
@@ -1501,7 +1510,7 @@ bound_pop(const int argc, const char **argv) {
           bootstrap_moments.push_back(exp(factorial(i + 3) +
                                           log(sample_hist[i + 2]) -
                                           log(sample_hist[1])) );
-	}
+        }
 
         size_t n_points = 0;
         n_points = ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
