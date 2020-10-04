@@ -309,6 +309,9 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
 
   for (size_t iter = 0; (iter < max_iter && bootstrap_estimates.size() < n_bootstraps); ++iter) {
 
+    if (VERBOSE && iter > 0 && iter % 72 == 0)
+      cerr << endl; // bootstrap success progress only 72 char wide
+
     vector<double> yield_vector;
     vector<double> hist;
     resample_hist(rng, orig_hist_distinct_counts, distinct_orig_hist, hist);
@@ -1578,8 +1581,8 @@ pop_size(const int argc, const char **argv) {
     string outfile;
 
     size_t orig_max_terms = 100;
-    double max_extrap = 1.0e18;
-    double step_size;
+    double max_extrap = 0.0;
+    double step_size = 0.0;
     // TL: desired number of steps for extrap
     size_t n_desired_steps = 50;
     size_t n_bootstraps = 100;
@@ -1600,12 +1603,12 @@ pop_size(const int argc, const char **argv) {
     size_t MAX_SEGMENT_LENGTH = 5000;
 #endif
 
-    string description = "Extrapolate the complexity of a library. This is the approach   \
-        described in Daley & Smith (2013). The method applies rational   \
-        function approximation via continued fractions with the          \
-        original goal of estimating the number of distinct reads that a  \
-        sequencing library would yield upon deeper sequencing. This      \
-        method has been used for many different purposes since then.";
+    const string description =
+      "Estimate the total population size using the approach described in "
+      "Daley & Smith (2013), extrapolating to very long range. Default "
+      "parameters assume that the initial sample represents at least"
+      "1e-9 of the population, which is sufficient for every example "
+      "application we have seen.";
 
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
 
@@ -1613,10 +1616,10 @@ pop_size(const int argc, const char **argv) {
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
                       false , outfile);
     opt_parse.add_opt("extrap",'e',"maximum extrapolation", false, max_extrap);
-    opt_parse.add_opt("desired_steps",'s',"desired number of steps", false, n_desired_steps);
+    opt_parse.add_opt("steps",'s',"number of steps", false, n_desired_steps);
     opt_parse.add_opt("boots",'n',"number of bootstraps", false, n_bootstraps);
     opt_parse.add_opt("cval", 'c', "level for confidence intervals", false, c_level);
-    opt_parse.add_opt("terms",'x',"maximum terms in estimator", false, orig_max_terms);
+    opt_parse.add_opt("terms", 'x', "maximum terms in estimator", false, orig_max_terms);
     opt_parse.add_opt("verbose", 'v', "print more info", false, VERBOSE);
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format",
@@ -1722,6 +1725,11 @@ pop_size(const int argc, const char **argv) {
     orig_max_terms = min(orig_max_terms, first_zero - 1);
     orig_max_terms = orig_max_terms - (orig_max_terms % 2 == 1);
 
+    if (max_extrap < 1.0)
+      max_extrap = 1000000000*distinct_reads;
+    if (step_size < 1.0)
+      step_size = (max_extrap - distinct_reads)/n_desired_steps;
+
     const size_t distinct_counts =
       std::count_if(begin(counts_hist), end(counts_hist),
                     [](const double x) {return x > 0.0;});
@@ -1761,9 +1769,6 @@ pop_size(const int argc, const char **argv) {
       cerr << "[ESTIMATING YIELD CURVE]" << endl;
 
     // TL: determine step size based on initial counts.
-    
-    step_size = (max_extrap - distinct_reads) / n_desired_steps;
-
     //
     vector<double> yield_estimates;
 
@@ -1819,11 +1824,21 @@ pop_size(const int argc, const char **argv) {
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
       out.precision(1);
 
+      const size_t n_ests = yield_estimates.size() - 1;
+      if (n_ests < 2)
+        throw runtime_error("problem with number of estimates in pop_size");
+
+      const bool converged =
+        (yield_estimates[n_ests] - yield_estimates[n_ests-1] < 1.0);
+
       out << "pop_size_estimate" << '\t'
           << "lower_ci" << '\t' << "upper_ci" << endl;
       out << yield_estimates.back() << '\t'
           << yield_lower_ci_lognorm.back() << '\t'
-          << yield_upper_ci_lognorm.back() << endl;
+          << yield_upper_ci_lognorm.back();
+      if (!converged)
+        out << "\tnot_converged";
+      out << endl;
     }
   }
   catch (runtime_error &e) {
