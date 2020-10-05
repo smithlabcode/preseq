@@ -1583,7 +1583,6 @@ pop_size(const int argc, const char **argv) {
     size_t orig_max_terms = 100;
     double max_extrap = 0.0;
     double step_size = 0.0;
-    // TL: desired number of steps for extrap
     size_t n_desired_steps = 50;
     size_t n_bootstraps = 100;
     int diagonal = 0;
@@ -1768,8 +1767,6 @@ pop_size(const int argc, const char **argv) {
     if (VERBOSE)
       cerr << "[ESTIMATING YIELD CURVE]" << endl;
 
-    // TL: determine step size based on initial counts.
-    //
     vector<double> yield_estimates;
 
     if (SINGLE_ESTIMATE) {
