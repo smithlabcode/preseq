@@ -138,6 +138,17 @@ More data is available in the `additional_data.txt` file in the `data`
 directory.  For an extended write-up on our programs, please read the
 manual in the `docs` directory.
 
+UPDATES TO VERSION 3.1.0
+========================================================================
+A mode `pop_size` has been added that uses the continued fraction
+approximation to the Good-Toulmin model and extrapolates as far as
+possible. Although `bound_pop` provides a good and reliable
+lower-bound, this new mode will give a more accurate estimate of the
+population size (e.g. total number of distinct molecules). It's not
+perfect yet, and in some cases if the population is more than a
+billion times larger than the sample, it will still only give a lower
+bound. But it works well on most data sets.
+
 UPDATES TO VERSION 3.0.2
 ========================================================================
 GSL has been completely removed, and a data directory has been added
