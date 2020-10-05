@@ -30,6 +30,7 @@
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
 #include "htslib_wrapper.hpp"
+#include "MappedRead.hpp"
 
 using std::string;
 using std::vector;
