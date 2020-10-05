@@ -27,7 +27,6 @@
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"
-#include "htslib_wrapper_deprecated.hpp"
 
 using std::string;
 using std::vector;
@@ -183,7 +182,7 @@ empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
 #ifdef HAVE_HTSLIB
 // switching dependency on bamtools to samtools
 #include <htslib_wrapper.hpp>
-
+#include "htslib_wrapper_deprecated.hpp"
 
 size_t
 load_counts_BAM_se(const string &input_file_name,
