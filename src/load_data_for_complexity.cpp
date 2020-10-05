@@ -23,11 +23,11 @@
 #include <sstream>
 #include <unistd.h>
 #include <unordered_map>
+#include <random>
 
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"
-#include <random>
-//#include "RNG.hpp"
+#include "htslib_wrapper_deprecated.hpp"
 
 using std::string;
 using std::vector;
@@ -189,7 +189,7 @@ size_t
 load_counts_BAM_se(const string &input_file_name,
                    vector<double> &counts_hist) {
   const string mapper = "general";
-  SAMReader sam_reader(input_file_name, mapper);
+  SAMReader_deprecated sam_reader(input_file_name, mapper);
   if(!sam_reader)
     throw runtime_error("problem opening input file "
                         + input_file_name);
@@ -339,7 +339,7 @@ load_counts_BAM_pe(const bool VERBOSE,
                    vector<double> &counts_hist) {
 
   const string mapper = "general";
-  SAMReader sam_reader(input_file_name, mapper);
+  SAMReader_deprecated sam_reader(input_file_name, mapper);
 
   // check sam_reader
   if(!sam_reader)

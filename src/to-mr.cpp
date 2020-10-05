@@ -29,7 +29,7 @@
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
-#include "htslib_wrapper.hpp"
+#include "htslib_wrapper_deprecated.hpp"
 #include "MappedRead.hpp"
 
 using std::string;
@@ -205,7 +205,7 @@ main(int argc, const char **argv) {
            << "[output file: "
            << (outfile.empty() ? "stdout" : outfile) << "]" << endl;
 
-    SAMReader sam_reader(mapped_reads_file, mapper);
+    SAMReader_deprecated sam_reader(mapped_reads_file, mapper);
     unordered_map<string, SAMRecord> dangling_mates;
 
     size_t count = 0;
