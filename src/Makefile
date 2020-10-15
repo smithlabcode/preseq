@@ -42,7 +42,8 @@ $(PROGS): $(addprefix smithlab_cpp/, \
 	OptionParser.o MappedRead.o)
 
 ifdef HAVE_HTSLIB
-preseq to-mr: $(addprefix smithlab_cpp/, htslib_wrapper.o)
+preseq to-mr: $(addprefix smithlab_cpp/, \
+  htslib_wrapper_deprecated.o cigar_utils.o)
 endif
 
 preseq: continued_fraction.o load_data_for_complexity.o moment_sequence.o

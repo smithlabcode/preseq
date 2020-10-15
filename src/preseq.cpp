@@ -56,7 +56,7 @@ using std::to_string;
 using std::mt19937;
 using std::max;
 
-static const string preseq_version = "3.0.2";
+static const string preseq_version = "3.1.1";
 
 template <typename T> T
 get_counts_from_hist(const vector<T> &h) {
