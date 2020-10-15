@@ -14,7 +14,7 @@ dnl but WITHOUT ANY WARRANTY; without even the implied warranty of
 dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 dnl General Public License for more details.
 
-AC_INIT([preseq], [3.1.0], [andrewds@usc.edu],
+AC_INIT([preseq], [3.1.1], [andrewds@usc.edu],
         [preseq], [https://github.com/smithlabcode/preseq])
 dnl the config.h is not currently #included in the source, and only
 dnl used to keep command lines short.
