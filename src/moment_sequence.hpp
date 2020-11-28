@@ -22,6 +22,7 @@
 
 #include <vector>
 #include <numeric>
+#include <cstddef>
 
 // test Hankel moment matrix to ensure the moment sequence
 // is positive definite

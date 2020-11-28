@@ -22,6 +22,7 @@
 
 #include <string>
 #include <vector>
+#include <cstddef>
 
 size_t
 load_coverage_counts_MR(const bool VERBOSE,

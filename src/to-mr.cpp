@@ -25,6 +25,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <stdexcept>
+#include <cstddef>
 
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"

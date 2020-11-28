@@ -24,6 +24,7 @@
 #include <vector>
 #include <fstream>
 #include <iomanip>
+#include <cstddef>
 
 struct ContinuedFraction {
   // Constructors

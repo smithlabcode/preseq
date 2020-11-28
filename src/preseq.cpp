@@ -32,6 +32,7 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <cstddef>
 
 #include <OptionParser.hpp>
 #include <smithlab_utils.hpp>
