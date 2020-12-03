@@ -138,6 +138,10 @@ More data is available in the `additional_data.txt` file in the `data`
 directory.  For an extended write-up on our programs, please read the
 manual in the `docs` directory.
 
+UPDATES TO VERSION 3.1.2
+========================================================================
+Two headers were added.
+
 UPDATES TO VERSION 3.1.0
 ========================================================================
 A mode `pop_size` has been added that uses the continued fraction
