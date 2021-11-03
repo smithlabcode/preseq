@@ -641,6 +641,10 @@ load_histogram(const string &filename, vector<double> &counts_hist) {
                           "(line " + toa(line_count) + ")");
     counts_hist.resize(read_count + 1, 0.0);
     counts_hist[read_count] = frequency;
+    if (read_count == 0ul) {
+      throw runtime_error("counts histograms may not "
+                  "include an entry for zero");
+    }
     prev_read_count = read_count;
     n_reads += static_cast<size_t>(read_count*frequency);
   }
