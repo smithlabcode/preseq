@@ -90,7 +90,7 @@ to download a release, and not simply the source code files.
 \label{sub:require}
 ~\\~\\[-.2cm]
 \textbf{preseq} runs on Unix-type systems. If the
-input file is in BAM format, the HTSLib API is required 
+input file is in BAM format, the HTSLib API is required
 (http://www.htslib.org/download/) but is
 included in all binaries and source code.  If the input is a text file
 of counts in a single column or is in BED format, SAMTools is not
@@ -882,9 +882,14 @@ immune repertoire and age will be of interest.
 }
 }
 
-\Ans{The default location of the GSL library will be in '\fn{/usr/local/include/gsl}'. Open the Makefile and append "\fn{-I /usr/local/include}" after \fn{CXX = g++}.  You may be receiving this error because the GSL library is not installed on the default search paths of your compiler, and you will need to specify the location.  }
-
-
+\Ans{Good news: GSL is no longer needed by preseq. Old answer: The
+  default location of the GSL library is probably
+  '\fn{/usr/local/include/gsl}' for the headers, and
+  '\fn{/usr/local/lib}' for the libraries themselves. Open the
+  Makefile and append "\fn{-I /usr/local/include}" after \fn{CXX =
+    g++}.  You may be receiving this error because the GSL library is
+  not installed on the default search paths of your compiler, and you
+  will need to specify the location.}
 
 
 \Que{When compiling the \textbf{preseq} binary, I receive the error
