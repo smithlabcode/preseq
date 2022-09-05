@@ -23,36 +23,36 @@ INSTALLATION
 
 1. Download `preseq-x.tar.gz` from the releases tab of this repository.
 2. Unpack the archive:
-```
+```console
 $ tar -zxvf preseq-x.tar.gz
 ```
 3. Move into the preseq directory and create a build directory:
-```
+```console
 $ cd preseq-x
 $ mkdir build && cd build
 ```
 4. Run the configuration script:
-```
+```console
 $ ../configure
 ```
 If you do not want to install preseq system-wide, or if you do
 not have admin privileges, specify a prefix directory:
-```
+```console
 $ ../configure --prefix=/some/reasonable/place
 ```
 Finally, if you want to build with HTSlib support (for the `to-mr`
 program) then you need to specify the following:
-```
+```console
 $ ../configure --enable-hts
 ```
 And if you installed HTSlib yourself in some non-standard directory,
 you must specify the location like this:
-```
+```console
 $ ../configure --enable-hts CPPFLAGS='-I /path/to/htslib/headers' \
     LDFLAGS='-L/path/to/htslib/lib'
 ```
 5. Compile and install the tools:
-```
+```console
 $ make
 $ make install
 ```
@@ -62,13 +62,13 @@ $ make install
 Developers looking to use the latest commits can compile the cloned
 repository using the `Makefile` within the `src` directory. The
 process is simple:
-```
+```console
 $ cd src/
 $ make
 ```
 If the desired input is in `.bam` format, `htslib` is required. Type
-```
-make HAVE_HTSLIB=1 all
+```console
+$ make HAVE_HTSLIB=1 all
 ```
 The HTSLib library can be obtained here:
 http://www.htslib.org/download.
@@ -102,16 +102,16 @@ Change to the `data` directory and try some of our commands.
 To predict the yield of a future experiment, use `lc_extrap`.
 For the most basic usage of `lc_extrap` to compute the expected yield,
 use the command on the following data:
-```
-preseq lc_extrap -o yield_estimates.txt SRR1003759_5M_subset.mr
+```console
+$ preseq lc_extrap -o yield_estimates.txt SRR1003759_5M_subset.mr
 ```
 If the input file is in `.bam` format, use the `-B` flag:
-```
-preseq lc_extrap -B -o yield_estimates.txt SRR1106616_5M_subset.bam
+```console
+$ preseq lc_extrap -B -o yield_estimates.txt SRR1106616_5M_subset.bam
 ```
 For the counts histogram format, use the `-H` flag:
-```
-preseq lc_extrap -H -o yield_estimates.txt SRR1301329_1M_read.txt
+```console
+$ preseq lc_extrap -H -o yield_estimates.txt SRR1301329_1M_read.txt
 ```
 
 The yield estimates will appear in yield_estimates.txt, and will be a
@@ -136,24 +136,26 @@ Finally, `gc_extrap` predicts the expected genomic coverage for a
 future experiment.  It produces the coverage in an output format
 identical to `lc_extrap`. `gc_extrap` can only take in files in BED
 and mapped reads format (using the `-B` flag for BED):
-```
-preseq gc_extrap -B -o coverage_estimates.txt SRR1003759_5M_subset.mr
+```console
+$ preseq gc_extrap -B -o coverage_estimates.txt SRR1003759_5M_subset.mr
 ```
 
 More data is available in the `additional_data.txt` file in the `data`
 directory.  For an extended write-up on our programs, please read the
 manual in the `docs` directory.
 
-UPDATES TO VERSION 3.2.0
+HISTORY
 ========================================================================
+Preseq was originally developed by Timothy Daley and Andrew D. Smith
+at University of Southern California.
+
+**v3.2.0:**
 Updates to the repo in preparation for putting preseq in conda
 
-UPDATES TO VERSION 3.1.2
-========================================================================
+**v3.1.2:**
 Two headers were added.
 
-UPDATES TO VERSION 3.1.0
-========================================================================
+**v3.1.0:**
 A mode `pop_size` has been added that uses the continued fraction
 approximation to the Good-Toulmin model and extrapolates as far as
 possible. Although `bound_pop` provides a good and reliable
@@ -163,38 +165,32 @@ perfect yet, and in some cases if the population is more than a
 billion times larger than the sample, it will still only give a lower
 bound. But it works well on most data sets.
 
-UPDATES TO VERSION 3.0.2
-========================================================================
+**v3.0.2:**
 GSL has been completely removed, and a data directory has been added
 for users to test our programs.
 
-UPDATES TO VERSION 3.0.1
-========================================================================
+**v3.0.1:**
 We no longer require users to have GSL for all modules except for
 `bound_pop`. Users interested in using `bound_pop` can install GSL and
 follow the instructions above to configure with GSL.
 
-UPDATES TO VERSION 3.0
-========================================================================
+**v3.0.0:**
 The main change to this version is that if BAM/SAM format will be used
 as input, the HTSLib library must be installed on the system when
 preseq is built. Installation instructions above have been updated
 correspondingly. We also updated to use C++11, so a more recent
 compiler is required, but these days C++11 is usually supported.
 
-UPDATES TO VERSION 2.0.3
-========================================================================
+**v2.0.3:**
 A bug in defect mode was fixed and a rng seed was added to allow for
 reproducibility.
 
-UPDATES TO VERSION 2.0.0
-========================================================================
+**v2.0.0:**
 We have added a new module, `bound_pop`, to estimate a lower bound of
 the population sampled from.  Interpolation is calculated by
 expectation rather than subsampling, dramatically improving the speed.
 
-UPDATES TO VERSION 1.0.2
-========================================================================
+**v1.0.2:**
 We have switched the dependency on the BamTools API to SAMTools, which
 we believe will be more convenient for most users of preseq. Minor
 bugs have been fixed, and algorithms have been refined to more
@@ -212,26 +208,18 @@ available in the R statistical environment, and includes some new
 functionality. The preseqR directory contains all required source code
 to build this R package.
 
-CONTACT INFORMATION:
+CONTACT INFORMATION
 ========================================================================
-Andrew D. Smith
-andrewds@usc.edu
-
-Timothy Daley
-tdaley@stanford.edu
+Andrew D. Smith <andrewds@usc.edu> and Timothy Daley <tdaley@stanford.edu>
 
 http://smithlabresearch.org
 
-HISTORY
-========================================================================
-Preseq was originally developed by Timothy Daley and Andrew D. Smith
-at University of Southern California.
-
 LICENSE
 ========================================================================
-The preseq software for estimating complexity Copyright (C) 2014-2020
-Timothy Daley and Andrew D Smith and Chao Deng and the University of
-Southern California
+```txt
+The preseq software for estimating library complexity
+Copyright (C) 2014-2022 Timothy Daley, Andrew D Smith, Chao Deng
+                        University of Southern California
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -245,3 +233,4 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+```
