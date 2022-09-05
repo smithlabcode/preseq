@@ -1,6 +1,6 @@
 # This file is part of preseq
 #
-# Copyright (C) 2018-2020: Andrew D. Smith
+# Copyright (C) 2018-2022: Andrew D. Smith
 #
 # Authors: Andrew D. Smith
 #
@@ -32,13 +32,13 @@ AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
 preseq_SOURCES = \
-	src/preseq.cpp \
-	src/continued_fraction.hpp \
-	src/continued_fraction.cpp \
-	src/load_data_for_complexity.hpp \
-	src/load_data_for_complexity.cpp \
-	src/moment_sequence.hpp \
-	src/moment_sequence.cpp
+        src/preseq.cpp \
+        src/continued_fraction.hpp \
+        src/continued_fraction.cpp \
+        src/load_data_for_complexity.hpp \
+        src/load_data_for_complexity.cpp \
+        src/moment_sequence.hpp \
+        src/moment_sequence.cpp
 
 to_mr_SOURCES = \
-	src/to-mr.cpp
+        src/to-mr.cpp

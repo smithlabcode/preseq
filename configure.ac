@@ -1,6 +1,6 @@
 dnl This file is part of preseq
 dnl
-dnl Copyright (C) 2020: Andrew D. Smith
+dnl Copyright (C) 2018-2022: Andrew D. Smith
 dnl
 dnl Authors: Andrew D. Smith
 dnl
@@ -14,7 +14,7 @@ dnl but WITHOUT ANY WARRANTY; without even the implied warranty of
 dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 dnl General Public License for more details.
 
-AC_INIT([preseq], [3.1.2], [andrewds@usc.edu],
+AC_INIT([preseq], [3.2.0], [andrewds@usc.edu],
         [preseq], [https://github.com/smithlabcode/preseq])
 dnl the config.h is not currently #included in the source, and only
 dnl used to keep command lines short.
