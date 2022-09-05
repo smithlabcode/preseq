@@ -1,0 +1,8 @@
+site_name: preseq
+strict: true
+
+theme: readthedocs
+nav:
+   - Home: 'index.md'
+   - 'Installation': 'quickstart.md'
+   - 'preseq on GitHub' : https://github.com/smithlabcode/preseq
