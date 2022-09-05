@@ -5,13 +5,13 @@ to examine the utility of further sequencing, optimize the sequencing
 depth, or to screen multiple libraries to avoid low complexity
 samples.
 
-SYSTEM REQUIREMENTS:
+SYSTEM REQUIREMENTS
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
 systems and was developed on both Linux and Mac. The preseq software
 requires a C++ compiler that supports C++11.
 
-INSTALLATION:
+INSTALLATION
 ========================================================================
 ### Installing from a release
 
@@ -67,7 +67,7 @@ make HAVE_HTSLIB=1 all
 The HTSLib library can be obtained here:
 http://www.htslib.org/download.
 
-INPUT FILE FORMATS:
+INPUT FILE FORMATS
 ========================================================================
 The input to preseq can be in 3 general formats:
 1. Mapped read locations in BED or BAM file format. The file should be
@@ -84,7 +84,7 @@ The input to preseq can be in 3 general formats:
    line. These will be made into the "counts histogram" inside preseq
    right away.
 
-USAGE EXAMPLES:
+USAGE EXAMPLES
 ========================================================================
 Each program included in this software package will print a list of
 options if executed without any command line arguments. Many of the
@@ -137,6 +137,10 @@ preseq gc_extrap -B -o coverage_estimates.txt SRR1003759_5M_subset.mr
 More data is available in the `additional_data.txt` file in the `data`
 directory.  For an extended write-up on our programs, please read the
 manual in the `docs` directory.
+
+UPDATES TO VERSION 3.2.0
+========================================================================
+Updates to the repo in preparation for putting preseq in conda
 
 UPDATES TO VERSION 3.1.2
 ========================================================================
