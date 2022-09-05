@@ -1,3 +1,9 @@
+[![Github Downloads](https://img.shields.io/github/downloads/smithlabcode/preseq/total.svg)]()
+[![Install with Conda](https://anaconda.org/bioconda/preseq/badges/installer/conda.svg)](https://anaconda.org/bioconda/preseq)
+[![Install with Conda](https://anaconda.org/bioconda/preseq/badges/platforms.svg)](https://anaconda.org/bioconda/preseq)
+[![Install with Conda](https://anaconda.org/bioconda/preseq/badges/downloads.svg)](https://anaconda.org/bioconda/preseq)
+[![Documentation Status](https://readthedocs.org/projects/preseq/badge/?version=latest)](https://preseq.readthedocs.io/en/latest/?badge=latest)
+
 This is the README file for the preseq package. The preseq package is
 aimed at predicting the yield of distinct reads from a genomic library
 from an initial sequencing experiment. The estimates can then be used
