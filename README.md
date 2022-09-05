@@ -1,4 +1,4 @@
-[![Github Downloads](https://img.shields.io/github/downloads/smithlabcode/preseq/total.svg)]()
+[![Github Downloads](https://img.shields.io/github/downloads/smithlabcode/preseq/total.svg)](https://github.com/smithlabcode/preseq/releases)
 [![Install with Conda](https://anaconda.org/bioconda/preseq/badges/installer/conda.svg)](https://anaconda.org/bioconda/preseq)
 [![Install with Conda](https://anaconda.org/bioconda/preseq/badges/platforms.svg)](https://anaconda.org/bioconda/preseq)
 [![Install with Conda](https://anaconda.org/bioconda/preseq/badges/downloads.svg)](https://anaconda.org/bioconda/preseq)
