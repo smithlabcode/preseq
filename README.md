@@ -5,13 +5,13 @@ to examine the utility of further sequencing, optimize the sequencing
 depth, or to screen multiple libraries to avoid low complexity
 samples.
 
-SYSTEM REQUIREMENTS:
+SYSTEM REQUIREMENTS
 ========================================================================
 The preseq software will only run on 64-bit UNIX-like operating
 systems and was developed on both Linux and Mac. The preseq software
 requires a C++ compiler that supports C++11.
 
-INSTALLATION:
+INSTALLATION
 ========================================================================
 ### Installing from a release
 
@@ -67,7 +67,7 @@ make HAVE_HTSLIB=1 all
 The HTSLib library can be obtained here:
 http://www.htslib.org/download.
 
-INPUT FILE FORMATS:
+INPUT FILE FORMATS
 ========================================================================
 The input to preseq can be in 3 general formats:
 1. Mapped read locations in BED or BAM file format. The file should be
@@ -84,7 +84,7 @@ The input to preseq can be in 3 general formats:
    line. These will be made into the "counts histogram" inside preseq
    right away.
 
-USAGE EXAMPLES:
+USAGE EXAMPLES
 ========================================================================
 Each program included in this software package will print a list of
 options if executed without any command line arguments. Many of the
