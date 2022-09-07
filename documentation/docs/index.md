@@ -1,7 +1,19 @@
-# preseq
+# Quick start
 
-Under construction... But the PDF documentation still applies and can
-be found [here](https://github.com/smithlabcode/preseq).
+You can install preseq as follows using conda:
+```console
+$ conda install -c bioconda preseq
+```
+The instructions for installing conda are
+[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). You can obtain preseq source code
+[here](https://github.com/smithlabcode/preseq).
+
+This documentation is still under construction... But the PDF
+documentation still applies and can be found
+[here](https://github.com/smithlabcode/preseq).
+
+
+# Preseq
 
 The preseq package is aimed to help researchers design and optimize
 sequencing experiments by using population sampling models to infer
@@ -43,9 +55,18 @@ conservatively estimate the total number of classes in the sample,
 also called the species richness of the population that is sampled.
 
 
-## Installation
+# Installation
 
-**Download**
+## Using conda
+
+You can install preseq as follows using conda:
+```console
+$ conda install -c bioconda preseq
+```
+The instructions for installing conda are
+[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
+
+## From source
 
 You can obtain preseq [here](https://github.com/smithlabcode/preseq).
 Only clone the repo if you are planning to modify or reuse the code,
@@ -60,8 +81,6 @@ input file is in BAM format, the
 input is a text file of counts in a single column, a "counts
 histogram" or is in BED format, then HTSLib is not required. Preseq
 has been tested on Linux and Mac OS-X.
-
-***Installation**
 
 Instructions on how to install preseq are included in the `README.md`
 file in root of the source tree for preseq.  If you have problems
@@ -537,4 +556,104 @@ When using these count "values" the command should be run with the `-V`
 flag (not to be confused with the lowercase `-v` for verbose mode):
 ```console
 $ preseq lc_extrap -o future_yield.txt -V counts.txt
+```
+
+gc\_extrap
+----------
+
+The `gc_extrap` command is designed for estimating genome coverage
+from more deeply sequencing a library, particularly in single cell
+whole genome sequencing experiments. For illustrative purposes we will
+examine an MDA (multiple displacement amplification) whole genome
+sequencing experiment, SRA accession SRR1777281. This experiment has
+5.76 million paired end 101 base reads. We mapped the experiment with
+bowtie2 v0.0-beta7 under default parameters. This resulted in 3.63
+million concordantly mapped fragment pairs and 2.1 million
+disconcordantly mapped fragments.
+
+The first step is to convert the sorted bam file to mr format
+and sort it.
+```console
+$ to-mr -o SRR1777281_bwt2.mr -L 10000 SRR1777281_bwt2.sort.bam
+$ sort -k 1,1 -k 2,2n -k 3,3n SRR1777281_bwt2.mr > SRR1777281_bwt2.sort.mr
+```
+The resulting mapped reads file has 813 million bases total (note that
+bases covered by two fragments of the same read are only counted once)
+and 410 million covered bases in the genome.
+
+By default, `gc_extrap` divides the genome into 10 base pair non-overlapping bins.
+In default mode, the running time of `gc_extrap` was under 12 minutes.
+```txt
+LOADING READS
+MAPPED READ FORMAT
+TOTAL READS         = 5726883
+BASE STEP SIZE      = 1e+08
+BIN STEP SIZE       = 1e+07
+TOTAL BINS          = 8.1325e+07
+BINS PER READ       = 14.2006
+DISTINCT BINS       = 4.09582e+07
+TOTAL BASES         = 8.1325e+08
+TOTAL COVERED BASES = 4.09582e+08
+MAX COVERAGE COUNT  = 79775
+COUNTS OF 1         = 3.13723e+07
+OBSERVED BIN COUNTS (79776)
+1       3.13723e+07
+2       6.97799e+06
+3       1.72101e+06
+```
+
+The first several lines of the output file were as follows:
+```txt
+TOTAL_BASES    EXPECTED_COVERED_BASES    LOWER_95%CI    UPPER_95%CI
+0    0     0     0
+100000000.0     64522380.0     63075879.1     66002053.1
+200000000.0     123422455.0     120747705.7     126156454.1
+300000000.0     178054120.0     174319619.1     181868626.2
+400000000.0     229008295.0     224352188.5     233761032.3
+500000000.0     276727080.0     271265011.6     282299130.1
+```
+The final line of the output was:
+```txt
+999900000000.0     1826891418.6     1621208958.1     2058668772.4
+```
+
+To run `gc_extrap` at single base resolution, the option
+`-b 1` is required.  This results in a significant increase
+in the running time of the algorithm.  For this case the
+running time was 113 minutes. The following is the command
+along with the first several lines of information reported
+to the terminal:
+```console
+$ preseq gc_extrap SRR1777281_bwt2.sort.mr -o SRR1777281_bwt2_1bp_gc_extrap.txt -b 1 -v
+LOADING READS
+MAPPED READ FORMAT
+TOTAL READS         = 5726883
+BASE STEP SIZE      = 1e+08
+BIN STEP SIZE       = 1e+08
+TOTAL BINS          = 8.13236e+08
+BINS PER READ       = 142.003
+DISTINCT BINS       = 4.09454e+08
+TOTAL BASES         = 8.13236e+08
+TOTAL COVERED BASES = 4.09454e+08
+MAX COVERAGE COUNT  = 80028
+COUNTS OF 1         = 3.13527e+08
+OBSERVED BIN COUNTS (80029)
+1       3.13527e+08
+2       6.98288e+07
+3       1.722e+07
+```
+
+The output looks like this:
+```txt
+TOTAL_BASES    EXPECTED_COVERED_BASES    LOWER_95%CI    UPPER_95%CI
+0    0     0     0
+100000000.0    64680427.0    64284593.4    65078698.0
+200000000.0    123709880.0    122978429.6    124445680.9
+300000000.0    178447901.0    177427065.8    179474609.6
+400000000.0    229488768.0    228216803.2    230767822.1
+500000000.0    277279369.5    275788078.2    278778724.8
+```
+with the final line:
+```txt
+999900000000.0    1838021604.0    1682515315.7    2007900543.3
 ```
