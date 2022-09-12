@@ -1,11 +1,18 @@
 # Quick start
 
-You can install preseq as follows using conda:
+If you have bioconda setup as recommended, then you can install preseq as follows:
 ```console
-$ conda install -c bioconda preseq
+$ conda install preseq
 ```
+
+If you have problems, try the following which sets the channel priority:
+```console
+$ conda install -c conda-forge -c bioconda --strict-channel-priority preseq
+```
+
 The instructions for installing conda are
-[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). You can obtain preseq source code
+[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
+You can obtain preseq source code
 [here](https://github.com/smithlabcode/preseq).
 
 This documentation is still under construction... But the PDF
