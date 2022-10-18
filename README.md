@@ -1,5 +1,5 @@
 [![GitHub all releases](https://img.shields.io/github/downloads/smithlabcode/preseq/total?label=GitHub%20downloads)](https://github.com/smithlabcode/preseq/releases)
-[![Install with Conda](https://anaconda.org/bioconda/preseq/badges/installer/conda.svg)](https://anaconda.org/bioconda/preseq)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/preseq/badges/version.svg)](https://anaconda.org/bioconda/preseq)
 [![Install with Conda](https://anaconda.org/bioconda/preseq/badges/platforms.svg)](https://anaconda.org/bioconda/preseq)
 [![Install with Conda](https://img.shields.io/conda/dn/bioconda/preseq?label=Conda%20downloads)](https://anaconda.org/bioconda/preseq)
 [![Documentation Status](https://readthedocs.org/projects/preseq/badge/?version=latest)](https://preseq.readthedocs.io/en/latest/?badge=latest)
