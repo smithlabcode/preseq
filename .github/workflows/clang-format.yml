@@ -1,0 +1,39 @@
+# This file is part of preseq
+#
+# Copyright (C) 2024: Andrew D. Smith
+#
+# Authors: Andrew D. Smith
+#
+# This is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+name: Source formatting with clang-format
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get install -y clang-format
+
+    - name: Run clang-format
+      run: |
+        clang-format --dry-run -Werror $(git ls-files '*.*pp')

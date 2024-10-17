@@ -1,0 +1,52 @@
+# This file is part of preseq
+#
+# Copyright (C) 2024: Andrew D. Smith
+#
+# Authors: Andrew D. Smith
+#
+# This is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+name: Linting with cpplint
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  cpplint:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Python setup ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install cpplint
+      run: |
+        python -m pip install --upgrade pip
+        pip install cpplint
+
+    - name: Check cpplint version
+      run: cpplint --version
+
+    - name: Run cpplint
+      run: |
+        cpplint --quiet --repository=. $(git ls-files '*.*pp')
