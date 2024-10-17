@@ -19,61 +19,60 @@
 
 #include <cmath>
 
-#include <string>
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <unordered_map>
-#include <stdexcept>
 #include <cstddef>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-#include "OptionParser.hpp"
-#include "smithlab_utils.hpp"
-#include "smithlab_os.hpp"
-#include "htslib_wrapper_deprecated.hpp"
 #include "MappedRead.hpp"
+#include "OptionParser.hpp"
+#include "htslib_wrapper_deprecated.hpp"
+#include "smithlab_os.hpp"
+#include "smithlab_utils.hpp"
 
-using std::string;
-using std::vector;
-using std::cout;
 using std::cerr;
+using std::cout;
 using std::endl;
 using std::ifstream;
 using std::max;
 using std::min;
 using std::runtime_error;
-using std::unordered_map;
+using std::string;
 using std::swap;
-
+using std::unordered_map;
+using std::vector;
 
 /********Below are functions for merging pair-end reads********/
 static void
 fill_overlap(const bool pos_str, const MappedRead &mr, const size_t start,
              const size_t end, const size_t offset, string &seq, string &scr) {
-  const size_t a = pos_str ? (start - mr.r.get_start()) : (mr.r.get_end() - end);
-  const size_t b = pos_str ? (end -  mr.r.get_start()) : (mr.r.get_end() - start);
+  const size_t a =
+    pos_str ? (start - mr.r.get_start()) : (mr.r.get_end() - end);
+  const size_t b =
+    pos_str ? (end - mr.r.get_start()) : (mr.r.get_end() - start);
   copy(mr.seq.begin() + a, mr.seq.begin() + b, seq.begin() + offset);
   copy(mr.scr.begin() + a, mr.scr.begin() + b, scr.begin() + offset);
 }
 
 static void
-merge_mates(const size_t suffix_len, const size_t range,
-            const MappedRead &one, const MappedRead &two,
-            MappedRead &merged, int &len) {
-
+merge_mates(const size_t suffix_len, const size_t range, const MappedRead &one,
+            const MappedRead &two, MappedRead &merged, int &len) {
   const bool pos_str = one.r.pos_strand();
   const size_t overlap_start = max(one.r.get_start(), two.r.get_start());
   const size_t overlap_end = min(one.r.get_end(), two.r.get_end());
 
-  const size_t one_left = pos_str ?
-    one.r.get_start() : max(overlap_end, one.r.get_start());
+  const size_t one_left =
+    pos_str ? one.r.get_start() : max(overlap_end, one.r.get_start());
   const size_t one_right =
     pos_str ? min(overlap_start, one.r.get_end()) : one.r.get_end();
 
-  const size_t two_left = pos_str ?
-    max(overlap_end, two.r.get_start()) : two.r.get_start();
-  const size_t two_right = pos_str ?
-    two.r.get_end() : min(overlap_start, two.r.get_end());
+  const size_t two_left =
+    pos_str ? max(overlap_end, two.r.get_start()) : two.r.get_start();
+  const size_t two_right =
+    pos_str ? two.r.get_end() : min(overlap_start, two.r.get_end());
 
   len = pos_str ? (two_right - one_left) : (one_right - two_left);
 
@@ -107,9 +106,11 @@ merge_mates(const size_t suffix_len, const size_t range,
 
         // use the mate with the most info to fill in the overlap
         if (info_one >= info_two)
-          fill_overlap(pos_str, one, overlap_start, overlap_end, lim_one, seq, scr);
+          fill_overlap(pos_str, one, overlap_start, overlap_end, lim_one, seq,
+                       scr);
         else
-          fill_overlap(pos_str, two, overlap_start, overlap_end, lim_one, seq, scr);
+          fill_overlap(pos_str, two, overlap_start, overlap_end, lim_one, seq,
+                       scr);
       }
     }
 
@@ -125,8 +126,7 @@ merge_mates(const size_t suffix_len, const size_t range,
 }
 
 inline static bool
-same_read(const size_t suffix_len,
-          const MappedRead &a, const MappedRead &b) {
+same_read(const size_t suffix_len, const MappedRead &a, const MappedRead &b) {
   const string sa(a.r.get_name());
   const string sb(b.r.get_name());
   return std::equal(sa.begin(), sa.end() - suffix_len, sb.begin());
@@ -149,9 +149,7 @@ get_read_name(const SAMRecord &aln, const size_t suffix_len) {
 
 int
 main(int argc, const char **argv) {
-
   try {
-
     string outfile;
     string mapper = "general";
     size_t max_frag_len = 1000;
@@ -164,17 +162,15 @@ main(int argc, const char **argv) {
                            "Convert the SAM/BAM output from "
                            "to MethPipe mapped read format",
                            "sam/bam_file");
-    opt_parse.add_opt("output", 'o', "Name of output file",
-                      false, outfile);
+    opt_parse.add_opt("output", 'o', "Name of output file", false, outfile);
     // opt_parse.add_opt("mapper", 'm',
     //                   "Original mapper: bismark, bs_seeker or general",
     //                   true, mapper);
     opt_parse.add_opt("suff", 's', "read name suffix length (default: 1)",
                       false, suffix_len);
-    opt_parse.add_opt("max-frag", 'L', "maximum allowed insert size",
-                      false, max_frag_len);
-    opt_parse.add_opt("verbose", 'v', "print more information",
-                      false, VERBOSE);
+    opt_parse.add_opt("max-frag", 'L', "maximum allowed insert size", false,
+                      max_frag_len);
+    opt_parse.add_opt("verbose", 'v', "print more information", false, VERBOSE);
 
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -199,12 +195,13 @@ main(int argc, const char **argv) {
     /****************** END COMMAND LINE OPTIONS *****************/
 
     std::ofstream of;
-    if (!outfile.empty()) of.open(outfile.c_str());
+    if (!outfile.empty())
+      of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());
     if (VERBOSE)
       cerr << "[input file: " << mapped_reads_file << "]" << endl
-           << "[output file: "
-           << (outfile.empty() ? "stdout" : outfile) << "]" << endl;
+           << "[output file: " << (outfile.empty() ? "stdout" : outfile) << "]"
+           << endl;
 
     SAMReader_deprecated sam_reader(mapped_reads_file, mapper);
     unordered_map<string, SAMRecord> dangling_mates;
@@ -223,15 +220,16 @@ main(int argc, const char **argv) {
 
           MappedRead merged;
           int len = 0;
-          merge_mates(suffix_len, max_frag_len,
-                      dangling_mates[read_name].mr, aln.mr, merged, len);
+          merge_mates(suffix_len, max_frag_len, dangling_mates[read_name].mr,
+                      aln.mr, merged, len);
           if (len <= static_cast<int>(max_frag_len))
             out << merged << endl;
           else if (len > 0)
             out << dangling_mates[read_name].mr << endl << aln.mr << endl;
           dangling_mates.erase(read_name);
         }
-        else dangling_mates[read_name] = aln;
+        else
+          dangling_mates[read_name] = aln;
 
         // flush dangling_mates
         if (dangling_mates.size() > max_dangling) {
@@ -239,12 +237,14 @@ main(int argc, const char **argv) {
           for (auto &&mates : dangling_mates)
             if (mates.second.mr.r.get_chrom() < aln.mr.r.get_chrom() ||
                 (mates.second.mr.r.get_chrom() == aln.mr.r.get_chrom() &&
-                 mates.second.mr.r.get_end() + max_frag_len < aln.mr.r.get_start())) {
+                 mates.second.mr.r.get_end() + max_frag_len <
+                   aln.mr.r.get_start())) {
               if (!mates.second.is_Trich)
                 revcomp(mates.second.mr);
               out << mates.second.mr << endl;
             }
-            else tmp[mates.first] = mates.second;
+            else
+              tmp[mates.first] = mates.second;
           swap(tmp, dangling_mates);
         }
       }

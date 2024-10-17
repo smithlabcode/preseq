@@ -17,47 +17,40 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MOMENT_SEQUENCE_HPP
-#define MOMENT_SEQUENCE_HPP
+#ifndef SRC_MOMENT_SEQUENCE_HPP_
+#define SRC_MOMENT_SEQUENCE_HPP_
 
-#include <vector>
-#include <numeric>
 #include <cstddef>
+#include <numeric>
+#include <vector>
 
 // test Hankel moment matrix to ensure the moment sequence
 // is positive definite
-size_t ensure_pos_def_mom_seq(std::vector<double> &moments,
-			      const double tolerance,
-			      const bool VERBOSE);
+std::size_t
+ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
+                       const bool VERBOSE);
 
 struct MomentSequence {
-
-  // Constructors
   MomentSequence() {}
-  MomentSequence(const std::vector<double> &obs_moms);
+  explicit MomentSequence(const std::vector<double> &obs_moms);
 
-  MomentSequence(const std::vector<double> &a,
-		 const std::vector<double> &b):
+  MomentSequence(const std::vector<double> &a, const std::vector<double> &b) :
     alpha(a), beta(b) {};
-
-
 
   // Estimate 3-term recurrence
   // these will be removed from the header when they are tested
   void unmodified_Chebyshev(const bool VERBOSE);
 
   void full_3term_recurrence(const bool VERBOSE,
-			     std::vector<double> &full_alpha,
-			     std::vector<double> &full_beta);
+                             std::vector<double> &full_alpha,
+                             std::vector<double> &full_beta);
 
-  // quadrature rules using QR on Jacobi matrix 
-  bool Lower_quadrature_rules(const bool VERBOSE,
-				 const size_t n_points,
-				 const double tolerance, 
-				 const size_t max_iter,
-				 std::vector<double> &points,
-				 std::vector<double> &weights);
-
+  // quadrature rules using QR on Jacobi matrix
+  bool Lower_quadrature_rules(const bool VERBOSE, const std::size_t n_points,
+                              const double tolerance,
+                              const std::size_t max_iter,
+                              std::vector<double> &points,
+                              std::vector<double> &weights);
 
   std::vector<double> moments;
   // 3-term recurrence
@@ -65,5 +58,4 @@ struct MomentSequence {
   std::vector<double> beta;
 };
 
-
-#endif
+#endif  // SRC_MOMENT_SEQUENCE_HPP_

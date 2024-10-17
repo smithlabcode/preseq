@@ -17,58 +17,51 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LOAD_DATA_FOR_COMPLEXITY_HPP
-#define LOAD_DATA_FOR_COMPLEXITY_HPP
+#ifndef SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
+#define SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
-#include <cstddef>
 
-size_t
-load_coverage_counts_MR(const bool VERBOSE,
-                        const std::string input_file_name,
-			const unsigned long int seed,
-                        const size_t bin_size,
-                        const size_t max_width,
+std::size_t
+load_coverage_counts_MR(const bool VERBOSE, const std::string input_file_name,
+                        const std::uint64_t seed, const std::size_t bin_size,
+                        const std::size_t max_width,
                         std::vector<double> &coverage_hist);
 
-
-size_t
+std::size_t
 load_coverage_counts_GR(const std::string input_file_name,
-			const unsigned long int seed,
-                        const size_t bin_size,
-                        const size_t max_width,
+                        const std::uint64_t seed, const std::size_t bin_size,
+                        const std::size_t max_width,
                         std::vector<double> &coverage_hist);
 
-
-size_t
+std::size_t
 load_histogram(const std::string &filename, std::vector<double> &counts_hist);
 
-size_t
-load_counts(const std::string &input_file_name, std::vector<double> &counts_hist);
+std::size_t
+load_counts(const std::string &input_file_name,
+            std::vector<double> &counts_hist);
 
-size_t
+std::size_t
 load_counts_BED_pe(const std::string input_file_name,
                    std::vector<double> &counts_hist);
 
-size_t
+std::size_t
 load_counts_BED_se(const std::string input_file_name,
                    std::vector<double> &counts_hist);
 
 #ifdef HAVE_HTSLIB
-size_t
-load_counts_BAM_pe(const bool VERBOSE,
-                   const std::string &input_file_name,
-                   const size_t MAX_SEGMENT_LENGTH,
-                   const size_t MAX_READS_TO_HOLD,
-                   size_t &n_paired,
-                   size_t &n_mates,
-                   std::vector<double> &counts_hist);
+std::size_t
+load_counts_BAM_pe(const bool VERBOSE, const std::string &input_file_name,
+                   const std::size_t MAX_SEGMENT_LENGTH,
+                   const std::size_t MAX_READS_TO_HOLD, std::size_t &n_paired,
+                   std::size_t &n_mates, std::vector<double> &counts_hist);
 
-size_t
+std::size_t
 load_counts_BAM_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist);
-#endif // HAVE_HTSLIB
+#endif  // HAVE_HTSLIB
 
-
-#endif
+#endif  // SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_

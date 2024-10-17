@@ -20,85 +20,86 @@
 
 #include "moment_sequence.hpp"
 
-#include <fstream>
+#include <algorithm>
+#include <cassert>
 #include <cmath>
-#include <numeric>
-#include <vector>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <cassert>
-#include <algorithm>
+#include <numeric>
+#include <string>
+#include <utility>  // std::swap
+#include <vector>
 
-using std::string;
-using std::vector;
-using std::endl;
-using std::max;
 using std::cerr;
-using std::setprecision;
-using std::swap;
+using std::endl;
 using std::find_if;
-using std::transform;
 using std::isfinite;
 using std::isinf;
+using std::max;
+using std::setprecision;
+using std::string;
+using std::swap;
+using std::transform;
+using std::vector;
 
-void 
-LU_decomp(vector<vector<double> > &A, vector<int> &P) {
- 
-    const size_t N = A.size();
-    double absA;
-    size_t i, j, k;
+void
+LU_decomp(vector<vector<double>> &A, vector<int> &P) {
+  const size_t N = A.size();
+  double absA;
+  size_t i, j, k;
 
-    P.clear();
-    for (size_t x = 0; x <= N; x++)
-        P.push_back(x);
+  P.clear();
+  for (size_t x = 0; x <= N; x++)
+    P.push_back(x);
 
-    for (i = 0; i < N; i++) {
-        double maxA = 0.0;
-        size_t imax = i;
+  for (i = 0; i < N; i++) {
+    double maxA = 0.0;
+    size_t imax = i;
 
-        for (k = i; k < N; k++)
-            if ((absA = fabs(A[k][i])) > maxA) {
-                maxA = absA;
-                imax = k;
-            }
+    for (k = i; k < N; k++)
+      if ((absA = fabs(A[k][i])) > maxA) {
+        maxA = absA;
+        imax = k;
+      }
 
-        if (imax != i) {
-            //pivoting P
-            size_t j = P[i];
-            P[i] = P[imax];
-            P[imax] = j;
+    if (imax != i) {
+      // pivoting P
+      size_t j = P[i];
+      P[i] = P[imax];
+      P[imax] = j;
 
-            //pivoting rows of A
-            vector<double> ptr(A[i]);
-            A[i] = A[imax];
-            A[imax] = ptr;
+      // pivoting rows of A
+      vector<double> ptr(A[i]);
+      A[i] = A[imax];
+      A[imax] = ptr;
 
-            //counting pivots starting from N (for determinant)
-            P[N]++;
-        }
-
-        for (j = i + 1; j < N; j++) {
-            A[j][i] /= A[i][i];
-
-            for (k = i + 1; k < N; k++)
-                A[j][k] -= A[j][i] * A[i][k];
-        }
+      // counting pivots starting from N (for determinant)
+      P[N]++;
     }
+
+    for (j = i + 1; j < N; j++) {
+      A[j][i] /= A[i][i];
+
+      for (k = i + 1; k < N; k++)
+        A[j][k] -= A[j][i] * A[i][k];
+    }
+  }
 }
 
-double 
-LU_determinant(vector<vector<double> > &A, vector<int> &P) {
+double
+LU_determinant(vector<vector<double>> &A, vector<int> &P) {
+  const size_t N = A.size();
 
-    const size_t N = A.size();
+  double det = A[0][0];
 
-    double det = A[0][0];
+  for (size_t i = 1; i < N; ++i)
+    det *= A[i][i];
 
-    for (size_t i = 1; i < N; ++i)
-        det *= A[i][i];
+  if ((P[N] - N) % 2 == 0)
+    return det;
 
-    if ((P[N] - N) % 2 == 0) return det;
-
-    return -det;
+  return -det;
 }
 
 /////////////////////////////////////////////////////
@@ -106,45 +107,43 @@ LU_determinant(vector<vector<double> > &A, vector<int> &P) {
 // ensure moment sequence is positive definite
 // truncate moment sequence to ensure pos def
 size_t
-ensure_pos_def_mom_seq(vector <double> &moments,
-                       const double tolerance,
+ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
                        const bool VERBOSE) {
-
   const size_t min_hankel_dim = 1;
   size_t hankel_dim = 2;
-  if (moments.size() < 2*hankel_dim) {
+  if (moments.size() < 2 * hankel_dim) {
     if (VERBOSE)
       cerr << "too few moments" << endl;
     return min_hankel_dim;
   }
 
   bool ACCEPT_HANKEL = true;
-  while (ACCEPT_HANKEL && (2*hankel_dim - 1 < moments.size())) {
-
-    vector<vector<double> > hankel_mat(hankel_dim, vector<double>(hankel_dim, 0.0));
+  while (ACCEPT_HANKEL && (2 * hankel_dim - 1 < moments.size())) {
+    vector<vector<double>> hankel_mat(hankel_dim,
+                                      vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
       for (size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-	hankel_mat[c_idx][r_idx] = moments[c_idx + r_idx];
+        hankel_mat[c_idx][r_idx] = moments[c_idx + r_idx];
 
     vector<int> perm;
     LU_decomp(hankel_mat, perm);
     const double hankel_mat_det = LU_determinant(hankel_mat, perm);
 
-    vector<vector<double> > shift_hankel_matrix(hankel_dim, vector<double>(hankel_dim, 0.0));
+    vector<vector<double>> shift_hankel_matrix(hankel_dim,
+                                               vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
       for (size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-	shift_hankel_matrix[c_idx][r_idx] = moments[c_idx + r_idx + 1];
+        shift_hankel_matrix[c_idx][r_idx] = moments[c_idx + r_idx + 1];
 
     vector<int> s_perm;
     LU_decomp(shift_hankel_matrix, s_perm);
-    const double shift_hankel_mat_det = LU_determinant(shift_hankel_matrix, s_perm);
+    const double shift_hankel_mat_det =
+      LU_determinant(shift_hankel_matrix, s_perm);
 
     if (VERBOSE) {
-      cerr << "dim" << '\t'
-           << "hankel_det" << '\t'
-           << "shifted_hankel_det" << endl;
-      cerr << hankel_dim << '\t'
-           << hankel_mat_det << '\t'
+      cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det"
+           << endl;
+      cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
            << shift_hankel_mat_det << endl;
     }
 
@@ -155,7 +154,7 @@ ensure_pos_def_mom_seq(vector <double> &moments,
     else {
       ACCEPT_HANKEL = false;
       hankel_dim--;
-      moments.resize(2*hankel_dim);
+      moments.resize(2 * hankel_dim);
       return hankel_dim;
     }
   }
@@ -170,7 +169,6 @@ ensure_pos_def_mom_seq(vector <double> &moments,
 // truncate if non-positive element found
 static void
 check_three_term_relation(vector<double> &a, vector<double> &b) {
-
   // abort if first entry is zero or smaller
   if (a[0] <= 0.0) {
     a.clear();
@@ -179,8 +177,8 @@ check_three_term_relation(vector<double> &a, vector<double> &b) {
 
   for (size_t i = 0; i < b.size(); i++)
     // ADS: some strange logic here
-    if (b[i] <= 0.0 || !isfinite(b[i]) ||
-        a[i + 1] <= 0.0 || !isfinite(a[i + 1])) {
+    if (b[i] <= 0.0 || !isfinite(b[i]) || a[i + 1] <= 0.0 ||
+        !isfinite(a[i + 1])) {
       b.resize(i);
       a.resize(i + 1);
       break;
@@ -191,7 +189,6 @@ check_three_term_relation(vector<double> &a, vector<double> &b) {
 // truncate at first non-positive element if found
 static void
 check_moment_sequence(vector<double> &obs_moms) {
-
   if (obs_moms[0] <= 0.0 || !isfinite(obs_moms[0]))
     obs_moms.clear();
 
@@ -203,30 +200,29 @@ check_moment_sequence(vector<double> &obs_moms) {
   }
 }
 
-
 void
 MomentSequence::unmodified_Chebyshev(const bool VERBOSE) {
-
-  const size_t n_points = static_cast<size_t>(floor(moments.size()/2));
+  const size_t n_points = static_cast<size_t>(floor(moments.size() / 2));
   vector<double> a(n_points, 0.0);
   vector<double> b(n_points - 1, 0.0);
 
-  vector< vector<double> > sigma(2*n_points, vector<double>(2*n_points, 0.0));
+  vector<vector<double>> sigma(2 * n_points, vector<double>(2 * n_points, 0.0));
   // initialization
-  a[0] = moments[1]/moments[0];
+  a[0] = moments[1] / moments[0];
   // sigma[-1][l] = 0
-  for (size_t l = 0; l < 2*n_points; l++)
+  for (size_t l = 0; l < 2 * n_points; l++)
     sigma[0][l] = moments[l];
 
   for (size_t k = 1; k <= n_points; k++) {
-    for (size_t l = k; l < 2*n_points - k; l++) {
-      sigma[k][l] = sigma[k-1][l+1] - a[k-1]*sigma[k-1][l];
+    for (size_t l = k; l < 2 * n_points - k; l++) {
+      sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
       if (k > 1)
-        sigma[k][l] -= b[k-2]*sigma[k-2][l];
+        sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
     }
     if (k != n_points) {
-      a[k] = sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
-      b[k-1] = sigma[k][k]/sigma[k-1][k-1];
+      a[k] =
+        sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
+      b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
     }
   }
 
@@ -239,34 +235,33 @@ void
 MomentSequence::full_3term_recurrence(const bool VERBOSE,
                                       vector<double> &full_alpha,
                                       vector<double> &full_beta) {
-
-  const size_t n_points = static_cast<size_t>(floor(moments.size()/2));
+  const size_t n_points = static_cast<size_t>(floor(moments.size() / 2));
   vector<double> a(n_points, 0.0);
   vector<double> b(n_points - 1, 0.0);
 
-  vector< vector<double> > sigma(2*n_points, vector<double>(2*n_points, 0.0));
+  vector<vector<double>> sigma(2 * n_points, vector<double>(2 * n_points, 0.0));
   // initialization
-  a[0] = moments[1]/moments[0];
+  a[0] = moments[1] / moments[0];
   // sigma[-1][l] = 0
-  for (size_t l = 0; l < 2*n_points; l++)
+  for (size_t l = 0; l < 2 * n_points; l++)
     sigma[0][l] = moments[l];
 
   for (size_t k = 1; k <= n_points; k++) {
-    for (size_t l = k; l < 2*n_points - k; l++) {
-      sigma[k][l] = sigma[k-1][l+1] - a[k-1]*sigma[k-1][l];
+    for (size_t l = k; l < 2 * n_points - k; l++) {
+      sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
       if (k > 1)
-        sigma[k][l] -= b[k-2]*sigma[k-2][l];
+        sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
     }
     if (k != n_points) {
-      a[k] = sigma[k][k+1]/sigma[k][k] - sigma[k-1][k]/sigma[k-1][k-1];
-      b[k-1] = sigma[k][k]/sigma[k-1][k-1];
+      a[k] =
+        sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
+      b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
     }
   }
 
   full_alpha.swap(a);
   full_beta.swap(b);
 }
-
 
 ////////////////////////////////////////////////////
 // Constructor
@@ -282,7 +277,6 @@ MomentSequence::MomentSequence(const vector<double> &obs_moms) :
   unmodified_Chebyshev(false);
 }
 
-
 /////////////////////////////////////////////////////
 // Quadrature Methods
 
@@ -293,7 +287,6 @@ MomentSequence::MomentSequence(const vector<double> &obs_moms) :
 static void
 QRiteration(vector<double> &alpha, vector<double> &beta,
             vector<double> &weights) {
-
   // initialize variables
   vector<double> sin_theta(alpha.size(), 0.0);
   vector<double> cos_theta(alpha.size(), 0.0);
@@ -316,39 +309,38 @@ QRiteration(vector<double> &alpha, vector<double> &beta,
   z_bar[0] = z[0];
 
   for (size_t j = 0; j < alpha.size() - 1; j++) {
-
     // for d and b_bar, j here is j-1 in G&W
     if (d[j] == 0.0 && b_bar[j] == 0.0) {
       sin_theta[j] = 0.0;
       cos_theta[j] = 1.0;
     }
     else {
-      sin_theta[j] = d[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
-      cos_theta[j] = b_bar[j]/sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+      sin_theta[j] = d[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
+      cos_theta[j] = b_bar[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
     }
 
-    a[j] = (a_bar[j]*cos_theta[j]*cos_theta[j] +
-            2*b_tilde[j]*cos_theta[j]*sin_theta[j] +
-            alpha[j+1]*sin_theta[j]*sin_theta[j]);
+    a[j] = (a_bar[j] * cos_theta[j] * cos_theta[j] +
+            2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
+            alpha[j + 1] * sin_theta[j] * sin_theta[j]);
 
-    a_bar[j+1] = (a_bar[j]*sin_theta[j]*sin_theta[j] -
-                  2*b_tilde[j]*cos_theta[j]*sin_theta[j] +
-                  alpha[j+1]*cos_theta[j]*cos_theta[j]);
+    a_bar[j + 1] = (a_bar[j] * sin_theta[j] * sin_theta[j] -
+                    2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
+                    alpha[j + 1] * cos_theta[j] * cos_theta[j]);
 
     if (j != 0)
-      b[j-1] = sqrt(d[j]*d[j] + b_bar[j]*b_bar[j]);
+      b[j - 1] = sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
 
-    b_bar[j+1] =
-      ((a_bar[j] - alpha[j+1])*sin_theta[j]*cos_theta[j] +
-       b_tilde[j]*(sin_theta[j]*sin_theta[j] - cos_theta[j]*cos_theta[j]));
+    b_bar[j + 1] = ((a_bar[j] - alpha[j + 1]) * sin_theta[j] * cos_theta[j] +
+                    b_tilde[j] * (sin_theta[j] * sin_theta[j] -
+                                  cos_theta[j] * cos_theta[j]));
 
-    b_tilde[j+1] = -beta[j+1]*cos_theta[j];
+    b_tilde[j + 1] = -beta[j + 1] * cos_theta[j];
 
-    d[j+1] = beta[j+1]*sin_theta[j];
+    d[j + 1] = beta[j + 1] * sin_theta[j];
 
-    z[j] = z_bar[j]*cos_theta[j] + weights[j+1]*sin_theta[j];
+    z[j] = z_bar[j] * cos_theta[j] + weights[j + 1] * sin_theta[j];
 
-    z_bar[j+1] = z_bar[j]*sin_theta[j] - weights[j+1]*cos_theta[j];
+    z_bar[j + 1] = z_bar[j] * sin_theta[j] - weights[j + 1] * cos_theta[j];
   }
 
   // last entries set equal to final "holding" values
@@ -361,22 +353,18 @@ QRiteration(vector<double> &alpha, vector<double> &beta,
   swap(weights, z);
 }
 
-
 static bool
 check_positivity(const vector<double> &v) {
   return find_if(begin(v), end(v),
-                 [](const double x) {return x <= 0.0 || isinf(x);}) == end(v);
+                 [](const double x) { return x <= 0.0 || isinf(x); }) == end(v);
 }
-
 
 bool
 MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
-                                       const size_t n_points,
-                                       const double tol,
+                                       const size_t n_points, const double tol,
                                        const size_t max_iter,
                                        vector<double> &points,
                                        vector<double> &weights) {
-
   // make sure that points.size() will be less than n_points
   vector<double> a(alpha);
   a.resize((n_points < alpha.size()) ? n_points : alpha.size());
@@ -420,7 +408,7 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
 
   // square entries in the weights vector
   transform(begin(weights), end(weights), begin(weights),
-            [](const double x) {return x*x;});
+            [](const double x) { return x * x; });
 
   return points_are_positive;
 }
