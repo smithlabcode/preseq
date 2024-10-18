@@ -54,10 +54,9 @@ load_counts_BED_se(const std::string &input_file_name,
 
 #ifdef HAVE_HTSLIB
 std::size_t
-load_counts_BAM_pe(const bool VERBOSE, const std::string &input_file_name,
-                   const std::size_t MAX_SEGMENT_LENGTH,
-                   const std::size_t MAX_READS_TO_HOLD, std::size_t &n_paired,
-                   std::size_t &n_mates, std::vector<double> &counts_hist);
+load_counts_BAM_pe(const std::string &input_file_name,
+                   // std::size_t &n_paired, std::size_t &n_mates,
+                   std::vector<double> &counts_hist);
 
 std::size_t
 load_counts_BAM_se(const std::string &input_file_name,

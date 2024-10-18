@@ -43,6 +43,7 @@ using std::min;
 using std::mt19937;
 using std::priority_queue;
 using std::runtime_error;
+using std::size;
 using std::size_t;
 using std::string;
 using std::uint64_t;
@@ -468,16 +469,15 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
                         const size_t bin_size, const size_t max_width,
                         vector<double> &coverage_hist) {
   srand(time(0) + getpid());
-  // Runif runif(rand());
   std::mt19937 generator(seed);
 
   std::ifstream in(input_file_name);
   if (!in)
-    throw "problem opening file: " + input_file_name;
+    throw runtime_error("problem opening file: " + input_file_name);
 
   GenomicRegion inputGR;
   if (!(in >> inputGR))
-    throw "problem reading from: " + input_file_name;
+    throw runtime_error("problem reading from: " + input_file_name);
 
   // initialize prioirty queue to reorder the split reads
   ReadPQ PQ;
@@ -512,291 +512,205 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
   return n_reads;
 }
 
-/*
- * This code is used to deal with read data in BAM format.
- */
 #ifdef HAVE_HTSLIB
-// switching dependency on bamtools to samtools
-#include "htslib_wrapper_deprecated.hpp"
+/* Deal with SAM/BAM format only if we have htslib
+ */
+
+#include "bam_record_utils.hpp"  // from dnmtools
+
+#include <bamxx.hpp>  // from bamxx
+#include <htslib_wrapper.hpp>
+
+static inline void
+swap(bamxx::bam_rec &a, bamxx::bam_rec &b) {
+  std::swap(a.b, b.b);
+}
+
+static inline void
+update_se_duplicate_counts_hist_BAM(
+  const int32_t curr_tid, const hts_pos_t curr_pos, const int32_t prev_tid,
+  const hts_pos_t prev_pos, const string &inputfile,
+  vector<double> &counts_hist, size_t &current_count) {
+  // check if reads are sorted; situation of unordered chroms is taken
+  // care of outside this function
+  if (curr_tid == prev_tid && curr_pos < prev_pos)
+    throw runtime_error("locations unsorted in: " + inputfile);
+
+  if (curr_tid != prev_tid || curr_pos != prev_pos) {
+    // next read is new, update counts_hist to include current_count
+    if (counts_hist.size() < current_count + 1) {
+      // histogram is too small, resize
+      counts_hist.resize(current_count + 1, 0.0);
+    }
+    ++counts_hist[current_count];
+    current_count = 1;
+  }
+  else  // next read is same, update current_count
+    ++current_count;
+}
 
 size_t
-load_counts_BAM_se(const string &input_file_name, vector<double> &counts_hist) {
-  const string mapper = "general";
-  SAMReader_deprecated sam_reader(input_file_name, mapper);
-  if (!sam_reader)
-    throw runtime_error("problem opening input file " + input_file_name);
+load_counts_BAM_se(/*const size_t n_threads, */
+                   const string &inputfile, vector<double> &counts_hist) {
+  // bamxx::bam_tpool tp(n_threads);
 
-  SAMRecord samr;
-  sam_reader >> samr;
-  size_t n_reads = 1;
-  // resize vals_hist, make sure it starts out empty
-  counts_hist.clear();
-  counts_hist.resize(2, 0.0);
+  bamxx::bam_in hts(inputfile);  // assume already checked
+  bamxx::bam_header hdr(hts);
+  if (!hdr)
+    throw runtime_error("failed to read header");
+
+  // if (n_threads > 1) tp.set_io(hts);
+
+  // find first mapped read to start
+  bamxx::bam_rec aln;
+  while (hts.read(hdr, aln) && get_tid(aln) == -1)
+    ;
+
+  size_t n_reads{};
+  // if all reads unmapped, must return
+  if (get_tid(aln) == -1)
+    return n_reads;
+
+  // to check that reads are sorted properly
+  vector<bool> chroms_seen(get_n_targets(hdr), false);
+
+  // start with prev_aln being first read
+  bamxx::bam_rec prev_aln;
+  swap(aln, prev_aln);
+  int32_t prev_tid = get_tid(prev_aln);
+  int32_t prev_pos = get_pos(prev_aln);
+
+  // start with count of 1 for first read seen
   size_t current_count = 1;
 
-  MappedRead prev_mr, curr_mr;
-  prev_mr = samr.mr;
-
-  while (sam_reader >> samr) {
-    // only convert mapped and primary reads
-    if (samr.is_primary && samr.is_mapped) {
-      // ignore unmapped reads & secondary alignments
-      if (!(samr.is_mapping_paired) ||
-          (samr.is_mapping_paired && samr.is_Trich)) {
-        // only count unpaired reads or the left mate of paired reads
-        curr_mr = samr.mr;
-        update_se_duplicate_counts_hist(curr_mr.r, prev_mr.r, input_file_name,
-                                        counts_hist, current_count);
-
-        // update number of reads and prev read
-        ++n_reads;
-        prev_mr = samr.mr;
-      }
+  while (hts.read(hdr, aln)) {
+    const int32_t curr_tid = get_tid(aln);
+    const int32_t curr_pos = get_pos(aln);
+    if (curr_tid != prev_tid) {
+      if (chroms_seen[curr_tid])
+        throw runtime_error("input not sorted");
+      chroms_seen[curr_tid] = true;
     }
+
+    // check that mapped read is not secondary
+    if (curr_tid != -1) {  // check that read is mapped
+      update_se_duplicate_counts_hist_BAM(curr_tid, curr_pos, prev_tid,
+                                          prev_pos, inputfile, counts_hist,
+                                          current_count);
+      ++n_reads;
+    }
+    prev_pos = curr_pos;
+    prev_tid = curr_tid;
   }
 
   // to account for the last read compared to the one before it.
-  if (counts_hist.size() < current_count + 1)
+  if (size(counts_hist) < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
 
   return n_reads;
 }
 
-/********Below are functions for merging pair-end reads********/
+static inline void
+update_pe_duplicate_counts_hist_BAM(
+  // clang-format off
+  const int32_t curr_tid, const hts_pos_t curr_pos,
+  const int32_t curr_mtid, const hts_pos_t curr_mpos,  // vals for curr
+  const int32_t prev_tid, const hts_pos_t prev_pos,
+  const int32_t prev_mtid, const hts_pos_t prev_mpos,  // vals for prev
+  // clang-format on
+  const string &inputfile, vector<double> &counts_hist, size_t &current_count) {
+  // check if reads are sorted; situation of unordered chroms is taken
+  // care of outside this function
+  if (curr_tid == prev_tid && curr_pos < prev_pos)
+    throw runtime_error("locations unsorted in: " + inputfile);
 
-static bool
-merge_mates(const size_t suffix_len, const size_t range,
-            const GenomicRegion &one, const GenomicRegion &two,
-            GenomicRegion &merged, int &len) {
-  assert(one.same_chrom(two));
-  const size_t read_start = min(one.get_start(), two.get_start());
-  const size_t read_end = max(one.get_end(), two.get_end());
-
-  len = read_end - read_start;
-
-  if (len < 0)
-    return false;
-
-  merged = one;
-  merged.set_start(read_start);
-  merged.set_end(read_end);
-  merged.set_score(one.get_score() + two.get_score());
-
-  const string name(one.get_name());
-  merged.set_name("FRAG:" + name.substr(0, name.size() - suffix_len));
-
-  return true;
-}
-
-inline static bool
-same_read(const size_t suffix_len, const MappedRead &a, const MappedRead &b) {
-  const string sa(a.r.get_name());
-  const string sb(b.r.get_name());
-  bool SAME_NAME = false;
-  if (sa == sb)
-    SAME_NAME = true;
-  return (SAME_NAME && a.r.same_chrom(b.r));
-}
-
-// return true if the genomic region is null
-static inline bool
-GenomicRegionIsNull(const GenomicRegion &gr) {
-  GenomicRegion null_gr;
-  if (gr == null_gr)
-    return true;
-
-  return false;
-}
-
-static void
-empty_pq(GenomicRegion &prev_gr,
-         priority_queue<GenomicRegion, vector<GenomicRegion>,
-                        GenomicRegionOrderChecker> &read_pq,
-         const string &input_file_name, vector<double> &counts_hist,
-         size_t &current_count) {
-  GenomicRegion curr_gr = read_pq.top();
-  read_pq.pop();
-
-  // check if reads are sorted
-  if (curr_gr.same_chrom(prev_gr) &&
-      curr_gr.get_start() < prev_gr.get_start() &&
-      curr_gr.get_end() < prev_gr.get_end()) {
-    std::ostringstream oss;
-    oss << "reads unsorted in: " << input_file_name << "\n"
-        << "prev = \t" << prev_gr << "\n"
-        << "curr = \t" << curr_gr << "\n"
-        << "Increase seg_len if in paired end mode";
-    throw runtime_error(oss.str());
-  }
-
-  if (GenomicRegionIsNull(prev_gr))
-    current_count = 1;
-  else {
-    std::ostringstream oss;
-    bool UPDATE_HIST = update_pe_duplicate_counts_hist(
-      curr_gr, prev_gr, counts_hist, current_count);
-    if (!UPDATE_HIST) {
-      oss << "locations unsorted in: " << input_file_name << "\n"
-          << "prev = \t" << prev_gr << "\n"
-          << "curr = \t" << curr_gr << "\n";
-      throw runtime_error(oss.str());
+  if (curr_tid != prev_tid || curr_pos != prev_pos || curr_mtid != prev_mtid ||
+      curr_mpos != prev_mpos) {
+    // next read is new, update counts_hist to include current_count
+    if (counts_hist.size() < current_count + 1) {
+      // histogram is too small, resize
+      counts_hist.resize(current_count + 1, 0.0);
     }
+    ++counts_hist[current_count];
+    current_count = 1;
   }
-  prev_gr = curr_gr;
+  else  // next read is same, update current_count
+    ++current_count;
 }
 
 size_t
-load_counts_BAM_pe(const bool VERBOSE, const string &input_file_name,
-                   const size_t MAX_SEGMENT_LENGTH,
-                   const size_t MAX_READS_TO_HOLD, size_t &n_paired,
-                   size_t &n_mates, vector<double> &counts_hist) {
-  const string mapper = "general";
-  SAMReader_deprecated sam_reader(input_file_name, mapper);
+load_counts_BAM_pe(const string &inputfile, vector<double> &counts_hist) {
+  bamxx::bam_in hts(inputfile);  // assume already checked
+  bamxx::bam_header hdr(hts);
+  if (!hdr)
+    throw runtime_error("failed to read header");
 
-  // check sam_reader
-  if (!sam_reader)
-    throw runtime_error("problem opening input file " + input_file_name);
+  // if (n_threads > 1) tp.set_io(hts);
 
-  SAMRecord samr;
-  // resize vals_hist, make sure it starts out empty
-  counts_hist.clear();
-  counts_hist.resize(2, 0.0);
-  size_t current_count = 0;
-  size_t suffix_len = 0;
-  n_paired = 0;
-  n_mates = 0;
-  size_t n_unpaired = 0;
-  size_t progress_step = 1000000;
+  // find first mapped read to start
+  bamxx::bam_rec aln;
+  while (hts.read(hdr, aln) && get_tid(aln) == -1)
+    ;
 
-  GenomicRegion prev_gr;
+  size_t n_reads{};
+  // if all reads unmapped, must return
+  if (get_tid(aln) == -1)
+    return n_reads;
 
-  std::priority_queue<GenomicRegion, vector<GenomicRegion>,
-                      GenomicRegionOrderChecker>
-    read_pq;
+  // to check that reads are sorted properly
+  vector<bool> chroms_seen(get_n_targets(hdr), false);
 
-  unordered_map<string, SAMRecord> dangling_mates;
+  // start with prev_aln being first read
+  bamxx::bam_rec prev_aln;
+  swap(aln, prev_aln);
 
-  while (sam_reader >> samr) {
-    // only convert mapped and primary reads
-    if (samr.is_primary && samr.is_mapped) {
-      ++n_mates;
+  int32_t prev_tid = get_tid(prev_aln);
+  int32_t prev_pos = get_pos(prev_aln);
+  int32_t prev_mtid = get_mtid(prev_aln);
+  int32_t prev_mpos = get_mpos(prev_aln);
 
-      // deal with paired-end stuff
-      if (samr.is_mapping_paired) {
-        const size_t name_len = samr.mr.r.get_name().size() - suffix_len;
-        const string read_name(samr.mr.r.get_name().substr(0, name_len));
+  // start with count of 1 for first read seen
+  size_t current_count = 1;
 
-        if (dangling_mates.find(read_name) != dangling_mates.end()) {
-          // other end is in dangling mates, merge the two mates
-          if (same_read(suffix_len, samr.mr, dangling_mates[read_name].mr)) {
-            if (samr.is_Trich)
-              std::swap(samr, dangling_mates[read_name]);
-            GenomicRegion merged;
-            int len = 0;
-            const bool MERGE_SUCCESS = merge_mates(
-              suffix_len, MAX_SEGMENT_LENGTH, dangling_mates[read_name].mr.r,
-              samr.mr.r, merged, len);
-            // merge success!
-            if (MERGE_SUCCESS && len >= 0 &&
-                len <= static_cast<int>(MAX_SEGMENT_LENGTH)) {
-              read_pq.push(merged);
-              ++n_paired;
-            }
-            else {
-              // informative error message!
-              if (VERBOSE) {
-                cerr << "problem merging read " << read_name
-                     << ", splitting read" << endl
-                     << samr.mr << "\t" << samr.is_mapping_paired << endl
-                     << dangling_mates[read_name].mr << "\t"
-                     << dangling_mates[read_name].is_mapping_paired << endl
-                     << "To merge, set max segement "
-                     << "length (seg_len) higher." << endl;
-              }
-              read_pq.push(samr.mr.r);
-              read_pq.push(dangling_mates[read_name].mr.r);
-              n_unpaired += 2;
-            }
-            dangling_mates.erase(read_name);
-          }
-          else {
-            read_pq.push(samr.mr.r);
-            read_pq.push(dangling_mates[read_name].mr.r);
-            dangling_mates.erase(read_name);
-            n_unpaired += 2;
-          }
-        }
-        else  // didn't find read in dangling_mates, store for later
-          dangling_mates[read_name] = samr;
-      }
-      else {
-        read_pq.push(samr.mr.r);
-        ++n_unpaired;
-      }
+  while (hts.read(hdr, aln)) {
+    const int32_t curr_tid = get_tid(aln);
+    const int32_t curr_pos = get_pos(aln);
+    const int32_t curr_mtid = get_mtid(aln);
+    const int32_t curr_mpos = get_mpos(aln);
 
-      // dangling mates is too large, flush dangling_mates of reads
-      // on different chroms and too far away
-      if (dangling_mates.size() > MAX_READS_TO_HOLD) {
-        unordered_map<string, SAMRecord> tmp;
-        for (unordered_map<string, SAMRecord>::iterator itr =
-               dangling_mates.begin();
-             itr != dangling_mates.end(); ++itr) {
-          if (itr->second.mr.r.get_chrom() != samr.mr.r.get_chrom() ||
-              (itr->second.mr.r.get_chrom() == samr.mr.r.get_chrom() &&
-               itr->second.mr.r.get_end() + MAX_SEGMENT_LENGTH <
-                 samr.mr.r.get_start())) {
-            if (itr->second.seg_len >= 0) {
-              read_pq.push(itr->second.mr.r);
-              ++n_unpaired;
-            }
-          }
-          else
-            tmp[itr->first] = itr->second;
-        }
-        std::swap(tmp, dangling_mates);
-        tmp.clear();
-      }
-
-      // now empty the priority queue
-      if (!(read_pq.empty()) &&
-          is_ready_to_pop(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
-        // begin emptying priority queue
-        while (!(read_pq.empty()) &&
-               is_ready_to_pop(read_pq, samr.mr.r, MAX_SEGMENT_LENGTH)) {
-          empty_pq(prev_gr, read_pq, input_file_name, counts_hist,
-                   current_count);
-        }
-      }
-
-      if (VERBOSE && n_mates % progress_step == 0)
-        cerr << "Processed " << n_mates << " records" << endl;
+    if (curr_mtid < curr_tid ||
+        (curr_mtid == curr_tid && curr_mpos == curr_mtid)) {
+      // ADS: this means that we should already have processed this
+      // same read pair earlier
+      continue;
     }
+
+    if (curr_tid != prev_tid) {
+      if (chroms_seen[curr_tid])
+        throw runtime_error("input not sorted");
+      chroms_seen[curr_tid] = true;
+    }
+
+    // check that mapped read is not secondary
+    if (curr_tid != -1) {  // check that read is mapped
+      update_pe_duplicate_counts_hist_BAM(
+        curr_tid, curr_pos, curr_mtid, curr_mpos,  // vals for curr
+        prev_tid, prev_pos, prev_mtid, prev_mpos,  // vals for prev
+        inputfile, counts_hist, current_count);
+
+      ++n_reads;
+    }
+    prev_tid = curr_tid;
+    prev_pos = curr_pos;
+    prev_mtid = curr_mtid;
+    prev_mpos = curr_mpos;
   }
 
-  // empty dangling mates of any excess reads
-  while (!dangling_mates.empty()) {
-    read_pq.push(dangling_mates.begin()->second.mr.r);
-    dangling_mates.erase(dangling_mates.begin());
-    ++n_unpaired;
-  }
-
-  // final iteration
-  while (!read_pq.empty())
-    empty_pq(prev_gr, read_pq, input_file_name, counts_hist, current_count);
-
-  if (counts_hist.size() < current_count + 1)
+  // to account for the last read compared to the one before it.
+  if (size(counts_hist) < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
-
   ++counts_hist[current_count];
-
-  assert((read_pq.empty()));
-
-  size_t n_reads = n_unpaired + n_paired;
-
-  if (VERBOSE)
-    cerr << "paired = " << n_paired << endl
-         << "unpaired = " << n_unpaired << endl;
 
   return n_reads;
 }
