@@ -31,13 +31,16 @@ EXTRA_DIST = \
 	docs \
 	tests/md5sum.txt \
 	tests/data/lc_extrap_input.vals \
+	tests/data/gc_extrap_input.mr \
 	tests/data/c_curve_input.hist \
 	tests/scripts/test_c_curve.test \
+	tests/scripts/test_gc_extrap.test \
 	tests/scripts/test_lc_extrap.test
 
 TESTS = \
 	tests/scripts/test_c_curve.test \
-	tests/scripts/test_lc_extrap.test
+	tests/scripts/test_lc_extrap.test \
+	tests/scripts/test_gc_extrap.test
 
 TEST_EXTENSIONS = .test
 
