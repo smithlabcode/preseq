@@ -34,6 +34,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <string>
 
 static std::string
 usage_message() {
