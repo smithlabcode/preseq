@@ -175,8 +175,8 @@ gc_extrap_main(const int argc, const char *argv[]) {
     else {
       if (VERBOSE)
         cerr << "MAPPED READ FORMAT" << endl;
-      n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, seed,
-                                        bin_size, max_width, coverage_hist);
+      n_reads = load_coverage_counts_MR(input_file_name, seed, bin_size,
+                                        max_width, coverage_hist);
     }
 
     const double total_bins = get_counts_from_hist(coverage_hist);
