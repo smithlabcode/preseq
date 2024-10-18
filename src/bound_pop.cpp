@@ -249,8 +249,8 @@ of observed species in an initial sample.)";
       }
 
       vector<double> points, weights;
-      obs_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance, max_iter,
-                                         points, weights);
+      obs_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter, points,
+                                         weights);
 
       // renormalize if needed
       const double weights_sum = accumulate(begin(weights), end(weights), 0.0);
@@ -341,8 +341,8 @@ of observed species in an initial sample.)";
         MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
         vector<double> points, weights;
-        bootstrap_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance,
-                                                 max_iter, points, weights);
+        bootstrap_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter,
+                                                 points, weights);
 
         // renormalize if needed
         const double weights_sum =
