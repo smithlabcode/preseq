@@ -14,14 +14,32 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 
-EXTRA_DIST = README.md LICENSE preseqR data docs
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS := src/smithlab_cpp
 install installdirs: SUBDIRS := $(filter-out src/smithlab_cpp, $(SUBDIRS))
 AM_CPPFLAGS = -I $(top_srcdir)/src/smithlab_cpp
+AM_CPPFLAGS += -Wall -Wextra -Wpedantic -Wno-unknown-attributes
 
 CXXFLAGS = -O2 # default has optimization on
+
+EXTRA_DIST = \
+	README.md \
+	LICENSE \
+	preseqR \
+	data \
+	docs \
+	tests/md5sum.txt \
+	tests/data/lc_extrap_input.vals \
+	tests/data/c_curve_input.hist \
+	tests/scripts/test_c_curve.test \
+	tests/scripts/test_lc_extrap.test
+
+TESTS = \
+	tests/scripts/test_c_curve.test \
+	tests/scripts/test_lc_extrap.test
+
+TEST_EXTENSIONS = .test
 
 LDADD = src/smithlab_cpp/libsmithlab_cpp.a
 
