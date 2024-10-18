@@ -21,6 +21,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "dnmt_error.hpp"
 #include "smithlab_utils.hpp"
@@ -122,7 +123,8 @@ sam_realloc_bam_data(bam1_t *b, size_t desired) {
       bam_set_mempolicy(b, bam_get_mempolicy(b) & (~BAM_USER_OWNS_DATA));
     }
   }
-  if (!new_data) return -1;
+  if (!new_data)
+    return -1;
   b->data = new_data;
   b->m_data = new_m_data;
   return 0;
@@ -267,21 +269,25 @@ to_insertion(const uint32_t x) {
 
 static inline void
 fix_internal_softclip(const size_t n_cigar, uint32_t *cigar) {
-  if (n_cigar < 3) return;
+  if (n_cigar < 3)
+    return;
   // find first non-softclip
   auto c_beg = cigar;
   auto c_end = cigar + n_cigar;
 
   while (!cigar_eats_ref(*c_beg) && ++c_beg != c_end)
     ;
-  if (c_beg == c_end) throw dnmt_error("cigar eats no ref");
+  if (c_beg == c_end)
+    throw dnmt_error("cigar eats no ref");
 
   while (!cigar_eats_ref(*(c_end - 1)) && --c_end != c_beg)
     ;
-  if (c_beg == c_end) throw dnmt_error("cigar eats no ref");
+  if (c_beg == c_end)
+    throw dnmt_error("cigar eats no ref");
 
   for (auto c_itr = c_beg; c_itr != c_end; ++c_itr)
-    if (bam_cigar_op(*c_itr) == BAM_CSOFT_CLIP) *c_itr = to_insertion(*c_itr);
+    if (bam_cigar_op(*c_itr) == BAM_CSOFT_CLIP)
+      *c_itr = to_insertion(*c_itr);
 }
 
 static inline uint32_t
@@ -291,7 +297,8 @@ to_softclip(const uint32_t x) {
 
 static inline void
 fix_external_insertion(const size_t n_cigar, uint32_t *cigar) {
-  if (n_cigar < 2) return;
+  if (n_cigar < 2)
+    return;
 
   auto c_itr = cigar;
   const auto c_end = c_itr + n_cigar;
@@ -299,7 +306,8 @@ fix_external_insertion(const size_t n_cigar, uint32_t *cigar) {
   for (; !cigar_eats_ref(*c_itr) && c_itr != c_end; ++c_itr)
     *c_itr = to_softclip(*c_itr);
 
-  if (c_itr == c_end) throw dnmt_error("cigar eats no ref");
+  if (c_itr == c_end)
+    throw dnmt_error("cigar eats no ref");
 
   c_itr = cigar + n_cigar - 1;
   for (; !cigar_eats_ref(*c_itr) && c_itr != cigar; --c_itr)
@@ -308,7 +316,8 @@ fix_external_insertion(const size_t n_cigar, uint32_t *cigar) {
 
 static inline size_t
 merge_cigar_ops(const size_t n_cigar, uint32_t *cigar) {
-  if (n_cigar < 2) return n_cigar;
+  if (n_cigar < 2)
+    return n_cigar;
   auto c_itr1 = cigar;
   auto c_end = c_itr1 + n_cigar;
   auto c_itr2 = c_itr1 + 1;
@@ -404,7 +413,8 @@ get_full_and_partial_ops(const uint32_t *cig_in, const uint32_t in_ops,
   uint32_t i = 0;
   for (i = 0; i < in_ops; ++i) {
     if (cigar_eats_ref(cig_in[i])) {
-      if (rlen + bam_cigar_oplen(cig_in[i]) > n_ref_full) break;
+      if (rlen + bam_cigar_oplen(cig_in[i]) > n_ref_full)
+        break;
       rlen += bam_cigar_oplen(cig_in[i]);
     }
   }
@@ -448,7 +458,8 @@ revcom_byte_then_reverse(unsigned char *a, unsigned char *b) {
     *p2 ^= *p1;
     *p1 ^= *p2;
   }
-  if (p1 == p2) *p1 = byte_revcom_table[*p1];
+  if (p1 == p2)
+    *p1 = byte_revcom_table[*p1];
 }
 
 static inline void
@@ -533,7 +544,8 @@ flip_conversion(bam1_t *aln) {
 
   // ADS: don't like *(cv + 1) below, but no HTSlib function for it?
   auto cv = bam_aux_get(aln, "CV");
-  if (!cv) throw dnmt_error("bam_aux_get failed for CV");
+  if (!cv)
+    throw dnmt_error("bam_aux_get failed for CV");
   *(cv + 1) = 'T';
 }
 
@@ -544,7 +556,8 @@ flip_conversion(bam_rec &aln) {
 
 // static inline bool
 // are_mates(const bam1_t *one, const bam1_t *two) {
-//   return one->core.mtid == two->core.tid && one->core.mpos == two->core.pos &&
+//   return one->core.mtid == two->core.tid && one->core.mpos == two->core.pos
+//   &&
 //          (one->core.flag & BAM_FREVERSE) != (one->core.flag & BAM_FREVERSE);
 //   // below is a consistency check and should not be necessary
 //   /* &&
@@ -593,7 +606,8 @@ truncate_overlap(const bam1_t *a, const uint32_t overlap, bam1_t *c) {
                              isize,         // rlen from new cigar
                              c_seq_len,     // truncated seq length
                              8);            // enough for the 2 tags?
-  if (ret < 0) throw dnmt_error(ret, "bam_set1_wrapper");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_set1_wrapper");
 
   const size_t n_bytes_to_copy = (c_seq_len + 1) / 2;  // compression
   std::copy_n(bam_get_seq(a), n_bytes_to_copy, bam_get_seq(c));
@@ -602,19 +616,22 @@ truncate_overlap(const bam1_t *a, const uint32_t overlap, bam1_t *c) {
   const int64_t nm = bam_aux2i(bam_aux_get(a, "NM"));  // ADS: do better here!
   // "_udpate" for "int" because it determines the right size
   ret = bam_aux_update_int(c, "NM", nm);
-  if (ret < 0) throw dnmt_error(ret, "bam_aux_update_int");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_aux_update_int");
 
   const uint8_t conversion = bam_aux2A(bam_aux_get(a, "CV"));
   // "_append" for "char" because there is no corresponding update
   ret = bam_aux_append(c, "CV", 'A', 1, &conversion);
-  if (ret < 0) throw dnmt_error(ret, "bam_aux_append");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_aux_append");
 
   return ret;
 }
 
 int
 truncate_overlap(const bam_rec &a, const uint32_t overlap, bam_rec &c) {
-  if (c.b == nullptr) c.b = bam_init1();
+  if (c.b == nullptr)
+    c.b = bam_init1();
   return truncate_overlap(a.b, overlap, c.b);
 }
 
@@ -689,7 +706,8 @@ merge_overlap(const bam1_t *a, const bam1_t *b, const uint32_t head,
                              isize,         // updated
                              c_seq_len,     // merged sequence length
                              8);            // enough for 2 tags?
-  if (ret < 0) throw dnmt_error(ret, "bam_set1_wrapper in merge_overlap");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_set1_wrapper in merge_overlap");
   // Merge the sequences by bytes
   merge_by_byte(a, b, c);
 
@@ -697,12 +715,14 @@ merge_overlap(const bam1_t *a, const bam1_t *b, const uint32_t head,
   const int64_t nm =
     (bam_aux2i(bam_aux_get(a, "NM")) + bam_aux2i(bam_aux_get(b, "NM")));
   ret = bam_aux_update_int(c, "NM", nm);
-  if (ret < 0) throw dnmt_error(ret, "bam_aux_update_int in merge_overlap");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_aux_update_int in merge_overlap");
 
   // add the tag for conversion
   const uint8_t cv = bam_aux2A(bam_aux_get(a, "CV"));
   ret = bam_aux_append(c, "CV", 'A', 1, &cv);
-  if (ret < 0) throw dnmt_error(ret, "bam_aux_append in merge_overlap");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_aux_append in merge_overlap");
 
   return ret;
 }
@@ -710,7 +730,8 @@ merge_overlap(const bam1_t *a, const bam1_t *b, const uint32_t head,
 int
 merge_overlap(const bam_rec &a, const bam_rec &b, const uint32_t head,
               bam_rec &c) {
-  if (c.b == nullptr) c.b = bam_init1();
+  if (c.b == nullptr)
+    c.b = bam_init1();
   return merge_overlap(a.b, b.b, head, c.b);
 }
 
@@ -756,7 +777,8 @@ merge_non_overlap(const bam1_t *a, const bam1_t *b, const uint32_t spacer,
                              isize,  // TLEN (relative to reference; SAM docs)
                              c_seq_len,  // merged sequence length
                              8);         // enough for 2 tags of 1 byte value?
-  if (ret < 0) throw dnmt_error(ret, "bam_set1 in merge_non_overlap");
+  if (ret < 0)
+    throw dnmt_error(ret, "bam_set1 in merge_non_overlap");
 
   merge_by_byte(a, b, c);
 
@@ -765,12 +787,14 @@ merge_non_overlap(const bam1_t *a, const bam1_t *b, const uint32_t spacer,
     (bam_aux2i(bam_aux_get(a, "NM")) + bam_aux2i(bam_aux_get(b, "NM")));
   // "udpate" for "int" because it determines the right size
   ret = bam_aux_update_int(c, "NM", nm);
-  if (ret < 0) throw dnmt_error(ret, "merge_non_overlap:bam_aux_update_int");
+  if (ret < 0)
+    throw dnmt_error(ret, "merge_non_overlap:bam_aux_update_int");
 
   const uint8_t cv = bam_aux2A(bam_aux_get(a, "CV"));
   // "append" for "char" because there is no corresponding update
   ret = bam_aux_append(c, "CV", 'A', 1, &cv);
-  if (ret < 0) throw dnmt_error(ret, "merge_non_overlap:bam_aux_append");
+  if (ret < 0)
+    throw dnmt_error(ret, "merge_non_overlap:bam_aux_append");
 
   return ret;
 }
@@ -778,7 +802,8 @@ merge_non_overlap(const bam1_t *a, const bam1_t *b, const uint32_t spacer,
 int
 merge_non_overlap(const bam_rec &a, const bam_rec &b, const uint32_t spacer,
                   bam_rec &c) {
-  if (c.b == nullptr) c.b = bam_init1();
+  if (c.b == nullptr)
+    c.b = bam_init1();
   return merge_non_overlap(a.b, b.b, spacer, c.b);
 }
 
@@ -797,7 +822,8 @@ keep_better_end(const bam1_t *a, const bam1_t *b, bam1_t *c) {
 
 int
 keep_better_end(const bam_rec &a, const bam_rec &b, bam_rec &c) {
-  if (c.b == nullptr) c.b = bam_init1();
+  if (c.b == nullptr)
+    c.b = bam_init1();
   return keep_better_end(a.b, b.b, c.b);
 }
 
@@ -806,21 +832,25 @@ static inline void
 standardize_format(const string &input_format, bam1_t *aln) {
   int err_code = 0;
 
-  if (input_format == "abismal" || input_format == "walt") return;
+  if (input_format == "abismal" || input_format == "walt")
+    return;
 
   if (input_format == "bsmap") {
     // A/T rich: get the ZS tag value
     const auto zs_tag = bam_aux_get(aln, "ZS");
-    if (!zs_tag) throw dnmt_error("bam_aux_get for ZS (invalid bsmap)");
+    if (!zs_tag)
+      throw dnmt_error("bam_aux_get for ZS (invalid bsmap)");
     // ADS: test for errors on the line below
     const auto zs_tag_value = string(bam_aux2Z(zs_tag));
-    if (zs_tag_value.empty()) throw dnmt_error("empty ZS tag in bsmap format");
+    if (zs_tag_value.empty())
+      throw dnmt_error("empty ZS tag in bsmap format");
     if (zs_tag_value[0] != '-' && zs_tag_value[0] != '+')
       throw dnmt_error("invalid ZS tag in bsmap format");
     const uint8_t cv = zs_tag_value[1] == '-' ? 'A' : 'T';
     // get the "mismatches" tag
     const auto nm_tag = bam_aux_get(aln, "NM");
-    if (!nm_tag) throw dnmt_error("invalid NM tag in bsmap format");
+    if (!nm_tag)
+      throw dnmt_error("invalid NM tag in bsmap format");
     const int64_t nm = bam_aux2i(nm_tag);
 
     // ADS: this should delete the aux data by truncating the used
@@ -840,7 +870,8 @@ standardize_format(const string &input_format, bam1_t *aln) {
       throw dnmt_error(err_code, "error setting conversion in bsmap format");
 
     // reverse complement if needed
-    if (bam_is_rev(aln)) revcomp_seq_by_byte(aln);
+    if (bam_is_rev(aln))
+      revcomp_seq_by_byte(aln);
   }
   else if (input_format == "bismark") {
     // ADS: Previously we modified the read names at the first
@@ -849,11 +880,13 @@ standardize_format(const string &input_format, bam1_t *aln) {
 
     // A/T rich; get the XR tag value
     auto xr_tag = bam_aux_get(aln, "XR");
-    if (!xr_tag) throw dnmt_error("bam_aux_get for XR (invalid bismark)");
+    if (!xr_tag)
+      throw dnmt_error("bam_aux_get for XR (invalid bismark)");
     const uint8_t cv = string(bam_aux2Z(xr_tag)) == "GA" ? 'A' : 'T';
     // get the "mismatches" tag
     auto nm_tag = bam_aux_get(aln, "NM");
-    if (!nm_tag) throw dnmt_error("bam_aux_get for NM (invalid bismark)");
+    if (!nm_tag)
+      throw dnmt_error("bam_aux_get for NM (invalid bismark)");
     const int64_t nm = bam_aux2i(nm_tag);
 
     aln->l_data = bam_get_aux(aln) - aln->data;  // del aux (no data resize)
@@ -862,17 +895,20 @@ standardize_format(const string &input_format, bam1_t *aln) {
     // "udpate" for "int" because it determines the right size; even
     // though we just deleted all tags, it will add it back here.
     err_code = bam_aux_update_int(aln, "NM", nm);
-    if (err_code < 0) throw dnmt_error(err_code, "bam_aux_update_int");
+    if (err_code < 0)
+      throw dnmt_error(err_code, "bam_aux_update_int");
     // "append" for "char" because there is no corresponding update
     err_code = bam_aux_append(aln, "CV", 'A', 1, &cv);
-    if (err_code < 0) throw dnmt_error(err_code, "bam_aux_append");
+    if (err_code < 0)
+      throw dnmt_error(err_code, "bam_aux_append");
 
     if (bam_is_rev(aln))
       revcomp_seq_by_byte(aln);  // reverse complement if needed
   }
   // ADS: the condition below should be checked much earlier, ideally
   // before the output file is created
-  else throw runtime_error("incorrect format specified: " + input_format);
+  else
+    throw runtime_error("incorrect format specified: " + input_format);
 
   // Be sure this doesn't depend on mapper! Removes the "qual" part of
   // the data in a bam1_t struct but does not change its uncompressed
@@ -940,7 +976,10 @@ string
 to_string(const bam_header &hdr, const bam_rec &aln) {
   kstring_t ks = {0, 0, nullptr};
   int ret = sam_format1(hdr.h, aln.b, &ks);
-  if (ret < 0) { runtime_error("Can't format record: " + to_string(hdr, aln)); }
-  if (ks.s != nullptr) free(ks.s);
+  if (ret < 0) {
+    runtime_error("Can't format record: " + to_string(hdr, aln));
+  }
+  if (ks.s != nullptr)
+    free(ks.s);
   return string(ks.s);
 }

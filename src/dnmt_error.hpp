@@ -13,30 +13,29 @@
  * General Public License for more details.
  */
 
-#ifndef DNMT_ERROR_HPP
-#define DNMT_ERROR_HPP
+#ifndef SRC_DNMT_ERROR_HPP_
+#define SRC_DNMT_ERROR_HPP_
 
+#include <cstdint>  // for int64_t
+#include <cstring>
+#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <cstring>
-#include <cstdint> // for int64_t
-#include <sstream>
 
-struct dnmt_error: public std::exception {
-  int64_t err;        // error possibly from HTSlib
-  int the_errno;      // ERRNO at time of construction
-  std::string msg;         // the message
-  std::string the_what;    // to report
-  dnmt_error(const int64_t _err, const std::string &_msg) :
-    err{_err}, the_errno{errno}, msg{_msg} {
+struct dnmt_error : public std::exception {
+  std::int64_t err{};    // error possibly from HTSlib
+  int the_errno{};       // ERRNO at time of construction
+  std::string msg;       // the message
+  std::string the_what;  // to report
+  dnmt_error(const std::int64_t err, const std::string &msg) :
+    err{err}, the_errno{errno}, msg{msg} {
     std::ostringstream oss;
     oss << "[error: " << err << "][" << "ERRNO: " << the_errno << "]"
         << "[" << strerror(the_errno) << "][" << msg << "]";
     the_what = oss.str();
   }
-  dnmt_error(const std::string &_msg) : dnmt_error(0, _msg) {}
-  const char*
-  what() const noexcept override {return the_what.c_str();}
+  explicit dnmt_error(const std::string &_msg) : dnmt_error(0, _msg) {}
+  const char *what() const noexcept override { return the_what.data(); }
 };
 
-#endif
+#endif  // SRC_DNMT_ERROR_HPP_

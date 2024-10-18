@@ -13,8 +13,8 @@
  * General Public License for more details.
  */
 
-#ifndef BAM_RECORD_UTILS_HPP
-#define BAM_RECORD_UTILS_HPP
+#ifndef SRC_BAM_RECORD_UTILS_HPP_
+#define SRC_BAM_RECORD_UTILS_HPP_
 
 /* ADS: need to control all the macros from HTSlib pollution. For
    functions maybe:
@@ -292,4 +292,4 @@ rlen_from_cigar(const bamxx::bam_rec &aln) {
   return bam_cigar2rlen(get_n_cigar(aln), bam_get_cigar(aln));
 }
 
-#endif
+#endif  // SRC_BAM_RECORD_UTILS_HPP_

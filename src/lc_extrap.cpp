@@ -285,11 +285,9 @@ method has been used for many different purposes since then.
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       // yield ci
       vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
-
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
 
-      /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[WRITING OUTPUT]" << endl;
 

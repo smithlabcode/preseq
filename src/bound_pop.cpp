@@ -283,7 +283,7 @@ of observed species in an initial sample.)";
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -403,7 +403,7 @@ of observed species in an initial sample.)";
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);

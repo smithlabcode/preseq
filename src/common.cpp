@@ -303,7 +303,6 @@ vector_median_and_ci(const vector<vector<double>> &bootstrap_estimates,
                      const double ci_level, vector<double> &yield_estimates,
                      vector<double> &lower_ci_lognorm,
                      vector<double> &upper_ci_lognorm) {
-
   yield_estimates.clear();
   lower_ci_lognorm.clear();
   upper_ci_lognorm.clear();

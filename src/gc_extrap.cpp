@@ -55,7 +55,7 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
   static constexpr double one_hundred = 100.0;
   std::ofstream of;
   if (!outfile.empty())
-    of.open(outfile.c_str());
+    of.open(outfile);
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
   const double percentile = one_hundred * c_level;
