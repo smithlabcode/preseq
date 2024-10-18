@@ -55,9 +55,14 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
     of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-  out << "TOTAL_BASES\tEXPECTED_COVERED_BASES\t"
-      << "LOWER_" << 100 * c_level << "%CI\t"
-      << "UPPER_" << 100 * c_level << "%CI" << endl;
+  const auto percentile = 100.0 * c_level;
+  // clang-format off
+  out << "TOTAL_BASES" << '\t'
+      << "EXPECTED_COVERED_BASES" << '\t'
+      << "LOWER_" << percentile << "%CI" << '\t'
+      << "UPPER_" << percentile << "%CI"
+      << endl;
+  // clang-format on
 
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);

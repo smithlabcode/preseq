@@ -35,7 +35,7 @@ struct MomentSequence {
   explicit MomentSequence(const std::vector<double> &obs_moms);
 
   MomentSequence(const std::vector<double> &a, const std::vector<double> &b) :
-    alpha(a), beta(b) {};
+    alpha(a), beta(b) {}
 
   // Estimate 3-term recurrence
   // these will be removed from the header when they are tested
