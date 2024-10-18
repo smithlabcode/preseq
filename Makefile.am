@@ -1,6 +1,6 @@
 # This file is part of preseq
 #
-# Copyright (C) 2018-2022: Andrew D. Smith
+# Copyright (C) 2018-2024: Andrew D. Smith
 #
 # Authors: Andrew D. Smith
 #
@@ -33,6 +33,18 @@ endif
 
 preseq_SOURCES = \
         src/preseq.cpp \
+        src/common.hpp \
+        src/common.cpp \
+        src/c_curve.hpp \
+        src/c_curve.cpp \
+        src/gc_extrap.hpp \
+        src/gc_extrap.cpp \
+        src/lc_extrap.hpp \
+        src/lc_extrap.cpp \
+        src/bound_pop.hpp \
+        src/bound_pop.cpp \
+        src/pop_size.hpp \
+        src/pop_size.cpp \
         src/continued_fraction.hpp \
         src/continued_fraction.cpp \
         src/load_data_for_complexity.hpp \
