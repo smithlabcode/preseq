@@ -50,12 +50,13 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
                                const vector<double> &cvrg_estimates,
                                const vector<double> &cvrg_lower_ci_lognorm,
                                const vector<double> &cvrg_upper_ci_lognorm) {
+  static constexpr double one_hundred = 100.0;
   std::ofstream of;
   if (!outfile.empty())
     of.open(outfile.c_str());
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-  const auto percentile = 100.0 * c_level;
+  const double percentile = one_hundred * c_level;
   // clang-format off
   out << "TOTAL_BASES" << '\t'
       << "EXPECTED_COVERED_BASES" << '\t'
