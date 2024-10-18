@@ -33,6 +33,8 @@
 #include <string>
 #include <vector>
 
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::endl;
 using std::min;
@@ -182,7 +184,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
     const double total_bins = get_counts_from_hist(coverage_hist);
 
     const double distinct_bins =
-      accumulate(coverage_hist.begin(), coverage_hist.end(), 0.0);
+      accumulate(cbegin(coverage_hist), cend(coverage_hist), 0.0);
 
     const double avg_bins_per_read = total_bins / n_reads;
     double bin_step_size = base_step_size / bin_size;

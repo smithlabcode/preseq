@@ -163,16 +163,15 @@ pop_size_main(const int argc, const char *argv[]) {
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
       if (VERBOSE)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
-      const size_t MAX_READS_TO_HOLD = 5000000;
-      size_t n_paired = 0;
-      size_t n_mates = 0;
-      n_reads =
-        load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
-                           MAX_READS_TO_HOLD, n_paired, n_mates, counts_hist);
-      if (VERBOSE) {
-        cerr << "MERGED PAIRED END READS = " << n_paired << endl;
-        cerr << "MATES PROCESSED = " << n_mates << endl;
-      }
+      // size_t n_paired = 0;
+      // size_t n_mates = 0;
+      n_reads = load_counts_BAM_pe(input_file_name,
+                                   // n_paired, n_mates,
+                                   counts_hist);
+      // if (VERBOSE) {
+      //   cerr << "MERGED PAIRED END READS = " << n_paired << endl;
+      //   cerr << "MATES PROCESSED = " << n_mates << endl;
+      // }
     }
     else if (BAM_FORMAT_INPUT) {
       if (VERBOSE)
@@ -289,14 +288,12 @@ pop_size_main(const int argc, const char *argv[]) {
 
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
-
-      /////////////////////////////////////////////////////////////////////
       if (VERBOSE)
         cerr << "[WRITING OUTPUT]" << endl;
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
