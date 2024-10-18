@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +42,7 @@
 #include <iostream>
 #include <numeric>
 #include <random>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
