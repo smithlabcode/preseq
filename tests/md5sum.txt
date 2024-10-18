@@ -1,3 +1,3 @@
 91ef0368a7da1a55e3acad083485df8b  tests/c_curve_output.txt
-8a830dd439dc1d96eef945ffd58f0345  tests/lc_extrap_output.txt
+ba02e52a5f3bc7646998e7ade1c7e35e  tests/lc_extrap_output.txt
 c8895e94346231a5beb4d867df3bb480  tests/gc_extrap_output.txt

@@ -19,7 +19,7 @@
 infile=tests/lc_extrap_input.vals
 outfile=tests/lc_extrap_output.txt
 if [[ -e "${infile}" ]]; then
-    ./preseq lc_extrap -o "${outfile}" "${infile}"
+    ./preseq lc_extrap -o "${outfile}" -V "${infile}"
     x=$(md5sum -c tests/md5sum.txt | grep "${outfile}:" | cut -d ' ' -f 2)
     if [[ "${x}" != "OK" ]]; then
         exit 1;
