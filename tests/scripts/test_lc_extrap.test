@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# This file is part of preseq
+#
+# Copyright (C) 2024: Andrew D. Smith
+#
+# Authors: Andrew D. Smith
+#
+# This is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+infile=tests/lc_extrap_input.vals
+outfile=tests/lc_extrap_output.txt
+if [[ -e "${infile}" ]]; then
+    ./preseq lc_extrap -o "${outfile}" "${infile}"
+    x=$(md5sum -c tests/md5sum.txt | grep "${outfile}:" | cut -d ' ' -f 2)
+    if [[ "${x}" != "OK" ]]; then
+        exit 1;
+    fi
+else
+    echo "${infile} not found";
+    exit 77;
+fi
