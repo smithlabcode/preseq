@@ -18,10 +18,10 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS := src/smithlab_cpp
 install installdirs: SUBDIRS := $(filter-out src/smithlab_cpp, $(SUBDIRS))
-AM_CPPFLAGS = -I $(top_srcdir)/src/smithlab_cpp
+AM_CPPFLAGS = -I $(top_srcdir)/src/smithlab_cpp -I $(top_srcdir)/src/bamxx
 AM_CPPFLAGS += -Wall -Wextra -Wpedantic -Wno-unknown-attributes
 
-CXXFLAGS = -O2 # default has optimization on
+CXXFLAGS = -O2 -DNDEBUG # default w/ optimization; careful for math
 
 EXTRA_DIST = \
 	README.md \
@@ -48,7 +48,6 @@ LDADD = src/smithlab_cpp/libsmithlab_cpp.a
 
 bin_PROGRAMS = preseq
 if ENABLE_HTS
-bin_PROGRAMS += to-mr
 AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
@@ -64,14 +63,14 @@ preseq_SOURCES = \
         src/lc_extrap.cpp \
         src/bound_pop.hpp \
         src/bound_pop.cpp \
+        src/bamxx/bamxx.hpp \
         src/pop_size.hpp \
         src/pop_size.cpp \
         src/continued_fraction.hpp \
         src/continued_fraction.cpp \
+        src/bam_record_utils.hpp \
+        src/bam_record_utils.cpp \
         src/load_data_for_complexity.hpp \
         src/load_data_for_complexity.cpp \
         src/moment_sequence.hpp \
         src/moment_sequence.cpp
-
-to_mr_SOURCES = \
-        src/to-mr.cpp
