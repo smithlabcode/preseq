@@ -53,6 +53,7 @@ AC_CONFIG_LINKS([
 tests/md5sum.txt:tests/md5sum.txt
 tests/c_curve_input.hist:tests/data/c_curve_input.hist
 tests/lc_extrap_input.vals:tests/data/lc_extrap_input.vals
+tests/gc_extrap_input.mr:tests/data/gc_extrap_input.mr
 ])
 
 AC_OUTPUT
