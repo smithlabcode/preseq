@@ -19,12 +19,14 @@
 
 #include <cmath>
 
+#include <algorithm>  // std::copy
 #include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>  // std::swap
 #include <vector>
 
 #include "MappedRead.hpp"
