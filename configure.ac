@@ -47,4 +47,12 @@ AS_IF([test "x$enable_hts" = "xyes"],
 AM_CONDITIONAL([ENABLE_HTS], [test "x$enable_hts" = "xyes"])
 
 AC_CONFIG_FILES([Makefile])
+
+dnl make the test data files available in the build tree
+AC_CONFIG_LINKS([
+tests/md5sum.txt:tests/md5sum.txt
+tests/c_curve_input.hist:tests/data/c_curve_input.hist
+tests/lc_extrap_input.vals:tests/data/lc_extrap_input.vals
+])
+
 AC_OUTPUT
