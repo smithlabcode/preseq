@@ -20,6 +20,7 @@
 
 #include "c_curve.hpp"
 
+#include "common.hpp"
 #include "continued_fraction.hpp"
 #include "load_data_for_complexity.hpp"
 #include "moment_sequence.hpp"
@@ -33,6 +34,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +48,7 @@
 #include <unordered_map>
 #include <vector>
 
+using std::array;
 using std::cerr;
 using std::endl;
 using std::isfinite;
@@ -54,20 +57,12 @@ using std::min;
 using std::mt19937;
 using std::runtime_error;
 using std::setprecision;
+using std::size;
 using std::string;
 using std::to_string;
 using std::uint64_t;
 using std::unordered_map;
 using std::vector;
-
-template <typename T>
-T
-get_counts_from_hist(const vector<T> &h) {
-  T c = 0.0;
-  for (size_t i = 0; i < h.size(); ++i)
-    c += i * h[i];
-  return c;
-}
 
 template <typename T>
 T
@@ -83,161 +78,6 @@ median_from_sorted_vector(const vector<T> sorted_data, const size_t stride,
     return sorted_data[lhs * stride];
 
   return (sorted_data[lhs * stride] + sorted_data[rhs * stride]) / 2.0;
-}
-
-template <typename T>
-T
-quantile_from_sorted_vector(const vector<T> sorted_data, const size_t stride,
-                            const size_t n, const double f) {
-  const double index = f * (n - 1);
-  const size_t lhs = static_cast<int>(index);
-  const double delta = index - lhs;
-
-  if (n == 0 || sorted_data.empty())
-    return 0.0;
-
-  if (lhs == n - 1)
-    return sorted_data[lhs * stride];
-
-  return (1 - delta) * sorted_data[lhs * stride] +
-         delta * sorted_data[(lhs + 1) * stride];
-}
-
-// Confidence interval stuff
-static void
-median_and_ci(vector<double> estimates,  // by val so we can sort them
-              const double ci_level, double &median_estimate,
-              double &lower_ci_estimate, double &upper_ci_estimate) {
-  assert(!estimates.empty());
-
-  sort(begin(estimates), end(estimates));
-
-  const double alpha = 1.0 - ci_level;
-  const size_t N = estimates.size();
-
-  median_estimate = median_from_sorted_vector(estimates, 1, N);
-  lower_ci_estimate = quantile_from_sorted_vector(estimates, 1, N, alpha / 2);
-  upper_ci_estimate =
-    quantile_from_sorted_vector(estimates, 1, N, 1.0 - alpha / 2);
-}
-
-static void
-vector_median_and_ci(const vector<vector<double>> &bootstrap_estimates,
-                     const double ci_level, vector<double> &yield_estimates,
-                     vector<double> &lower_ci_lognorm,
-                     vector<double> &upper_ci_lognorm) {
-  yield_estimates.clear();
-  lower_ci_lognorm.clear();
-  upper_ci_lognorm.clear();
-  assert(!bootstrap_estimates.empty());
-
-  const size_t n_est = bootstrap_estimates.size();
-  vector<double> estimates_row(n_est, 0.0);
-  for (size_t i = 0; i < bootstrap_estimates[0].size(); i++) {
-    // estimates is in wrong order, work locally on const val
-    for (size_t k = 0; k < n_est; ++k)
-      estimates_row[k] = bootstrap_estimates[k][i];
-
-    double median_estimate, lower_ci_estimate, upper_ci_estimate;
-    median_and_ci(estimates_row, ci_level, median_estimate, lower_ci_estimate,
-                  upper_ci_estimate);
-    sort(begin(estimates_row), end(estimates_row));
-
-    yield_estimates.push_back(median_estimate);
-    lower_ci_lognorm.push_back(lower_ci_estimate);
-    upper_ci_lognorm.push_back(upper_ci_estimate);
-  }
-}
-
-template <typename uint_type>
-void
-multinomial(mt19937 &gen, const vector<double> &mult_probs, uint_type trials,
-            vector<uint_type> &result) {
-  typedef std::binomial_distribution<uint32_t> binom_dist;
-
-  result.clear();
-  result.resize(mult_probs.size());
-
-  double remaining_prob = accumulate(begin(mult_probs), end(mult_probs), 0.0);
-
-  auto r(begin(result));
-  auto p(begin(mult_probs));
-
-  while (p != end(mult_probs)) {  // iterate to sample for each category
-    *r = binom_dist(trials, (*p) / remaining_prob)(gen);  // take the sample
-
-    remaining_prob -= *p++;  // update remaining probability mass
-    trials -= *r++;          // update remaining trials needed
-  }
-
-  if (trials > 0)
-    throw runtime_error("multinomial sampling failed");
-}
-
-// Lanczos approximation for gamma function for x >= 0.5 - essentially an
-// approximation for (x-1)!
-static double
-factorial(double x) {
-  // constants
-  double LogRootTwoPi = 0.9189385332046727;
-  double Euler = 2.71828182845904523536028747135;
-
-  // Approximation for factorial is actually x-1
-  x -= 1.0;
-
-  vector<double> lanczos{0.99999999999980993227684700473478,
-                         676.520368121885098567009190444019,
-                         -1259.13921672240287047156078755283,
-                         771.3234287776530788486528258894,
-                         -176.61502916214059906584551354,
-                         12.507343278686904814458936853,
-                         -0.13857109526572011689554707,
-                         9.984369578019570859563e-6,
-                         1.50563273514931155834e-7};
-
-  double Ag = lanczos[0];
-
-  for (size_t k = 1; k < lanczos.size(); k++)
-    Ag += lanczos[k] / (x + k);
-
-  double term1 = (x + 0.5) * log((x + 7.5) / Euler);
-  double term2 = LogRootTwoPi + log(Ag);
-
-  return term1 + (term2 - 7.0);
-}
-
-// interpolate by explicit calculating the expectation
-// for sampling without replacement;
-// see K.L Heck 1975
-// N total sample size; S the total number of distincts
-// n sub sample size
-static double
-interpolate_distinct(const vector<double> &hist, const size_t N, const size_t S,
-                     const size_t n) {
-  const double denom =
-    factorial(N + 1) - factorial(n + 1) - factorial(N - n + 1);
-
-  vector<double> numer(hist.size(), 0);
-  for (size_t i = 1; i < hist.size(); i++) {
-    // N - i -n + 1 should be greater than 0
-    if (N < i + n) {
-      numer[i] = 0;
-    }
-    else {
-      const double x =
-        (factorial(N - i + 1) - factorial(n + 1) - factorial(N - i - n + 1));
-      numer[i] = exp(x - denom) * hist[i];
-    }
-  }
-  return S - accumulate(begin(numer), end(numer), 0);
-}
-
-static double
-GoodToulmin2xExtrap(const vector<double> &counts_hist) {
-  double two_fold_extrap = 0.0;
-  for (size_t i = 0; i < counts_hist.size(); i++)
-    two_fold_extrap += pow(-1.0, i + 1) * counts_hist[i];
-  return two_fold_extrap;
 }
 
 int
