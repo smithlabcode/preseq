@@ -1,6 +1,6 @@
 dnl This file is part of preseq
 dnl
-dnl Copyright (C) 2018-2022: Andrew D. Smith
+dnl Copyright (C) 2018-2024: Andrew D. Smith
 dnl
 dnl Authors: Andrew D. Smith
 dnl
@@ -24,7 +24,7 @@ AM_INIT_AUTOMAKE([subdir-objects foreign])
 AC_CONFIG_MACRO_DIR([m4])
 AC_LANG(C++)
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
+AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
 AC_PROG_RANLIB
 
 dnl recursively configure smithlab_cpp

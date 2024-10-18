@@ -27,11 +27,14 @@
 #include <algorithm>  // std::min
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <queue>
 #include <random>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <utility>  // std::swap
+#include <vector>
 
 using std::cerr;
 using std::endl;
