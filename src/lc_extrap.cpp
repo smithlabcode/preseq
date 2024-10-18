@@ -260,7 +260,7 @@ method has been used for many different purposes since then.
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out << "TOTAL_READS\tEXPECTED_DISTINCT" << endl;
