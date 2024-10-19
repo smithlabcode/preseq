@@ -22,6 +22,12 @@
 #include "GenomicRegion.hpp"
 #include "MappedRead.hpp"
 
+#ifdef HAVE_HTSLIB
+#include "bam_record_utils.hpp"  // from dnmtools
+#include <bamxx.hpp>             // from bamxx
+#include <htslib_wrapper.hpp>
+#endif  // HAVE_HTSLIB
+
 #include <unistd.h>
 
 #include <algorithm>  // std::min
@@ -512,13 +518,7 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
 }
 
 #ifdef HAVE_HTSLIB
-/* Deal with SAM/BAM format only if we have htslib
- */
-
-#include "bam_record_utils.hpp"  // from dnmtools
-
-#include <bamxx.hpp>  // from bamxx
-#include <htslib_wrapper.hpp>
+// Deal with SAM/BAM format only if we have htslib
 
 static inline void
 swap(bamxx::bam_rec &a, bamxx::bam_rec &b) {
@@ -530,7 +530,8 @@ struct aln_pos {
   hts_pos_t pos{};
   aln_pos() = default;
   aln_pos(const int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
-  aln_pos(const bamxx::bam_rec &a) : tid{get_tid(a)}, pos{get_pos(a)} {}
+  explicit aln_pos(const bamxx::bam_rec &a) :
+    tid{get_tid(a)}, pos{get_pos(a)} {}
   bool operator<(const aln_pos &rhs) const {
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
   }
@@ -545,7 +546,7 @@ struct aln_pos_pair {
   hts_pos_t pos{};
   int32_t mtid{};
   hts_pos_t mpos{};
-  aln_pos_pair(const bamxx::bam_rec &a) :
+  explicit aln_pos_pair(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
   bool operator<(const aln_pos_pair &rhs) const {
     // ADS: only compares on tid and pos, NOT mtid or mpos
@@ -809,4 +810,4 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
   return n_reads;
 }
 
-#endif
+#endif  // HAVE_HTSLIB
