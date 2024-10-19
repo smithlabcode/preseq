@@ -622,7 +622,7 @@ load_counts_BAM(const uint32_t n_threads, const string &inputfile,
     const aln_pos_t curr{aln};
 
     // check that reads are sorted
-    if (prev < curr)
+    if (curr < prev)
       throw runtime_error("locations unsorted in: " + inputfile);
 
     if (curr.tid != prev.tid) {  // check that reads are sorted
