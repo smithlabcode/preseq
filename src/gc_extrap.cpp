@@ -97,6 +97,9 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
+#ifdef HAVE_HTSLIB
+    bool BAM_FORMAT_INPUT = false;
+#endif
 
     const string description = R"(
       "Extrapolate the size of the covered genome by mapped reads. This \
@@ -138,6 +141,10 @@ gc_extrap_main(const int argc, const char *argv[]) {
     opt_parse.add_opt("defects", 'D',
                       "defects mode to extrapolate without testing for defects",
                       false, allow_defects);
+#ifdef HAVE_HTSLIB
+    opt_parse.add_opt("bam", '\0', "input is in BAM format", false,
+                      BAM_FORMAT_INPUT);
+#endif
     opt_parse.add_opt("seed", 'r', "seed for random number generator", false,
                       seed);
     opt_parse.set_show_defaults();
@@ -160,7 +167,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
       cerr << opt_parse.help_message() << endl;
       return EXIT_SUCCESS;
     }
-    const string input_file_name = leftover_args.front();
+    const string infile = leftover_args.front();
     // ****************************************************************
 
     vector<double> coverage_hist;
@@ -171,14 +178,22 @@ gc_extrap_main(const int argc, const char *argv[]) {
     if (NO_SEQUENCE) {
       if (VERBOSE)
         cerr << "BED FORMAT" << endl;
-      n_reads = load_coverage_counts_GR(input_file_name, seed, bin_size,
-                                        max_width, coverage_hist);
+      n_reads = load_coverage_counts_GR(infile, seed, bin_size, max_width,
+                                        coverage_hist);
     }
+#ifdef HAVE_HTSLIB
+    else if (BAM_FORMAT_INPUT) {
+      if (VERBOSE)
+        cerr << "BAM_INPUT" << endl;
+      n_reads = load_coverage_counts_BAM(infile, seed, bin_size, max_width,
+                                         coverage_hist);
+    }
+#endif
     else {
       if (VERBOSE)
         cerr << "MAPPED READ FORMAT" << endl;
-      n_reads = load_coverage_counts_MR(input_file_name, seed, bin_size,
-                                        max_width, coverage_hist);
+      n_reads = load_coverage_counts_MR(infile, seed, bin_size, max_width,
+                                        coverage_hist);
     }
 
     const double total_bins = get_counts_from_hist(coverage_hist);
