@@ -38,6 +38,8 @@
 #include <vector>
 
 using std::begin;
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::end;
 using std::endl;
@@ -45,9 +47,25 @@ using std::runtime_error;
 using std::size_t;
 using std::string;
 using std::to_string;
+using std::uint32_t;
+using std::uint64_t;
 using std::vector;
 
 namespace fs = std::filesystem;
+
+template <typename H>
+static void
+report_histogram(const string &outfile, const H &h) {
+  std::ofstream of;
+  if (!outfile.empty())
+    of.open(outfile);
+  std::ostream o(outfile.empty() ? std::cerr.rdbuf() : of.rdbuf());
+  o << "OBSERVED COUNTS (" << std::size(h) << ")" << std::endl;
+  for (auto i = 0u; i < std::size(h); ++i)
+    if (h[i] > 0)
+      o << i << '\t' << static_cast<uint32_t>(h[i]) << std::endl;
+  o << std::endl;
+}
 
 int
 lc_extrap_main(const int argc, const char **argv) {
@@ -58,6 +76,7 @@ lc_extrap_main(const int argc, const char **argv) {
       to_string(min_required_counts) + ") duplicates removed";
 
     string outfile;
+    string histogram_outfile;
 
     size_t orig_max_terms = 100;
     double max_extrap = 1.0e10;
@@ -68,7 +87,7 @@ lc_extrap_main(const int argc, const char **argv) {
     uint64_t seed = 408;
 
     /* FLAGS */
-    bool VERBOSE = false;
+    bool verbose = false;
     bool VALS_INPUT = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
@@ -82,18 +101,20 @@ lc_extrap_main(const int argc, const char **argv) {
 #endif
 
     string description =
-      R"(Extrapolate the complexity of a library. This is the approach   \
-described in Daley & Smith (2013). The method applies rational  \
-function approximation via continued fractions with the         \
-original goal of estimating the number of distinct reads that a \
-sequencing library would yield upon deeper sequencing. This     \
+      R"(
+Extrapolate the complexity of a library. This is the approach
+described in Daley & Smith (2013). The method applies rational
+function approximation via continued fractions with the
+original goal of estimating the number of distinct reads that a
+sequencing library would yield upon deeper sequencing. This
 method has been used for many different purposes since then.
 )";
+    string program_name = fs::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
 
-    OptionParser opt_parse(fs::path(argv[1]).filename(), description,
-                           "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
                       false, outfile);
     opt_parse.add_opt("extrap", 'e', "maximum extrapolation", false,
@@ -105,7 +126,7 @@ method has been used for many different purposes since then.
                       c_level);
     opt_parse.add_opt("terms", 'x', "maximum terms in estimator", false,
                       orig_max_terms);
-    opt_parse.add_opt("verbose", 'v', "print more info", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more info", false, verbose);
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format", false,
                       BAM_FORMAT_INPUT);
@@ -124,6 +145,8 @@ method has been used for many different purposes since then.
     opt_parse.add_opt("hist", 'H',
                       "input is a text file containing the observed histogram",
                       false, HIST_INPUT);
+    opt_parse.add_opt("hist-out", '\0', "output counts histogram to this file",
+                      false, histogram_outfile);
     opt_parse.add_opt("quick", 'Q',
                       "quick mode (no bootstraps) for confidence intervals",
                       false, SINGLE_ESTIMATE);
@@ -137,6 +160,7 @@ method has been used for many different purposes since then.
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
+      cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
     if (opt_parse.about_requested()) {
@@ -159,34 +183,36 @@ method has been used for many different purposes since then.
 
     /************ loading input ***************************************/
     if (HIST_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "HIST_INPUT" << endl;
       n_reads = load_histogram(input_file_name, counts_hist);
     }
     else if (VALS_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "VALS_INPUT" << endl;
       n_reads = load_counts(input_file_name, counts_hist);
     }
 #ifdef HAVE_HTSLIB
-    else if (BAM_FORMAT_INPUT && PAIRED_END) {
-      if (VERBOSE)
-        cerr << "PAIRED_END_BAM_INPUT" << endl;
-      n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
-    }
     else if (BAM_FORMAT_INPUT) {
-      if (VERBOSE)
-        cerr << "BAM_INPUT" << endl;
-      n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
+      if (PAIRED_END) {
+        if (verbose)
+          cerr << "PAIRED_END_BAM_INPUT" << endl;
+        n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
+      }
+      else {  // single end
+        if (verbose)
+          cerr << "BAM_INPUT" << endl;
+        n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
+      }
     }
 #endif
     else if (PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BED_INPUT" << endl;
       n_reads = load_counts_BED_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED_INPUT" << endl;
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
@@ -194,21 +220,22 @@ method has been used for many different purposes since then.
 
     const size_t max_observed_count = counts_hist.size() - 1;
     const double distinct_reads =
-      std::accumulate(begin(counts_hist), end(counts_hist), 0.0);
+      std::accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t first_zero = 1;
     while (first_zero < counts_hist.size() && counts_hist[first_zero] > 0)
       ++first_zero;
 
+    // make sure the max terms is at most one less than the first zero
     orig_max_terms = std::min(orig_max_terms, first_zero - 1);
     orig_max_terms = orig_max_terms - (orig_max_terms % 2 == 1);
 
     const size_t distinct_counts =
-      std::count_if(begin(counts_hist), end(counts_hist),
+      std::count_if(cbegin(counts_hist), cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "TOTAL READS     = " << n_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
@@ -216,14 +243,8 @@ method has been used for many different purposes since then.
            << "COUNTS OF 1     = " << counts_hist[1] << endl
            << "MAX TERMS       = " << orig_max_terms << endl;
 
-    if (VERBOSE) {
-      // OUTPUT THE ORIGINAL HISTOGRAM
-      cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
-      for (size_t i = 0; i < counts_hist.size(); i++)
-        if (counts_hist[i] > 0)
-          cerr << i << '\t' << static_cast<size_t>(counts_hist[i]) << endl;
-      cerr << endl;
-    }
+    if (verbose)
+      report_histogram(histogram_outfile, counts_hist);
 
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
@@ -231,26 +252,22 @@ method has been used for many different purposes since then.
       throw runtime_error("Saturation expected at double initial sample size. "
                           "Unable to extrapolate.");
 
-    // const size_t total_reads = get_counts_from_hist(counts_hist);
-
-    // assert(total_reads == n_reads); // ADS: why commented out?
-
     // check that min required count is satisfied
     if (orig_max_terms < min_required_counts)
       throw runtime_error(min_required_counts_error_message);
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "[ESTIMATING YIELD CURVE]" << endl;
     vector<double> yield_estimates;
 
     if (SINGLE_ESTIMATE) {
       const bool single_estimate_success = extrap_single_estimate(
-        VERBOSE, allow_defects, counts_hist, orig_max_terms, diagonal,
+        verbose, allow_defects, counts_hist, orig_max_terms, diagonal,
         step_size, max_extrap, yield_estimates);
-      // IF FAILURE, EXIT
+      // exit on failure
       if (!single_estimate_success)
-        throw runtime_error("single estimate failed, run "
-                            "full mode for estimates");
+        throw runtime_error(
+          "single estimate failed, run full mode for estimates");
 
       std::ofstream of;
       if (!outfile.empty())
@@ -266,24 +283,24 @@ method has been used for many different purposes since then.
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << endl;
     }
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
 
       const size_t max_iter = 100 * n_bootstraps;
 
       vector<vector<double>> bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, allow_defects, seed, counts_hist, n_bootstraps,
+      extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
                        orig_max_terms, diagonal, step_size, max_extrap,
                        max_iter, bootstrap_estimates);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       // yield ci
       vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[WRITING OUTPUT]" << endl;
 
       write_predicted_complexity_curve(outfile, c_level, step_size,
