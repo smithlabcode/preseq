@@ -34,6 +34,7 @@
 #include <algorithm>  // std::min
 #include <cstddef>
 #include <cstdint>
+#include <functional>  // std::greater
 #include <iostream>
 #include <queue>
 #include <random>
