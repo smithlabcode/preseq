@@ -25,7 +25,6 @@
 #include "load_data_for_complexity.hpp"
 #include "moment_sequence.hpp"
 
-#include <GenomicRegion.hpp>
 #include <OptionParser.hpp>
 #include <smithlab_os.hpp>
 #include <smithlab_utils.hpp>
@@ -38,17 +37,21 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <random>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+namespace fs = std::filesystem;
+
+using std::accumulate;
 using std::array;
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::endl;
 using std::isfinite;
@@ -59,37 +62,33 @@ using std::runtime_error;
 using std::setprecision;
 using std::size;
 using std::string;
-using std::to_string;
 using std::uint64_t;
-using std::unordered_map;
 using std::vector;
 
 template <typename T>
 T
-median_from_sorted_vector(const vector<T> sorted_data, const size_t stride,
+median_from_sorted_vector(const vector<T> &sorted_data, const size_t stride,
                           const size_t n) {
   if (n == 0 || sorted_data.empty())
     return 0.0;
-
   const size_t lhs = (n - 1) / 2;
   const size_t rhs = n / 2;
-
   if (lhs == rhs)
     return sorted_data[lhs * stride];
-
   return (sorted_data[lhs * stride] + sorted_data[rhs * stride]) / 2.0;
 }
 
 int
 c_curve_main(const int argc, const char *argv[]) {
   try {
-    bool VERBOSE = false;
+    bool verbose = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool VALS_INPUT = false;
     uint64_t seed = 408;
 
     string outfile;
+    string histogram_outfile;
 
     size_t upper_limit = 0;
     double step_size = 1e6;
@@ -99,25 +98,32 @@ c_curve_main(const int argc, const char *argv[]) {
     uint32_t n_threads{1};
 #endif
 
-    const string description = R"(
-Generate the complexity curve for data. This does not extrapolate, \
-but instead resamples from the given data.)";
+    const string description =
+      R"(
+Generate the complexity curve for data. This does not extrapolate, but
+instead resamples from the given data.
+)";
+    string program_name = fs::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
-    OptionParser opt_parse(strip_path(argv[1]), description, "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
                       false, outfile);
     opt_parse.add_opt("step", 's', "step size in extrapolations", false,
                       step_size);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, VERBOSE);
-    opt_parse.add_opt("pe", 'P', "input is paired end read file", false,
+    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
+    opt_parse.add_opt("pe", 'P', "input paired end read file", false,
                       PAIRED_END);
     opt_parse.add_opt("hist", 'H',
-                      "input is a text file containing the observed histogram",
-                      false, HIST_INPUT);
-    opt_parse.add_opt(
-      "vals", 'V', "input is a text file containing only the observed counts",
-      false, VALS_INPUT);
+                      "input is text file containing observed histogram", false,
+                      HIST_INPUT);
+    opt_parse.add_opt("hist-out", '\0',
+                      "output histogram to this file (for non-hist input)",
+                      false, histogram_outfile);
+    opt_parse.add_opt("vals", 'V',
+                      "input is text file containing only observed counts",
+                      false, VALS_INPUT);
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format", false,
                       BAM_FORMAT_INPUT);
@@ -136,6 +142,7 @@ but instead resamples from the given data.)";
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
+      cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
     if (opt_parse.about_requested()) {
@@ -154,7 +161,7 @@ but instead resamples from the given data.)";
     /******************************************************************/
 
     // Setup the random number generator
-    srand(time(0) + getpid());  // give the random fxn a new seed
+    srand(time(0) + getpid());  // random seed
     mt19937 rng(seed);
 
     vector<double> counts_hist;
@@ -162,49 +169,49 @@ but instead resamples from the given data.)";
 
     // LOAD VALUES
     if (HIST_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "INPUT_HIST" << endl;
       n_reads = load_histogram(input_file_name, counts_hist);
     }
     else if (VALS_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "VALS_INPUT" << endl;
       n_reads = load_counts(input_file_name, counts_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
       n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
     }
     else if (BAM_FORMAT_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BAM_INPUT" << endl;
       n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
     }
 #endif
     else if (PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BED_INPUT" << endl;
       n_reads = load_counts_BED_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED_INPUT" << endl;
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
 
     const size_t max_observed_count = counts_hist.size() - 1;
     const double distinct_reads =
-      accumulate(begin(counts_hist), end(counts_hist), 0.0);
+      accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
 
     const size_t total_reads = get_counts_from_hist(counts_hist);
 
     const size_t distinct_counts =
-      std::count_if(begin(counts_hist), end(counts_hist),
+      std::count_if(cbegin(counts_hist), cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "TOTAL READS     = " << n_reads << endl
            << "COUNTS_SUM      = " << total_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
@@ -212,42 +219,32 @@ but instead resamples from the given data.)";
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl;
 
-    if (VERBOSE) {
-      // output the original histogram
-      cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
-      for (size_t i = 0; i < counts_hist.size(); i++)
-        if (counts_hist[i] > 0)
-          cerr << i << '\t' << static_cast<size_t>(counts_hist[i]) << endl;
-      cerr << endl;
-    }
+    if (verbose)
+      report_histogram(histogram_outfile, counts_hist);
 
     if (upper_limit == 0)
-      upper_limit = n_reads;  // set upper limit to equal the number of
+      upper_limit = n_reads;  // set upper limit equal to number of
                               // molecules
 
-    // handles output of c_curve
+    // setup for output of the complexity curve
     std::ofstream of;
     if (!outfile.empty())
-      of.open(outfile.c_str());
+      of.open(outfile);
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
     // prints the complexity curve
     out << "total_reads" << "\t" << "distinct_reads" << endl;
     out << 0 << '\t' << 0 << endl;
     for (size_t i = step_size; i <= upper_limit; i += step_size) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "sample size: " << i << endl;
       out << i << "\t"
           << interpolate_distinct(counts_hist, total_reads, distinct_reads, i)
           << endl;
     }
   }
-  catch (runtime_error &e) {
+  catch (const std::exception &e) {
     cerr << "ERROR:\t" << e.what() << endl;
-    return EXIT_FAILURE;
-  }
-  catch (std::bad_alloc &ba) {
-    cerr << "ERROR: could not allocate memory" << endl;
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
