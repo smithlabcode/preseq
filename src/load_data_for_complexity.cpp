@@ -1,20 +1,21 @@
-/*    Copyright (C) 2014 University of Southern California and
- *                       Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2014-2024 University of Southern California and
+ *                         Andrew D. Smith and Timothy Daley
  *
- *    Authors: Andrew D. Smith and Timothy Daley
+ * Authors: Andrew D. Smith and Timothy Daley
  *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
+ * This program is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include "load_data_for_complexity.hpp"
@@ -517,13 +518,6 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
 #ifdef HAVE_HTSLIB
 // Deal with SAM/BAM format only if we have htslib
 
-static inline void
-reset_bam_rec(bamxx::bam_rec &b) {
-  if (b.b)
-    bam_destroy1(b.b);
-  b.b = nullptr;
-}
-
 static inline bool
 not_mapped(const bamxx::bam_rec &aln) {
   return get_tid(aln) == -1;
@@ -769,6 +763,9 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
   aln_pos prev_part;
   genomic_interval prev;
 
+  // max_dist indicates when we think we can assume the read parts
+  // will be sorted and can be processed; this is not the same as the
+  // full reads being sorted
   const hts_pos_t max_dist = bin_size + max_width;
 
   while (hts.read(hdr, aln)) {
@@ -805,7 +802,6 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
       update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
       prev_part = curr_part;
     }
-    reset_bam_rec(aln);
     prev = curr;
     ++n_reads;
   }
