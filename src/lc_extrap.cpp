@@ -149,10 +149,6 @@ method has been used for many different purposes since then.
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
-    if (opt_parse.about_requested()) {
-      cerr << opt_parse.about_message() << endl;
-      return EXIT_SUCCESS;
-    }
     if (opt_parse.option_missing()) {
       cerr << opt_parse.option_missing_message() << endl;
       return EXIT_SUCCESS;
