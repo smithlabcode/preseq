@@ -768,8 +768,8 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
     if (not_mapped(aln))
       continue;  // check that read is mapped
 
-    const hts_pos_t rlen = rlen_from_cigar(aln);
-    const genomic_interval curr{get_tid(aln), get_pos(aln), rlen};
+    const hts_pos_t len = rlen_from_cigar(aln);
+    const genomic_interval curr{get_tid(aln), get_pos(aln), get_pos(aln) + len};
 
     if (curr.tid != prev.tid) {
       if (chroms_seen[curr.tid])
@@ -778,8 +778,9 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
     }
 
     if (size(curr) > max_width)
-      throw runtime_error("found read width " + std::to_string(max_width) +
-                          "; increase max width");
+      throw runtime_error("read " + string(bam_get_qname(aln)) + " covers " +
+                          std::to_string(size(curr)) +
+                          "bp; increase max width or reconsider data");
 
     parts.clear();  // need new vec, but keep capacity
     split_genomic_interval(curr, generator, bin_size, parts);
