@@ -99,6 +99,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
     double c_level = 0.95;
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
+    uint32_t n_threads{1};
 #endif
 
     const string description = R"(
@@ -144,6 +145,8 @@ gc_extrap_main(const int argc, const char *argv[]) {
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", '\0', "input is in BAM format", false,
                       BAM_FORMAT_INPUT);
+    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
+                      false, n_threads);
 #endif
     opt_parse.add_opt("seed", 'r', "seed for random number generator", false,
                       seed);
@@ -185,8 +188,8 @@ gc_extrap_main(const int argc, const char *argv[]) {
     else if (BAM_FORMAT_INPUT) {
       if (VERBOSE)
         cerr << "BAM_INPUT" << endl;
-      n_reads = load_coverage_counts_BAM(infile, seed, bin_size, max_width,
-                                         coverage_hist);
+      n_reads = load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
+                                         max_width, coverage_hist);
     }
 #endif
     else {

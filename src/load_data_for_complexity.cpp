@@ -582,23 +582,19 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
     ++current_count;
 }
 
-// template<typename T>
-// size_t
-// load_counts_BAM_se(/*const size_t n_threads, */
-//                   const string &inputfile, vector<double> &counts_hist) {
-
-template <typename aln_pos_t = aln_pos>
+template <typename aln_pos_t>
 size_t
-load_counts_BAM(/*const size_t n_threads, */
-                const string &inputfile, vector<double> &counts_hist) {
-  // bamxx::bam_tpool tp(n_threads);
+load_counts_BAM(const uint32_t n_threads, const string &inputfile,
+                vector<double> &counts_hist) {
+  bamxx::bam_tpool tp(n_threads);
 
   bamxx::bam_in hts(inputfile);  // assume already checked
   bamxx::bam_header hdr(hts);
   if (!hdr)
     throw runtime_error("failed to read header");
 
-  // if (n_threads > 1) tp.set_io(hts);
+  if (n_threads > 1)
+    tp.set_io(hts);
 
   // find first mapped read to start
   bamxx::bam_rec aln;
@@ -646,15 +642,15 @@ load_counts_BAM(/*const size_t n_threads, */
 }
 
 size_t
-load_counts_BAM_se(/*const size_t n_threads, */
-                   const string &inputfile, vector<double> &counts_hist) {
-  return load_counts_BAM<aln_pos>(inputfile, counts_hist);
+load_counts_BAM_se(const uint32_t n_threads, const string &inputfile,
+                   vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos>(n_threads, inputfile, counts_hist);
 }
 
 size_t
-load_counts_BAM_pe(/*const size_t n_threads, */
-                   const string &inputfile, vector<double> &counts_hist) {
-  return load_counts_BAM<aln_pos_pair>(inputfile, counts_hist);
+load_counts_BAM_pe(const uint32_t n_threads, const string &inputfile,
+                   vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
 }
 
 struct genomic_interval {
@@ -726,18 +722,21 @@ update_duplicate_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the
 // first mate for each mapped read
 size_t
-load_coverage_counts_BAM(const string &inputfile, const uint64_t seed,
-                         const size_t bin_size, const size_t max_width,
+load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
+                         const uint64_t seed, const size_t bin_size,
+                         const size_t max_width,
                          vector<double> &coverage_hist) {
   srand(time(0) + getpid());
   std::mt19937 generator(seed);
 
+  bamxx::bam_tpool tp(n_threads);
   bamxx::bam_in hts(inputfile);  // assume already checked
   bamxx::bam_header hdr(hts);
   if (!hdr)
     throw runtime_error("failed to read header");
 
-  // if (n_threads > 1) tp.set_io(hts);
+  if (n_threads > 1)
+    tp.set_io(hts);
 
   // find first mapped read to start
   bamxx::bam_rec aln;

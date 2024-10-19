@@ -78,6 +78,7 @@ lc_extrap_main(const int argc, const char **argv) {
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
+    uint32_t n_threads{1};
 #endif
 
     string description =
@@ -112,6 +113,8 @@ method has been used for many different purposes since then.
                       "maximum segment length when merging "
                       "paired end bam reads",
                       false, MAX_SEGMENT_LENGTH);
+    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
+                      false, n_threads);
 #endif
     opt_parse.add_opt("pe", 'P', "input is paired end read file", false,
                       PAIRED_END);
@@ -169,20 +172,12 @@ method has been used for many different purposes since then.
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
       if (VERBOSE)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
-      // size_t n_paired = 0;
-      // size_t n_mates = 0;
-      n_reads = load_counts_BAM_pe(input_file_name,
-                                   // n_paired, n_mates,
-                                   counts_hist);
-      // if (VERBOSE) {
-      //   cerr << "MERGED PAIRED END READS = " << n_paired << endl;
-      //   cerr << "MATES PROCESSED = " << n_mates << endl;
-      // }
+      n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
     }
     else if (BAM_FORMAT_INPUT) {
       if (VERBOSE)
         cerr << "BAM_INPUT" << endl;
-      n_reads = load_counts_BAM_se(input_file_name, counts_hist);
+      n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
     }
 #endif
     else if (PAIRED_END) {
