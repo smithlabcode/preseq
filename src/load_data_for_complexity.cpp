@@ -52,7 +52,6 @@ using std::vector;
 
 //////////////////////////////////////////////////////////////////////
 // Data imputation
-/////////////////////////////////////////////////////////////////////
 
 static bool
 update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
@@ -526,19 +525,53 @@ swap(bamxx::bam_rec &a, bamxx::bam_rec &b) {
   std::swap(a.b, b.b);
 }
 
+struct aln_pos {
+  int32_t tid{};
+  hts_pos_t pos{};
+  aln_pos() = default;
+  aln_pos(const int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
+  aln_pos(const bamxx::bam_rec &a) : tid{get_tid(a)}, pos{get_pos(a)} {}
+  bool operator<(const aln_pos &rhs) const {
+    return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
+  }
+  bool operator!=(const aln_pos &rhs) const {
+    // ADS: ordered to check pos first
+    return pos != rhs.pos || tid != rhs.tid;
+  }
+};
+
+struct aln_pos_pair {
+  int32_t tid{};
+  hts_pos_t pos{};
+  int32_t mtid{};
+  hts_pos_t mpos{};
+  aln_pos_pair(const bamxx::bam_rec &a) :
+    tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
+  bool operator<(const aln_pos_pair &rhs) const {
+    // ADS: only compares on tid and pos, NOT mtid or mpos
+    return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
+  }
+  bool operator!=(const aln_pos_pair &rhs) const {
+    // ADS: ordered to check pos first
+    return pos != rhs.pos || tid != rhs.tid || mtid != rhs.mtid ||
+           mpos != rhs.mpos;
+  }
+};
+
+template <typename T>
 static inline void
-update_se_duplicate_counts_hist_BAM(
-  const int32_t curr_tid, const hts_pos_t curr_pos, const int32_t prev_tid,
-  const hts_pos_t prev_pos, const string &inputfile,
-  vector<double> &counts_hist, size_t &current_count) {
-  // check if reads are sorted; situation of unordered chroms is taken
-  // care of outside this function
-  if (curr_tid == prev_tid && curr_pos < prev_pos)
+update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
+                                 const string &inputfile,
+                                 vector<double> &counts_hist,
+                                 size_t &current_count) {
+  // check if reads are sorted within chroms; situation of unordered
+  // chroms is taken care of outside this function
+  if (prev < curr)
     throw runtime_error("locations unsorted in: " + inputfile);
 
-  if (curr_tid != prev_tid || curr_pos != prev_pos) {
+  if (prev != curr) {
     // next read is new, update counts_hist to include current_count
-    if (counts_hist.size() < current_count + 1) {
+    if (size(counts_hist) < current_count + 1) {
       // histogram is too small, resize
       counts_hist.resize(current_count + 1, 0.0);
     }
@@ -549,9 +582,15 @@ update_se_duplicate_counts_hist_BAM(
     ++current_count;
 }
 
+// template<typename T>
+// size_t
+// load_counts_BAM_se(/*const size_t n_threads, */
+//                   const string &inputfile, vector<double> &counts_hist) {
+
+template <typename aln_pos_t = aln_pos>
 size_t
-load_counts_BAM_se(/*const size_t n_threads, */
-                   const string &inputfile, vector<double> &counts_hist) {
+load_counts_BAM(/*const size_t n_threads, */
+                const string &inputfile, vector<double> &counts_hist) {
   // bamxx::bam_tpool tp(n_threads);
 
   bamxx::bam_in hts(inputfile);  // assume already checked
@@ -575,32 +614,27 @@ load_counts_BAM_se(/*const size_t n_threads, */
   vector<bool> chroms_seen(get_n_targets(hdr), false);
 
   // start with prev_aln being first read
-  bamxx::bam_rec prev_aln;
-  swap(aln, prev_aln);
-  int32_t prev_tid = get_tid(prev_aln);
-  int32_t prev_pos = get_pos(prev_aln);
+  aln_pos_t prev{aln};
 
   // start with count of 1 for first read seen
   size_t current_count = 1;
 
   while (hts.read(hdr, aln)) {
-    const int32_t curr_tid = get_tid(aln);
-    const int32_t curr_pos = get_pos(aln);
-    if (curr_tid != prev_tid) {
-      if (chroms_seen[curr_tid])
+    const aln_pos_t curr{aln};
+
+    if (curr.tid != prev.tid) {  // check that reads are sorted
+      if (chroms_seen[curr.tid])
         throw runtime_error("input not sorted");
-      chroms_seen[curr_tid] = true;
+      chroms_seen[curr.tid] = true;
     }
 
     // check that mapped read is not secondary
-    if (curr_tid != -1) {  // check that read is mapped
-      update_se_duplicate_counts_hist_BAM(curr_tid, curr_pos, prev_tid,
-                                          prev_pos, inputfile, counts_hist,
-                                          current_count);
+    if (curr.tid != -1) {  // check that read is mapped
+      update_duplicate_counts_hist_BAM(curr, prev, inputfile, counts_hist,
+                                       current_count);
       ++n_reads;
     }
-    prev_pos = curr_pos;
-    prev_tid = curr_tid;
+    prev = curr;
   }
 
   // to account for the last read compared to the one before it.
@@ -611,27 +645,77 @@ load_counts_BAM_se(/*const size_t n_threads, */
   return n_reads;
 }
 
-static inline void
-update_pe_duplicate_counts_hist_BAM(
-  // clang-format off
-  const int32_t curr_tid, const hts_pos_t curr_pos,
-  const int32_t curr_mtid, const hts_pos_t curr_mpos,  // vals for curr
-  const int32_t prev_tid, const hts_pos_t prev_pos,
-  const int32_t prev_mtid, const hts_pos_t prev_mpos,  // vals for prev
-  // clang-format on
-  const string &inputfile, vector<double> &counts_hist, size_t &current_count) {
-  // check if reads are sorted; situation of unordered chroms is taken
-  // care of outside this function
-  if (curr_tid == prev_tid && curr_pos < prev_pos)
-    throw runtime_error("locations unsorted in: " + inputfile);
+size_t
+load_counts_BAM_se(/*const size_t n_threads, */
+                   const string &inputfile, vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos>(inputfile, counts_hist);
+}
 
-  if (curr_tid != prev_tid || curr_pos != prev_pos || curr_mtid != prev_mtid ||
-      curr_mpos != prev_mpos) {
-    // next read is new, update counts_hist to include current_count
-    if (counts_hist.size() < current_count + 1) {
-      // histogram is too small, resize
+size_t
+load_counts_BAM_pe(/*const size_t n_threads, */
+                   const string &inputfile, vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos_pair>(inputfile, counts_hist);
+}
+
+struct genomic_interval {
+  int32_t tid{};  // indicates uninitialized
+  hts_pos_t start{};
+  hts_pos_t stop{};
+  bool operator<(const genomic_interval &rhs) const {
+    // clang-format off
+    return (tid < rhs.tid ||
+            (tid == rhs.tid &&
+             (start < rhs.start ||
+              (start == rhs.start &&
+               (stop < rhs.stop)))));
+    // clang-format on
+  }
+};
+
+static inline uint32_t
+size(const genomic_interval &gi) {
+  return gi.stop - gi.start;
+}
+
+template <typename T>
+static inline T
+round_prob(const T x, const uint32_t bin_size, const double frac) {
+  const double lo = (x / bin_size) * bin_size;
+  const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
+  return frac < (x - lo) ? lo : hi;
+}
+
+// split a mapped read into multiple genomic intervals based on the
+// number of base pairs in each
+static void
+split_genomic_interval(const genomic_interval &gi, mt19937 &generator,
+                       const hts_pos_t bin_size, vector<aln_pos> &output) {
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+  // this could either shorten or lengthen the read, but after this
+  // rounding, it will align with bin boundaries
+  const hts_pos_t r_start = round_prob(gi.start, bin_size, dist(generator));
+  const hts_pos_t r_stop = round_prob(gi.stop, bin_size, dist(generator));
+
+  // gather all the parts at bin offsets
+  for (auto pos = r_start; pos < r_stop; pos += bin_size)
+    output.emplace_back(gi.tid, pos);
+}
+
+template <class T, class U>
+static inline bool
+can_pop(const T &pq, const U &u, const hts_pos_t max_dist) {
+  return pq.top().tid != u.tid || pq.top().pos + max_dist < u.pos;
+}
+
+template <class T>
+static void
+update_duplicate_coverage_hist(const T &curr, const T &prev,
+                               vector<double> &counts_hist,
+                               size_t &current_count) {
+  if (curr != prev) {
+    if (counts_hist.size() < current_count + 1)  // histogram too small
       counts_hist.resize(current_count + 1, 0.0);
-    }
     ++counts_hist[current_count];
     current_count = 1;
   }
@@ -639,8 +723,15 @@ update_pe_duplicate_counts_hist_BAM(
     ++current_count;
 }
 
+// ADS: don't care if mapped reads are SE or PE, we only need the
+// first mate for each mapped read
 size_t
-load_counts_BAM_pe(const string &inputfile, vector<double> &counts_hist) {
+load_coverage_counts_BAM(const string &inputfile, const uint64_t seed,
+                         const size_t bin_size, const size_t max_width,
+                         vector<double> &coverage_hist) {
+  srand(time(0) + getpid());
+  std::mt19937 generator(seed);
+
   bamxx::bam_in hts(inputfile);  // assume already checked
   bamxx::bam_header hdr(hts);
   if (!hdr)
@@ -654,64 +745,60 @@ load_counts_BAM_pe(const string &inputfile, vector<double> &counts_hist) {
     ;
 
   size_t n_reads{};
-  // if all reads unmapped, must return
-  if (get_tid(aln) == -1)
-    return n_reads;
+  if (get_tid(aln) == -1)  // no reads unmapped
+    return 0;
 
-  // to check that reads are sorted properly
+  // to check reads are sorted properly
   vector<bool> chroms_seen(get_n_targets(hdr), false);
-
-  // start with prev_aln being first read
-  bamxx::bam_rec prev_aln;
-  swap(aln, prev_aln);
-
-  int32_t prev_tid = get_tid(prev_aln);
-  int32_t prev_pos = get_pos(prev_aln);
-  int32_t prev_mtid = get_mtid(prev_aln);
-  int32_t prev_mpos = get_mpos(prev_aln);
 
   // start with count of 1 for first read seen
   size_t current_count = 1;
 
+  // initialize prioirty queue to reorder the split reads
+  priority_queue<aln_pos> pq;
+  vector<aln_pos> parts;  // reuse allocated space
+  aln_pos prev_part;
+  genomic_interval prev;
+
+  const hts_pos_t max_dist = bin_size + max_width;
+
   while (hts.read(hdr, aln)) {
-    const int32_t curr_tid = get_tid(aln);
-    const int32_t curr_pos = get_pos(aln);
-    const int32_t curr_mtid = get_mtid(aln);
-    const int32_t curr_mpos = get_mpos(aln);
+    if (get_tid(aln) == -1)
+      continue;  // check that read is mapped
 
-    if (curr_mtid < curr_tid ||
-        (curr_mtid == curr_tid && curr_mpos == curr_mtid)) {
-      // ADS: this means that we should already have processed this
-      // same read pair earlier
-      continue;
-    }
+    const hts_pos_t rlen = rlen_from_cigar(aln);
+    const genomic_interval curr{get_tid(aln), get_pos(aln), rlen};
 
-    if (curr_tid != prev_tid) {
-      if (chroms_seen[curr_tid])
+    if (curr.tid != prev.tid) {
+      if (chroms_seen[curr.tid])
         throw runtime_error("input not sorted");
-      chroms_seen[curr_tid] = true;
+      chroms_seen[curr.tid] = true;
     }
 
-    // check that mapped read is not secondary
-    if (curr_tid != -1) {  // check that read is mapped
-      update_pe_duplicate_counts_hist_BAM(
-        curr_tid, curr_pos, curr_mtid, curr_mpos,  // vals for curr
-        prev_tid, prev_pos, prev_mtid, prev_mpos,  // vals for prev
-        inputfile, counts_hist, current_count);
+    if (size(curr) > max_width)
+      throw runtime_error("found read width " + std::to_string(max_width) +
+                          "; increase max width");
 
-      ++n_reads;
+    parts.clear();  // keep capacity
+    split_genomic_interval(curr, generator, bin_size, parts);
+
+    // add split intervals to the priority queue
+    const auto last = parts.back();  // keep a copy for test below
+    for (auto &&i : parts)
+      pq.push(i);
+
+    // remove genomic intervals from the priority queue
+    while (!pq.empty() && can_pop(pq, last, max_dist)) {
+      const aln_pos curr_part = pq.top();
+      pq.pop();
+      // update counts hist
+      update_duplicate_coverage_hist(curr_part, prev_part, coverage_hist,
+                                     current_count);
+      prev_part = curr_part;
     }
-    prev_tid = curr_tid;
-    prev_pos = curr_pos;
-    prev_mtid = curr_mtid;
-    prev_mpos = curr_mpos;
+    prev = curr;
+    ++n_reads;
   }
-
-  // to account for the last read compared to the one before it.
-  if (size(counts_hist) < current_count + 1)
-    counts_hist.resize(current_count + 1, 0.0);
-  ++counts_hist[current_count];
-
   return n_reads;
 }
 
