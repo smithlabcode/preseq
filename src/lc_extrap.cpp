@@ -53,20 +53,6 @@ using std::vector;
 
 namespace fs = std::filesystem;
 
-template <typename H>
-static void
-report_histogram(const string &outfile, const H &h) {
-  std::ofstream of;
-  if (!outfile.empty())
-    of.open(outfile);
-  std::ostream o(outfile.empty() ? std::cerr.rdbuf() : of.rdbuf());
-  o << "OBSERVED COUNTS (" << std::size(h) << ")" << std::endl;
-  for (auto i = 0u; i < std::size(h); ++i)
-    if (h[i] > 0)
-      o << i << '\t' << static_cast<uint32_t>(h[i]) << std::endl;
-  o << std::endl;
-}
-
 int
 lc_extrap_main(const int argc, const char **argv) {
   try {
@@ -100,7 +86,7 @@ lc_extrap_main(const int argc, const char **argv) {
     uint32_t n_threads{1};
 #endif
 
-    string description =
+    const string description =
       R"(
 Extrapolate the complexity of a library. This is the approach
 described in Daley & Smith (2013). The method applies rational
@@ -145,7 +131,8 @@ method has been used for many different purposes since then.
     opt_parse.add_opt("hist", 'H',
                       "input is a text file containing the observed histogram",
                       false, HIST_INPUT);
-    opt_parse.add_opt("hist-out", '\0', "output counts histogram to this file",
+    opt_parse.add_opt("hist-out", '\0',
+                      "output histogram to this file (for non-hist input)",
                       false, histogram_outfile);
     opt_parse.add_opt("quick", 'Q',
                       "quick mode (no bootstraps) for confidence intervals",
@@ -156,7 +143,6 @@ method has been used for many different purposes since then.
                       seed);
     opt_parse.set_show_defaults();
     vector<string> leftover_args;
-    // ADS: suspect bug below; "-about" isn't working.
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
@@ -308,7 +294,7 @@ method has been used for many different purposes since then.
                                        yield_upper_ci_lognorm);
     }
   }
-  catch (std::exception &e) {
+  catch (const std::exception &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }
