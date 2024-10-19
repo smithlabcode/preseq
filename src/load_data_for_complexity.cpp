@@ -680,6 +680,7 @@ size(const genomic_interval &gi) {
 template <typename T>
 static inline T
 round_prob(const T x, const uint32_t bin_size, const double frac) {
+  // probabilisticly round read ends so they are at bin boundaries
   const double lo = (x / bin_size) * bin_size;
   const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
   return frac < (x - lo) ? lo : hi;
@@ -692,8 +693,7 @@ split_genomic_interval(const genomic_interval &gi, mt19937 &generator,
                        const hts_pos_t bin_size, vector<aln_pos> &output) {
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-  // this could either shorten or lengthen the read, but after this
-  // rounding, it will align with bin boundaries
+  // could shorten or lengthen; postcond: ends are at bin boundaries
   const hts_pos_t r_start = round_prob(gi.start, bin_size, dist(generator));
   const hts_pos_t r_stop = round_prob(gi.stop, bin_size, dist(generator));
 
@@ -710,9 +710,8 @@ can_pop(const T &pq, const U &u, const hts_pos_t max_dist) {
 
 template <class T>
 static void
-update_duplicate_coverage_hist(const T &curr, const T &prev,
-                               vector<double> &counts_hist,
-                               size_t &current_count) {
+update_coverage_hist(const T &curr, const T &prev, vector<double> &counts_hist,
+                     size_t &current_count) {
   if (curr != prev) {
     if (counts_hist.size() < current_count + 1)  // histogram too small
       counts_hist.resize(current_count + 1, 0.0);
@@ -782,7 +781,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
       throw runtime_error("found read width " + std::to_string(max_width) +
                           "; increase max width");
 
-    parts.clear();  // keep capacity
+    parts.clear();  // need new vec, but keep capacity
     split_genomic_interval(curr, generator, bin_size, parts);
 
     // add split intervals to the priority queue
@@ -795,8 +794,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
       const aln_pos curr_part = pq.top();
       pq.pop();
       // update counts hist
-      update_duplicate_coverage_hist(curr_part, prev_part, coverage_hist,
-                                     current_count);
+      update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
       prev_part = curr_part;
     }
     prev = curr;
@@ -808,8 +806,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
     const aln_pos curr_part = pq.top();
     pq.pop();
     // update counts hist
-    update_duplicate_coverage_hist(curr_part, prev_part, coverage_hist,
-                                   current_count);
+    update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
     prev_part = curr_part;
   }
   return n_reads;
