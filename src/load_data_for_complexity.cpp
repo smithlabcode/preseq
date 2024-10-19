@@ -42,9 +42,6 @@
 #include <utility>  // std::swap
 #include <vector>
 
-using std::cerr;
-using std::endl;
-using std::max;
 using std::min;
 using std::mt19937;
 using std::priority_queue;
@@ -520,6 +517,13 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
 #ifdef HAVE_HTSLIB
 // Deal with SAM/BAM format only if we have htslib
 
+static inline void
+reset_bam_rec(bamxx::bam_rec &b) {
+  if (b.b)
+    bam_destroy1(b.b);
+  b.b = nullptr;
+}
+
 static inline bool
 not_mapped(const bamxx::bam_rec &aln) {
   return get_tid(aln) == -1;
@@ -539,6 +543,9 @@ struct aln_pos {
     tid{get_tid(a)}, pos{get_pos(a)} {}
   bool operator<(const aln_pos &rhs) const {
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
+  }
+  bool operator>(const aln_pos &rhs) const {
+    return tid > rhs.tid || (tid == rhs.tid && pos > rhs.pos);
   }
   bool operator!=(const aln_pos &rhs) const {
     // ADS: ordered to check pos first
@@ -704,8 +711,8 @@ split_genomic_interval(const genomic_interval &gi, mt19937 &generator,
 
 template <class T, class U>
 static inline bool
-can_pop(const T &pq, const U &u, const hts_pos_t max_dist) {
-  return pq.top().tid != u.tid || pq.top().pos + max_dist < u.pos;
+can_pop(const T &pq, const U &last, const hts_pos_t max_dist) {
+  return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
 }
 
 template <class T>
@@ -757,7 +764,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
   size_t current_count = 1;
 
   // initialize prioirty queue to reorder the split reads
-  priority_queue<aln_pos> pq;
+  priority_queue<aln_pos, vector<aln_pos>, std::greater<aln_pos>> pq;
   vector<aln_pos> parts;  // reuse allocated space
   aln_pos prev_part;
   genomic_interval prev;
@@ -787,7 +794,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
 
     // add split intervals to the priority queue
     const auto last = parts.back();  // keep a copy for test below
-    for (auto &&i : parts)
+    for (const auto &i : parts)
       pq.push(i);
 
     // remove genomic interval parts from the priority queue
@@ -798,6 +805,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
       update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
       prev_part = curr_part;
     }
+    reset_bam_rec(aln);
     prev = curr;
     ++n_reads;
   }
