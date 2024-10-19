@@ -23,6 +23,9 @@
 
 #include <cstddef>  // std::size_t
 #include <cstdint>  // std::uint64_t
+#include <fstream>
+#include <iostream>
+#include <ostream>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -111,6 +114,20 @@ multinomial(std::mt19937 &gen, const std::vector<double> &mult_probs,
 
   if (trials > 0)
     throw std::runtime_error("multinomial sampling failed");
+}
+
+template <typename H>
+void
+report_histogram(const std::string &outfile, const H &h) {
+  std::ofstream of;
+  if (!outfile.empty())
+    of.open(outfile);
+  std::ostream o(outfile.empty() ? std::cerr.rdbuf() : of.rdbuf());
+  o << "OBSERVED COUNTS (" << std::size(h) << ")" << std::endl;
+  for (auto i = 0u; i < std::size(h); ++i)
+    if (h[i] > 0)
+      o << i << '\t' << static_cast<std::uint32_t>(h[i]) << std::endl;
+  o << std::endl;
 }
 
 #endif  // SRC_COMMON_HPP_

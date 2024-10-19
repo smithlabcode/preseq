@@ -334,7 +334,7 @@ write_predicted_complexity_curve(const string &outfile, const double c_level,
                                  const vector<double> &yield_upper_ci_lognorm) {
   std::ofstream of;
   if (!outfile.empty())
-    of.open(outfile.c_str());
+    of.open(outfile);
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
   out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
