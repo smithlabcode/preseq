@@ -82,11 +82,13 @@ gc_extrap_main(const int argc, const char *argv[]) {
   try {
     const size_t MIN_REQUIRED_COUNTS = 4;
 
+    string outfile;
+    string histogram_outfile;
+
     int diagonal = 0;
     size_t orig_max_terms = 100;
     size_t bin_size = 10;
-    bool VERBOSE = false;
-    string outfile;
+    bool verbose = false;
     double base_step_size = 1.0e8;
     size_t max_width = 10000;
     bool SINGLE_ESTIMATE = false;
@@ -103,16 +105,18 @@ gc_extrap_main(const int argc, const char *argv[]) {
 #endif
 
     const string description = R"(
-      "Extrapolate the size of the covered genome by mapped reads. This \
-      approach is described in Daley & Smith (2014). The method is the  \
-      same as for lc_extrap: using rational function approximation to   \
-      a power-series expansion for the number of \"unobserved\" bases   \
-      in the initial sample. The gc_extrap method is adapted to deal    \
-      with individual nucleotides rather than distinct reads.)";
+Extrapolate the size of the covered genome by mapped reads. This
+approach is described in Daley & Smith (2014). The method is the same
+as for lc_extrap: using rational function approximation to a
+power-series expansion for the number of "unobserved" bases in the
+initial sample. The gc_extrap method is adapted to deal with
+individual nucleotides rather than distinct reads.
+)";
+    string program_name = fs::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
-    OptionParser opt_parse(fs::path(argv[1]).filename(), description,
-                           "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o',
                       "coverage yield output file (default: stdout)", false,
                       outfile);
@@ -131,7 +135,9 @@ gc_extrap_main(const int argc, const char *argv[]) {
                       c_level);
     opt_parse.add_opt("terms", 'x', "maximum number of terms", false,
                       orig_max_terms);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
+    opt_parse.add_opt("hist-out", '\0', "output histogram to this file", false,
+                      histogram_outfile);
     opt_parse.add_opt("bed", 'B',
                       "input is in bed format without sequence information",
                       false, NO_SEQUENCE);
@@ -175,25 +181,25 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
     vector<double> coverage_hist;
     size_t n_reads = 0;
-    if (VERBOSE)
+    if (verbose)
       cerr << "LOADING READS" << endl;
 
     if (NO_SEQUENCE) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED FORMAT" << endl;
       n_reads = load_coverage_counts_GR(infile, seed, bin_size, max_width,
                                         coverage_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BAM_INPUT" << endl;
       n_reads = load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
                                          max_width, coverage_hist);
     }
 #endif
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "MAPPED READ FORMAT" << endl;
       n_reads = load_coverage_counts_MR(infile, seed, bin_size, max_width,
                                         coverage_hist);
@@ -201,11 +207,14 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
     const double total_bins = get_counts_from_hist(coverage_hist);
 
+    if (verbose)
+      report_histogram(histogram_outfile, coverage_hist);
+
     const double distinct_bins =
       accumulate(cbegin(coverage_hist), cend(coverage_hist), 0.0);
 
     const double avg_bins_per_read = total_bins / n_reads;
-    double bin_step_size = base_step_size / bin_size;
+    const double bin_step_size = base_step_size / bin_size;
 
     const size_t max_observed_count = coverage_hist.size() - 1;
 
@@ -216,7 +225,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
     orig_max_terms = min(orig_max_terms, first_zero - 1);
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "TOTAL READS         = " << n_reads << endl
            << "BASE STEP SIZE      = " << base_step_size << endl
            << "BIN STEP SIZE       = " << bin_step_size << endl
@@ -228,7 +237,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
            << "MAX COVERAGE COUNT  = " << max_observed_count << endl
            << "COUNTS OF 1         = " << coverage_hist[1] << endl;
 
-    if (VERBOSE) {
+    if (verbose) {
       // OUTPUT THE ORIGINAL HISTOGRAM
       cerr << "OBSERVED BIN COUNTS (" << coverage_hist.size() << ")" << endl;
       for (size_t i = 0; i < coverage_hist.size(); i++)
@@ -249,14 +258,14 @@ gc_extrap_main(const int argc, const char *argv[]) {
       throw runtime_error("Library expected to saturate in doubling of "
                           "experiment size, unable to extrapolate");
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "[ESTIMATING COVERAGE CURVE]" << endl;
 
     vector<double> coverage_estimates;
 
     if (SINGLE_ESTIMATE) {
       bool SINGLE_ESTIMATE_SUCCESS = extrap_single_estimate(
-        VERBOSE, allow_defects, coverage_hist, orig_max_terms, diagonal,
+        verbose, allow_defects, coverage_hist, orig_max_terms, diagonal,
         bin_step_size, max_extrap / bin_size, coverage_estimates);
       // IF FAILURE, EXIT
       if (!SINGLE_ESTIMATE_SUCCESS)
@@ -265,7 +274,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out << "TOTAL_BASES\tEXPECTED_DISTINCT" << endl;
@@ -279,24 +288,24 @@ gc_extrap_main(const int argc, const char *argv[]) {
             << coverage_estimates[i] * bin_size << endl;
     }
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
 
       const size_t max_iter = 10 * n_bootstraps;
 
       vector<vector<double>> bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, allow_defects, seed, coverage_hist,
+      extrap_bootstrap(verbose, allow_defects, seed, coverage_hist,
                        n_bootstraps, orig_max_terms, diagonal, bin_step_size,
                        max_extrap / bin_size, max_iter, bootstrap_estimates);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       vector<double> coverage_upper_ci_lognorm, coverage_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
                            coverage_lower_ci_lognorm,
                            coverage_upper_ci_lognorm);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[WRITING OUTPUT]" << endl;
 
       write_predicted_coverage_curve(
