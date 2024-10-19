@@ -520,8 +520,8 @@ load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
 #ifdef HAVE_HTSLIB
 // Deal with SAM/BAM format only if we have htslib
 
-static inline void
-is_unmapped(const bamxx::bam_rec &aln) {
+static inline bool
+not_mapped(const bamxx::bam_rec &aln) {
   return get_tid(aln) == -1;
 }
 
@@ -598,12 +598,12 @@ load_counts_BAM(const uint32_t n_threads, const string &inputfile,
 
   // find first mapped read to start
   bamxx::bam_rec aln;
-  while (hts.read(hdr, aln) && is_unmapped(aln))
+  while (hts.read(hdr, aln) && not_mapped(aln))
     ;
 
   size_t n_reads{};
   // if all reads unmapped, must return
-  if (is_unmapped(aln))
+  if (not_mapped(aln))
     return n_reads;
 
   // to check that reads are sorted properly
@@ -616,7 +616,7 @@ load_counts_BAM(const uint32_t n_threads, const string &inputfile,
   size_t current_count = 1;
 
   while (hts.read(hdr, aln)) {
-    if (is_unmapped(aln))
+    if (not_mapped(aln))
       continue;  // skip unmapped reads
 
     const aln_pos_t curr{aln};
@@ -744,11 +744,11 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
 
   // find first mapped read to start
   bamxx::bam_rec aln;
-  while (hts.read(hdr, aln) && is_unmapped(aln))
+  while (hts.read(hdr, aln) && not_mapped(aln))
     ;
 
   size_t n_reads{};
-  if (is_unmapped(aln))  // no reads unmapped
+  if (not_mapped(aln))  // no reads unmapped
     return 0;
 
   // to check reads are sorted properly
@@ -766,7 +766,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
   const hts_pos_t max_dist = bin_size + max_width;
 
   while (hts.read(hdr, aln)) {
-    if (is_unmapped(aln))
+    if (not_mapped(aln))
       continue;  // check that read is mapped
 
     const hts_pos_t rlen = rlen_from_cigar(aln);
