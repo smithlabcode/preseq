@@ -61,6 +61,13 @@ load_counts_BAM_pe(const std::string &input_file_name,
 std::size_t
 load_counts_BAM_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist);
+
+std::size_t
+load_coverage_counts_BAM(const std::string &input_file_name,
+                         const std::uint64_t seed, const std::size_t bin_size,
+                         const std::size_t max_width,
+                         std::vector<double> &coverage_hist);
+
 #endif  // HAVE_HTSLIB
 
 #endif  // SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
