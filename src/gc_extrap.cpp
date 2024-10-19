@@ -162,9 +162,6 @@ individual nucleotides rather than distinct reads.
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.about_requested()) {
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
