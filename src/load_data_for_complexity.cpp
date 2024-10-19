@@ -561,14 +561,8 @@ struct aln_pos_pair {
 template <typename T>
 static inline void
 update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
-                                 const string &inputfile,
                                  vector<double> &counts_hist,
                                  size_t &current_count) {
-  // check if reads are sorted within chroms; situation of unordered
-  // chroms is taken care of outside this function
-  if (prev < curr)
-    throw runtime_error("locations unsorted in: " + inputfile);
-
   if (prev != curr) {
     // next read is new, update counts_hist to include current_count
     if (size(counts_hist) < current_count + 1) {
@@ -616,7 +610,14 @@ load_counts_BAM(const uint32_t n_threads, const string &inputfile,
   size_t current_count = 1;
 
   while (hts.read(hdr, aln)) {
+    if (get_tid(aln) != -1)
+      continue;  // skip unmapped reads
+
     const aln_pos_t curr{aln};
+
+    // check that reads are sorted
+    if (prev < curr)
+      throw runtime_error("locations unsorted in: " + inputfile);
 
     if (curr.tid != prev.tid) {  // check that reads are sorted
       if (chroms_seen[curr.tid])
@@ -625,15 +626,12 @@ load_counts_BAM(const uint32_t n_threads, const string &inputfile,
     }
 
     // check that mapped read is not secondary
-    if (curr.tid != -1) {  // check that read is mapped
-      update_duplicate_counts_hist_BAM(curr, prev, inputfile, counts_hist,
-                                       current_count);
-      ++n_reads;
-    }
+    update_duplicate_counts_hist_BAM(curr, prev, counts_hist, current_count);
+    ++n_reads;
     prev = curr;
   }
 
-  // to account for the last read compared to the one before it.
+  // account for the last read
   if (size(counts_hist) < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
@@ -786,7 +784,7 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
     for (auto &&i : parts)
       pq.push(i);
 
-    // remove genomic intervals from the priority queue
+    // remove genomic interval parts from the priority queue
     while (!pq.empty() && can_pop(pq, last, max_dist)) {
       const aln_pos curr_part = pq.top();
       pq.pop();
@@ -797,6 +795,16 @@ load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
     }
     prev = curr;
     ++n_reads;
+  }
+
+  // take care of remaining parts in priority queue
+  while (!pq.empty()) {
+    const aln_pos curr_part = pq.top();
+    pq.pop();
+    // update counts hist
+    update_duplicate_coverage_hist(curr_part, prev_part, coverage_hist,
+                                   current_count);
+    prev_part = curr_part;
   }
   return n_reads;
 }
