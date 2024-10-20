@@ -217,16 +217,15 @@ method has been used for many different purposes since then.
       std::count_if(cbegin(counts_hist), cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (verbose)
+    if (verbose) {
       cerr << "TOTAL READS     = " << n_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl
            << "MAX TERMS       = " << orig_max_terms << endl;
-
-    if (verbose)
       report_histogram(histogram_outfile, counts_hist);
+    }
 
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);

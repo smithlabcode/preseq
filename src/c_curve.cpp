@@ -90,7 +90,6 @@ c_curve_main(const int argc, const char *argv[]) {
     string outfile;
     string histogram_outfile;
 
-    size_t upper_limit = 0;
     double step_size = 1e6;
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
@@ -211,20 +210,17 @@ instead resamples from the given data.
       std::count_if(cbegin(counts_hist), cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (verbose)
+    if (verbose) {
       cerr << "TOTAL READS     = " << n_reads << endl
            << "COUNTS_SUM      = " << total_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl;
-
-    if (verbose)
       report_histogram(histogram_outfile, counts_hist);
-
-    if (upper_limit == 0)
-      upper_limit = n_reads;  // set upper limit equal to number of
-                              // molecules
+    }
+    const size_t upper_limit = n_reads;  // set upper limit equal to number of
+                                         // molecules
 
     // setup for output of the complexity curve
     std::ofstream of;

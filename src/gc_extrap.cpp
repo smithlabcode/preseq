@@ -204,9 +204,6 @@ individual nucleotides rather than distinct reads.
 
     const double total_bins = get_counts_from_hist(coverage_hist);
 
-    if (verbose)
-      report_histogram(histogram_outfile, coverage_hist);
-
     const double distinct_bins =
       accumulate(cbegin(coverage_hist), cend(coverage_hist), 0.0);
 
@@ -222,7 +219,7 @@ individual nucleotides rather than distinct reads.
 
     orig_max_terms = min(orig_max_terms, first_zero - 1);
 
-    if (verbose)
+    if (verbose) {
       cerr << "TOTAL READS         = " << n_reads << endl
            << "BASE STEP SIZE      = " << base_step_size << endl
            << "BIN STEP SIZE       = " << bin_step_size << endl
@@ -233,14 +230,7 @@ individual nucleotides rather than distinct reads.
            << "TOTAL COVERED BASES = " << distinct_bins * bin_size << endl
            << "MAX COVERAGE COUNT  = " << max_observed_count << endl
            << "COUNTS OF 1         = " << coverage_hist[1] << endl;
-
-    if (verbose) {
-      // OUTPUT THE ORIGINAL HISTOGRAM
-      cerr << "OBSERVED BIN COUNTS (" << coverage_hist.size() << ")" << endl;
-      for (size_t i = 0; i < coverage_hist.size(); i++)
-        if (coverage_hist[i] > 0)
-          cerr << i << '\t' << coverage_hist[i] << endl;
-      cerr << endl;
+      report_histogram(histogram_outfile, coverage_hist);
     }
 
     // catch if all reads are distinct
@@ -310,7 +300,7 @@ individual nucleotides rather than distinct reads.
         coverage_lower_ci_lognorm, coverage_upper_ci_lognorm);
     }
   }
-  catch (std::exception &e) {
+  catch (const std::exception &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }

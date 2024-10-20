@@ -49,6 +49,39 @@ using std::vector;
 
 namespace fs = std::filesystem;
 
+static void
+report_bootstrapped_moments(const vector<double> &bootstrap_moments,
+                            const MomentSequence &bootstrap_mom_seq,
+                            const vector<double> &points,
+                            const vector<double> &weights,
+                            const double estimated_unobs) {
+  cerr << "bootstrapped_moments=" << endl;
+  for (size_t i = 0; i < bootstrap_moments.size(); i++)
+    cerr << bootstrap_moments[i] << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+    cerr << "alpha_" << k << '\t';
+  cerr << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+    cerr << bootstrap_mom_seq.alpha[k] << '\t';
+  cerr << endl;
+
+  for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+    cerr << "beta_" << k << '\t';
+  cerr << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+    cerr << bootstrap_mom_seq.beta[k] << '\t';
+  cerr << endl;
+  cerr << "points=" << "\t";
+  for (size_t i = 0; i < points.size(); i++)
+    cerr << points[i] << "\t";
+  cerr << endl;
+  cerr << "weights=" << "\t";
+  for (size_t i = 0; i < weights.size(); i++)
+    cerr << weights[i] << "\t";
+  cerr << endl;
+  cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
+}
+
 // BOUND_UNOBS: bounding n_0
 int
 bound_pop_main(const int argc, const char *argv[]) {
@@ -190,7 +223,7 @@ counts of observed species in an initial sample.
     vector<double> measure_moments;
     // mu_r = (r + 1)! n_{r+1} / n_1
     size_t idx = 1;
-    while (counts_hist[idx] > 0 && idx <= counts_hist.size()) {
+    while (idx < counts_hist.size() && counts_hist[idx]) {
       // idx + 1 because function calculates (x-1)!
       measure_moments.push_back(
         exp(factorial(idx + 1) + log(counts_hist[idx]) - log(counts_hist[1])));
@@ -198,7 +231,7 @@ counts of observed species in an initial sample.
         measure_moments.pop_back();
         break;
       }
-      idx++;
+      ++idx;
     }
 
     if (verbose) {
@@ -333,7 +366,8 @@ counts of observed species in an initial sample.
 
         MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
-        vector<double> points, weights;
+        vector<double> points;
+        vector<double> weights;
         bootstrap_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter,
                                                  points, weights);
 
@@ -356,37 +390,9 @@ counts of observed species in an initial sample.
           n_points = 0;
         }
 
-        if (verbose) {
-          cerr << "bootstrapped_moments=" << endl;
-          for (size_t i = 0; i < bootstrap_moments.size(); i++)
-            cerr << bootstrap_moments[i] << endl;
-        }
-        if (verbose) {
-          for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-            cerr << "alpha_" << k << '\t';
-          cerr << endl;
-          for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-            cerr << bootstrap_mom_seq.alpha[k] << '\t';
-          cerr << endl;
-
-          for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-            cerr << "beta_" << k << '\t';
-          cerr << endl;
-          for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-            cerr << bootstrap_mom_seq.beta[k] << '\t';
-          cerr << endl;
-        }
-        if (verbose) {
-          cerr << "points=" << "\t";
-          for (size_t i = 0; i < points.size(); i++)
-            cerr << points[i] << "\t";
-          cerr << endl;
-          cerr << "weights=" << "\t";
-          for (size_t i = 0; i < weights.size(); i++)
-            cerr << weights[i] << "\t";
-          cerr << endl;
-          cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
-        }
+        if (verbose)
+          report_bootstrapped_moments(bootstrap_moments, bootstrap_mom_seq,
+                                      points, weights, estimated_unobs);
 
         quad_estimates.push_back(estimated_unobs);
       }
@@ -408,8 +414,8 @@ counts of observed species in an initial sample.
       out << median_estimate << '\t' << lower_ci << '\t' << upper_ci << endl;
     }
   }
-  catch (runtime_error &e) {
-    cerr << "ERROR:\t" << e.what() << endl;
+  catch (const std::exception &e) {
+    cerr << e.what() << endl;
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
