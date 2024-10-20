@@ -27,13 +27,13 @@
 
 std::size_t
 load_coverage_counts_MR(const std::string &input_file_name,
-                        const std::uint64_t seed, const std::size_t bin_size,
+                        const std::uint32_t seed, const std::size_t bin_size,
                         const std::size_t max_width,
                         std::vector<double> &coverage_hist);
 
 std::size_t
 load_coverage_counts_GR(const std::string &input_file_name,
-                        const std::uint64_t seed, const std::size_t bin_size,
+                        const std::uint32_t seed, const std::size_t bin_size,
                         const std::size_t max_width,
                         std::vector<double> &coverage_hist);
 
@@ -66,7 +66,7 @@ load_counts_BAM_se(const std::uint32_t n_threads,
 std::size_t
 load_coverage_counts_BAM(const std::uint32_t n_threads,
                          const std::string &input_file_name,
-                         const std::uint64_t seed, const std::size_t bin_size,
+                         const std::uint32_t seed, const std::size_t bin_size,
                          const std::size_t max_width,
                          std::vector<double> &coverage_hist);
 
