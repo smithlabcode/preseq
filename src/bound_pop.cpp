@@ -47,8 +47,6 @@ using std::setprecision;
 using std::string;
 using std::vector;
 
-namespace fs = std::filesystem;
-
 static void
 report_bootstrapped_moments(const vector<double> &bootstrap_moments,
                             const MomentSequence &bootstrap_mom_seq,
@@ -112,7 +110,7 @@ bound_pop_main(const int argc, const char *argv[]) {
 Estimate a bound on the size of the underlying population based on
 counts of observed species in an initial sample.
 )";
-    string program_name = fs::path(argv[0]).filename();
+    string program_name = std::filesystem::path(argv[0]).filename();
     program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS FOR BOUND_POP ***********/
@@ -239,12 +237,13 @@ counts of observed species in an initial sample.
            << "DISTINCT OBSERVATIONS  = " << distinct_obs << endl
            << "MAX COUNT              = " << counts_hist.size() - 1 << endl;
 
-      report_histogram(histogram_outfile, counts_hist);
-
       cerr << "OBSERVED MOMENTS" << endl;
       for (size_t i = 0; i < measure_moments.size(); i++)
         cerr << std::setprecision(16) << measure_moments[i] << endl;
     }
+
+    if (!histogram_outfile.empty())
+      report_histogram(histogram_outfile, counts_hist);
 
     if (QUICK_MODE) {
       if (measure_moments.size() < 2 * max_num_points)

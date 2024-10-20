@@ -45,8 +45,6 @@ using std::string;
 using std::to_string;
 using std::vector;
 
-namespace fs = std::filesystem;
-
 int
 pop_size_main(const int argc, const char *argv[]) {
   try {
@@ -88,7 +86,7 @@ parameters assume that the initial sample represents at least 1e-9 of
 the population, which is sufficient for every example application we
 have seen.
 )";
-    string program_name = fs::path(argv[0]).filename();
+    string program_name = std::filesystem::path(argv[0]).filename();
     program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
@@ -213,15 +211,16 @@ have seen.
       std::count_if(begin(counts_hist), end(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (verbose) {
+    if (verbose)
       cerr << "TOTAL READS     = " << n_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl
            << "MAX TERMS       = " << orig_max_terms << endl;
+
+    if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
-    }
 
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);

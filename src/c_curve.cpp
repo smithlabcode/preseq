@@ -46,8 +46,6 @@
 #include <string>
 #include <vector>
 
-namespace fs = std::filesystem;
-
 using std::accumulate;
 using std::array;
 using std::cbegin;
@@ -102,7 +100,7 @@ c_curve_main(const int argc, const char *argv[]) {
 Generate the complexity curve for data. This does not extrapolate, but
 instead resamples from the given data.
 )";
-    string program_name = fs::path(argv[0]).filename();
+    string program_name = std::filesystem::path(argv[0]).filename();
     program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
@@ -210,15 +208,17 @@ instead resamples from the given data.
       std::count_if(cbegin(counts_hist), cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (verbose) {
+    if (verbose)
       cerr << "TOTAL READS     = " << n_reads << endl
            << "COUNTS_SUM      = " << total_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
            << "MAX COUNT       = " << max_observed_count << endl
            << "COUNTS OF 1     = " << counts_hist[1] << endl;
+
+    if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
-    }
+
     const size_t upper_limit = n_reads;  // set upper limit equal to number of
                                          // molecules
 

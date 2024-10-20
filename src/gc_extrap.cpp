@@ -42,8 +42,6 @@ using std::runtime_error;
 using std::string;
 using std::vector;
 
-namespace fs = std::filesystem;
-
 // ADS: functions same, header different (above and this one)
 static void
 write_predicted_coverage_curve(const string &outfile, const double c_level,
@@ -112,7 +110,7 @@ power-series expansion for the number of "unobserved" bases in the
 initial sample. The gc_extrap method is adapted to deal with
 individual nucleotides rather than distinct reads.
 )";
-    string program_name = fs::path(argv[0]).filename();
+    string program_name = std::filesystem::path(argv[0]).filename();
     program_name += " " + string(argv[1]);
 
     // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
@@ -219,7 +217,7 @@ individual nucleotides rather than distinct reads.
 
     orig_max_terms = min(orig_max_terms, first_zero - 1);
 
-    if (verbose) {
+    if (verbose)
       cerr << "TOTAL READS         = " << n_reads << endl
            << "BASE STEP SIZE      = " << base_step_size << endl
            << "BIN STEP SIZE       = " << bin_step_size << endl
@@ -230,8 +228,9 @@ individual nucleotides rather than distinct reads.
            << "TOTAL COVERED BASES = " << distinct_bins * bin_size << endl
            << "MAX COVERAGE COUNT  = " << max_observed_count << endl
            << "COUNTS OF 1         = " << coverage_hist[1] << endl;
+
+    if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, coverage_hist);
-    }
 
     // catch if all reads are distinct
     if (orig_max_terms < MIN_REQUIRED_COUNTS)
