@@ -250,7 +250,8 @@ inline bool
 precedes_by_end_and_strand(const bamxx::bam_rec &a, const bamxx::bam_rec &b) {
   const auto end_a = bam_endpos(a.b);
   const auto end_b = bam_endpos(b.b);
-  return end_a < end_b || (end_a == end_b && bam_is_rev(a) < bam_is_rev(b));
+  return end_a < end_b ||
+         (end_a == end_b && bam_is_rev(a) == false && bam_is_rev(b) == true);
 }
 
 inline bool
