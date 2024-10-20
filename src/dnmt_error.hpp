@@ -30,8 +30,10 @@ struct dnmt_error : public std::exception {
   dnmt_error(const std::int64_t err, const std::string &msg) :
     err{err}, the_errno{errno}, msg{msg} {
     std::ostringstream oss;
+    // clang-format off
     oss << "[error: " << err << "][" << "ERRNO: " << the_errno << "]"
         << "[" << strerror(the_errno) << "][" << msg << "]";
+    // clang-format on
     the_what = oss.str();
   }
   explicit dnmt_error(const std::string &_msg) : dnmt_error(0, _msg) {}

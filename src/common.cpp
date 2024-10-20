@@ -338,9 +338,12 @@ write_predicted_complexity_curve(const string &outfile, const double c_level,
     of.open(outfile);
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-  out << "TOTAL_READS\tEXPECTED_DISTINCT\t"
-      << "LOWER_" << c_level << "CI\t"
-      << "UPPER_" << c_level << "CI" << endl;
+  // clang-format off
+  out << "TOTAL_READS" << '\t'
+      << "EXPECTED_DISTINCT" << '\t'
+      << "LOWER_" << c_level << "CI" << '\t'
+      << "UPPER_" << c_level << "CI" << '\n';
+  // clang-format on
 
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
