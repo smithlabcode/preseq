@@ -44,7 +44,6 @@ struct ContinuedFraction {
                             std::vector<double> &estimates) const;
 
   bool is_valid() const { return !cf_coeffs.empty(); }
-  size_t return_degree() const { return degree; }
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -70,8 +69,6 @@ public:
   // find best cont frac approx for estimating distinct
   ContinuedFraction
   optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
-
-  int get_diagonal() const { return diagonal_idx; }
 
 private:
   int diagonal_idx;  // the diagonal to work with for estimates
