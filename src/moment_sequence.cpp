@@ -51,7 +51,7 @@ void
 LU_decomp(vector<vector<double>> &A, vector<int> &P) {
   const size_t N = A.size();
   double absA{};
-  size_t i, j, k;
+  size_t i, k;
 
   P.clear();
   for (size_t x = 0; x <= N; x++)
@@ -82,7 +82,7 @@ LU_decomp(vector<vector<double>> &A, vector<int> &P) {
       P[N]++;
     }
 
-    for (j = i + 1; j < N; j++) {
+    for (size_t j = i + 1; j < N; j++) {
       A[j][i] /= A[i][i];
 
       for (k = i + 1; k < N; k++)
@@ -92,7 +92,7 @@ LU_decomp(vector<vector<double>> &A, vector<int> &P) {
 }
 
 double
-LU_determinant(vector<vector<double>> &A, vector<int> &P) {
+LU_determinant(const vector<vector<double>> &A, const vector<int> &P) {
   const size_t N = A.size();
 
   double det = A[0][0];
