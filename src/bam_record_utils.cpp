@@ -431,7 +431,8 @@ get_full_and_partial_ops(const uint32_t *cig_in, const uint32_t in_ops,
  * output of "A-" is "-T", and the output of "C-" is "-G", and so
  * forth. The user must handle this case separately.
  */
-const uint8_t byte_revcom_table[] = {
+const uint8_t byte_revcomp_table[] = {
+  // clang-format off
   0,  0, 0,  0,   0,  0, 0,  0,   0,  0, 0,  0,   0,  0,   0,  0,   8,  136,
   72, 0, 40, 0,   0,  0, 24, 0,   0,  0, 0,  0,   0,  248, 4,  132, 68, 0,
   36, 0, 0,  0,   20, 0, 0,  0,   0,  0, 0,  244, 0,  0,   0,  0,   0,  0,
@@ -446,29 +447,31 @@ const uint8_t byte_revcom_table[] = {
   0,  0, 0,  0,   0,  0, 0,  0,   0,  0, 0,  0,   0,  0,   0,  0,   0,  0,
   0,  0, 0,  0,   0,  0, 0,  0,   0,  0, 0,  0,   0,  0,   0,  0,   0,  0,
   0,  0, 0,  0,   0,  0, 15, 143, 79, 0, 47, 0,   0,  0,   31, 0,   0,  0,
-  0,  0, 0,  255};
+  0,  0, 0,  255
+  // clang-format on
+};
 
 static inline void
-revcom_byte_then_reverse(unsigned char *a, unsigned char *b) {
-  unsigned char *p1, *p2;
-  for (p1 = a, p2 = b - 1; p2 > p1; ++p1, --p2) {
-    *p1 = byte_revcom_table[*p1];
-    *p2 = byte_revcom_table[*p2];
+revcomp_byte_then_reverse(unsigned char *const a, unsigned char *const b) {
+  unsigned char *p1{a}, *p2{b};
+  for (p2 -= 1; p2 > p1; ++p1, --p2) {
+    *p1 = byte_revcomp_table[*p1];
+    *p2 = byte_revcomp_table[*p2];
     *p1 ^= *p2;
     *p2 ^= *p1;
     *p1 ^= *p2;
   }
   if (p1 == p2)
-    *p1 = byte_revcom_table[*p1];
+    *p1 = byte_revcomp_table[*p1];
 }
 
 static inline void
-revcomp_seq_by_byte(bam1_t *aln) {
+revcomp_seq_by_byte(bam1_t *const aln) {
   const size_t l_qseq = get_l_qseq(aln);
   auto seq = bam_get_seq(aln);
-  const size_t num_bytes = ceil(l_qseq / 2.0);
+  const size_t num_bytes = (l_qseq + 1) / 2;  // integer ceil / 2
   auto seq_end = seq + num_bytes;
-  revcom_byte_then_reverse(seq, seq_end);
+  revcomp_byte_then_reverse(seq, seq_end);
   if (l_qseq % 2 == 1) {  // for odd-length sequences
     for (size_t i = 0; i < num_bytes - 1; i++) {
       // swap 4-bit chunks within consecutive bytes like this:
@@ -486,7 +489,7 @@ revcomp_seq_by_byte(bam1_t *aln) {
 // has been set to ceil((a_used_len + b_seq_len) / 2.0) where
 // a_used_len = c_seq_len - b_seq_len
 static inline void
-merge_by_byte(const bam1_t *a, const bam1_t *b, bam1_t *c) {
+merge_by_byte(bam1_t const *const a, bam1_t const *const b, bam1_t *const c) {
   // ADS: (todo) need some functions for int_ceil and is_odd
   const size_t b_seq_len = get_l_qseq(b);
   const size_t c_seq_len = get_l_qseq(c);
@@ -496,8 +499,8 @@ merge_by_byte(const bam1_t *a, const bam1_t *b, bam1_t *c) {
   const bool is_b_odd = b_seq_len % 2 == 1;
   const bool is_c_odd = c_seq_len % 2 == 1;
 
-  const size_t a_num_bytes = ceil(a_used_len / 2.0);
-  const size_t b_num_bytes = ceil(b_seq_len / 2.0);
+  const size_t a_num_bytes = (a_used_len + 1) / 2;  // integer ceil / 2
+  const size_t b_num_bytes = (b_seq_len + 1) / 2;   // integer ceil / 2
 
   const size_t b_offset = is_a_odd && is_b_odd;
 
@@ -511,25 +514,25 @@ merge_by_byte(const bam1_t *a, const bam1_t *b, bam1_t *c) {
     //                      or [ aa aa aa a- ]
     c_seq[a_num_bytes - 1] &= 0xf0;
     c_seq[a_num_bytes - 1] |=
-      is_b_odd ? byte_revcom_table[b_seq[b_num_bytes - 1]]
-               : byte_revcom_table[b_seq[b_num_bytes - 1]] >> 4;
+      is_b_odd ? byte_revcomp_table[b_seq[b_num_bytes - 1]]
+               : byte_revcomp_table[b_seq[b_num_bytes - 1]] >> 4;
   }
   if (is_c_odd) {
     // c_seq looks like either [ aa aa aa aa ]
     //                      or [ aa aa aa ab ]
     for (size_t i = 0; i < b_num_bytes - 1; i++) {
       c_seq[a_num_bytes + i] =
-        (byte_revcom_table[b_seq[b_num_bytes - i - 1]] << 4) |
-        (byte_revcom_table[b_seq[b_num_bytes - i - 2]] >> 4);
+        (byte_revcomp_table[b_seq[b_num_bytes - i - 1]] << 4) |
+        (byte_revcomp_table[b_seq[b_num_bytes - i - 2]] >> 4);
     }
-    c_seq[a_num_bytes + b_num_bytes - 1] = byte_revcom_table[b_seq[0]] << 4;
+    c_seq[a_num_bytes + b_num_bytes - 1] = byte_revcomp_table[b_seq[0]] << 4;
     // Here, c_seq is either [ aa aa aa aa bb bb bb b- ] (a even; b odd)
     //                    or [ aa aa aa ab bb bb bb b- ] (a odd; b odd)
   }
   else {
     for (size_t i = 0; i < b_num_bytes - b_offset; i++) {
       c_seq[a_num_bytes + i] =
-        byte_revcom_table[b_seq[b_num_bytes - i - 1 - b_offset]];
+        byte_revcomp_table[b_seq[b_num_bytes - i - 1 - b_offset]];
     }
     // Here, c_seq is either [ aa aa aa aa bb bb bb bb ] (a even and b even)
     //                    or [ aa aa aa ab bb bb bb    ] (a odd and b odd)
@@ -554,16 +557,15 @@ flip_conversion(bam_rec &aln) {
   flip_conversion(aln.b);
 }
 
-// static inline bool
-// are_mates(const bam1_t *one, const bam1_t *two) {
-//   return one->core.mtid == two->core.tid && one->core.mpos == two->core.pos
-//   &&
-//          (one->core.flag & BAM_FREVERSE) != (one->core.flag & BAM_FREVERSE);
-//   // below is a consistency check and should not be necessary
-//   /* &&
-//      two->core.mtid == one->core.tid &&
-//      two->core.mpos == one->core.pos; */
-// }
+[[maybe_unused]] static inline bool
+are_mates(const bam1_t *one, const bam1_t *two) {
+  return one->core.mtid == two->core.tid && one->core.mpos == two->core.pos &&
+         (one->core.flag & BAM_FREVERSE) != (one->core.flag & BAM_FREVERSE);
+  // below is a consistency check and should not be necessary
+  /* &&
+     two->core.mtid == one->core.tid &&
+     two->core.mpos == one->core.pos; */
+}
 
 static inline int
 truncate_overlap(const bam1_t *a, const uint32_t overlap, bam1_t *c) {
@@ -830,7 +832,7 @@ keep_better_end(const bam_rec &a, const bam_rec &b, bam_rec &c) {
 // ADS: will move to using this function once it is written
 static inline void
 standardize_format(const string &input_format, bam1_t *aln) {
-  int err_code = 0;
+  int err_code{};
 
   if (input_format == "abismal" || input_format == "walt")
     return;
@@ -977,7 +979,7 @@ to_string(const bam_header &hdr, const bam_rec &aln) {
   kstring_t ks = {0, 0, nullptr};
   int ret = sam_format1(hdr.h, aln.b, &ks);
   if (ret < 0) {
-    runtime_error("Can't format record: " + to_string(hdr, aln));
+    throw runtime_error("Can't format record: " + to_string(hdr, aln));
   }
   if (ks.s != nullptr)
     free(ks.s);
