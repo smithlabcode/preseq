@@ -44,9 +44,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install cpplint
 
-    - name: Check cpplint version
-      run: cpplint --version
-
     - name: Run cpplint
       run: |
         cpplint --quiet --repository=. $(git ls-files '*.*pp')
