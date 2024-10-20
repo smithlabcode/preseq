@@ -43,15 +43,9 @@ jobs:
       run: |
         conda install -c conda-forge cppcheck
 
-    - name: check conda
-      run: |
-        echo ${CONDA}
-        ${CONDA}/bin/conda --version
-        ${CONDA}/bin/cppcheck --version
-
     - name: Run cppcheck
       run: |
-        cppcheck \
+        ${CONDA}/bin/cppcheck \
           --std=c++17 \
           --enable=all \
           --check-level=exhaustive \
