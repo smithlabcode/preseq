@@ -120,8 +120,7 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
     return min_hankel_dim;
   }
 
-  bool ACCEPT_HANKEL = true;
-  while (ACCEPT_HANKEL && (2 * hankel_dim - 1 < moments.size())) {
+  while (2 * hankel_dim - 1 < moments.size()) {
     vector<vector<double>> hankel_mat(hankel_dim,
                                       vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
@@ -151,11 +150,9 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
     }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
-      ACCEPT_HANKEL = true;
       hankel_dim++;
     }
     else {
-      ACCEPT_HANKEL = false;
       hankel_dim--;
       moments.resize(2 * hankel_dim);
       return hankel_dim;
