@@ -43,6 +43,12 @@ jobs:
       run: |
         conda install -c conda-forge cppcheck
 
+    - name: check conda
+      run: |
+        echo ${CONDA}
+        ${CONDA}/bin/conda --version
+        ${CONDA}/bin/cppcheck --version
+
     - name: Run cppcheck
       run: |
         cppcheck \
