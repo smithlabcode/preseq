@@ -376,7 +376,6 @@ SplitMappedRead(const MappedRead &inputMR, mt19937 &generator,
   size_t covered_bases = 0;
   size_t read_iterator = inputMR.r.get_start();
   size_t seq_iterator = 0;
-  size_t total_covered_bases = 0;
 
   while (seq_iterator < inputMR.seq.size()) {
     if (inputMR.seq[seq_iterator] != 'N')
@@ -395,7 +394,6 @@ SplitMappedRead(const MappedRead &inputMR, mt19937 &generator,
           inputMR.r.get_score(), inputMR.r.get_strand());
         outputGRs.push_back(binned_gr);
       }
-      total_covered_bases += covered_bases;
       covered_bases = 0;
     }
     seq_iterator++;
@@ -434,7 +432,6 @@ load_coverage_counts_MR(const string &input_file_name, const uint64_t seed,
   ReadPQ PQ;
 
   size_t n_reads = 0;
-  size_t n_bins = 0;
   GenomicRegion curr_gr, prev_gr;
   size_t current_count = 1;
 
@@ -446,8 +443,7 @@ load_coverage_counts_MR(const string &input_file_name, const uint64_t seed,
     vector<GenomicRegion> splitGRs;
     SplitMappedRead(mr, generator, bin_size, splitGRs);
 
-    n_reads++;
-    n_bins += splitGRs.size();
+    ++n_reads;
 
     // add split Genomic Regions to the priority queue
     for (size_t i = 0; i < splitGRs.size(); i++)
