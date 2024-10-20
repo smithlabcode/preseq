@@ -1,21 +1,22 @@
-/*    Copyright (C) 2013-2015
- *                  University of Southern California and
- *                  Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2015
+ *               University of Southern California and
+ *               Andrew D. Smith and Timothy Daley
  *
- *    Authors: Andrew D. Smith and Timothy Daley
+ * Authors: Andrew D. Smith and Timothy Daley
  *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
+ * This program is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include "moment_sequence.hpp"
@@ -31,6 +32,9 @@
 #include <utility>  // std::swap
 #include <vector>
 
+using std::begin;
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::endl;
 using std::find_if;
@@ -46,8 +50,8 @@ using std::vector;
 void
 LU_decomp(vector<vector<double>> &A, vector<int> &P) {
   const size_t N = A.size();
-  double absA;
-  size_t i, j, k;
+  double absA{};
+  size_t i, k;
 
   P.clear();
   for (size_t x = 0; x <= N; x++)
@@ -78,7 +82,7 @@ LU_decomp(vector<vector<double>> &A, vector<int> &P) {
       P[N]++;
     }
 
-    for (j = i + 1; j < N; j++) {
+    for (size_t j = i + 1; j < N; j++) {
       A[j][i] /= A[i][i];
 
       for (k = i + 1; k < N; k++)
@@ -88,11 +92,10 @@ LU_decomp(vector<vector<double>> &A, vector<int> &P) {
 }
 
 double
-LU_determinant(vector<vector<double>> &A, vector<int> &P) {
+LU_determinant(const vector<vector<double>> &A, const vector<int> &P) {
   const size_t N = A.size();
 
   double det = A[0][0];
-
   for (size_t i = 1; i < N; ++i)
     det *= A[i][i];
 
@@ -117,8 +120,7 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
     return min_hankel_dim;
   }
 
-  bool ACCEPT_HANKEL = true;
-  while (ACCEPT_HANKEL && (2 * hankel_dim - 1 < moments.size())) {
+  while (2 * hankel_dim - 1 < moments.size()) {
     vector<vector<double>> hankel_mat(hankel_dim,
                                       vector<double>(hankel_dim, 0.0));
     for (size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
@@ -148,11 +150,9 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
     }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
-      ACCEPT_HANKEL = true;
       hankel_dim++;
     }
     else {
-      ACCEPT_HANKEL = false;
       hankel_dim--;
       moments.resize(2 * hankel_dim);
       return hankel_dim;
@@ -201,7 +201,7 @@ check_moment_sequence(vector<double> &obs_moms) {
 }
 
 void
-MomentSequence::unmodified_Chebyshev(const bool VERBOSE) {
+MomentSequence::unmodified_Chebyshev() {
   const size_t n_points = static_cast<size_t>(floor(moments.size() / 2));
   vector<double> a(n_points, 0.0);
   vector<double> b(n_points - 1, 0.0);
@@ -232,10 +232,9 @@ MomentSequence::unmodified_Chebyshev(const bool VERBOSE) {
 
 // un-normalized 3 term recurrence
 void
-MomentSequence::full_3term_recurrence(const bool VERBOSE,
-                                      vector<double> &full_alpha,
+MomentSequence::full_3term_recurrence(vector<double> &full_alpha,
                                       vector<double> &full_beta) {
-  const size_t n_points = static_cast<size_t>(floor(moments.size() / 2));
+  const size_t n_points = std::size(moments) / 2;
   vector<double> a(n_points, 0.0);
   vector<double> b(n_points - 1, 0.0);
 
@@ -274,7 +273,7 @@ MomentSequence::MomentSequence(const vector<double> &obs_moms) :
   moments = holding_moms;
 
   // calculate 3-term recurrence
-  unmodified_Chebyshev(false);
+  unmodified_Chebyshev();
 }
 
 /////////////////////////////////////////////////////
@@ -355,13 +354,12 @@ QRiteration(vector<double> &alpha, vector<double> &beta,
 
 static bool
 check_positivity(const vector<double> &v) {
-  return find_if(begin(v), end(v),
-                 [](const double x) { return x <= 0.0 || isinf(x); }) == end(v);
+  const auto non_pos = [](const double x) { return x <= 0.0 || isinf(x); };
+  return find_if(cbegin(v), cend(v), non_pos) == cend(v);
 }
 
 bool
-MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
-                                       const size_t n_points, const double tol,
+MomentSequence::Lower_quadrature_rules(const size_t n_points, const double tol,
                                        const size_t max_iter,
                                        vector<double> &points,
                                        vector<double> &weights) {
@@ -407,7 +405,7 @@ MomentSequence::Lower_quadrature_rules(const bool VERBOSE,
   }
 
   // square entries in the weights vector
-  transform(begin(weights), end(weights), begin(weights),
+  transform(cbegin(weights), cend(weights), begin(weights),
             [](const double x) { return x * x; });
 
   return points_are_positive;

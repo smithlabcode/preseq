@@ -14,7 +14,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 
-name: Linting with cpplint
+name: Linting with cppcheck
 
 on:
   push:
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  cpplint:
+  cppcheck:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -39,11 +39,16 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install cpplint
+    - name: Install cppcheck
       run: |
-        python -m pip install --upgrade pip
-        pip install cpplint
+        conda install -c conda-forge cppcheck
 
-    - name: Run cpplint
+    - name: Run cppcheck
       run: |
-        cpplint --quiet --repository=. $(git ls-files '*.*pp')
+        ${CONDA}/bin/cppcheck \
+          --std=c++17 \
+          --enable=all \
+          --check-level=exhaustive \
+          --suppressions-list=.cppcheck_suppress \
+          -I src/smithlab_cpp \
+          $(git ls-files '*.*pp')

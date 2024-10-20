@@ -26,13 +26,12 @@
 
 #include <OptionParser.hpp>
 
-#include <unistd.h>
-
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <random>
+#include <random>  // std::mt19937
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -43,27 +42,60 @@ using std::isfinite;
 using std::min;
 using std::mt19937;
 using std::runtime_error;
-using std::setprecision;
 using std::string;
+using std::uint32_t;
 using std::vector;
 
-namespace fs = std::filesystem;
+static void
+report_bootstrapped_moments(const vector<double> &bootstrap_moments,
+                            const MomentSequence &bootstrap_mom_seq,
+                            const vector<double> &points,
+                            const vector<double> &weights,
+                            const double estimated_unobs) {
+  cerr << "bootstrapped_moments=" << endl;
+  for (size_t i = 0; i < bootstrap_moments.size(); i++)
+    cerr << bootstrap_moments[i] << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+    cerr << "alpha_" << k << '\t';
+  cerr << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
+    cerr << bootstrap_mom_seq.alpha[k] << '\t';
+  cerr << endl;
+
+  for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+    cerr << "beta_" << k << '\t';
+  cerr << endl;
+  for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
+    cerr << bootstrap_mom_seq.beta[k] << '\t';
+  cerr << endl;
+  cerr << "points=" << "\t";
+  for (size_t i = 0; i < points.size(); i++)
+    cerr << points[i] << "\t";
+  cerr << endl;
+  cerr << "weights=" << "\t";
+  for (size_t i = 0; i < weights.size(); i++)
+    cerr << weights[i] << "\t";
+  cerr << endl;
+  cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
+}
 
 // BOUND_UNOBS: bounding n_0
 int
 bound_pop_main(const int argc, const char *argv[]) {
   try {
-    bool VERBOSE = false;
+    bool verbose = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool VALS_INPUT = false;
     bool QUICK_MODE = false;
 
     string outfile;
+    string histogram_outfile;
 
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
+    uint32_t n_threads{1};
 #endif
 
     size_t max_num_points = 10;
@@ -71,15 +103,17 @@ bound_pop_main(const int argc, const char *argv[]) {
     size_t n_bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
 
     const string description = R"(
-Estimate the size of the underlying population based on counts  \
-of observed species in an initial sample.)";
+Estimate a bound on the size of the underlying population based on
+counts of observed species in an initial sample.
+)";
+    string program_name = std::filesystem::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS FOR BOUND_POP ***********/
-    OptionParser opt_parse(fs::path(argv[1]).filename(), description,
-                           "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o',
                       "species richness output file "
                       "(default: stdout)",
@@ -94,13 +128,16 @@ of observed species in an initial sample.)";
                       n_bootstraps);
     opt_parse.add_opt("clevel", 'c', "level for confidence intervals", false,
                       c_level);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
     opt_parse.add_opt("pe", 'P', "input is paired end read file", false,
                       PAIRED_END);
     opt_parse.add_opt("hist", 'H',
                       "input is a text file containing the "
                       "observed histogram",
                       false, HIST_INPUT);
+    opt_parse.add_opt("hist-out", '\0',
+                      "output histogram to this file (for non-hist input)",
+                      false, histogram_outfile);
     opt_parse.add_opt("vals", 'V',
                       "input is a text file containing only the "
                       "observed duplicate counts",
@@ -112,6 +149,8 @@ of observed species in an initial sample.)";
                       "maximum segment length when merging "
                       "paired end bam reads",
                       false, MAX_SEGMENT_LENGTH);
+    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
+                      false, n_threads);
 #endif
     opt_parse.add_opt("quick", 'Q',
                       "quick mode, estimate without bootstrapping", false,
@@ -124,9 +163,6 @@ of observed species in an initial sample.)";
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.about_requested()) {
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
@@ -146,43 +182,34 @@ of observed species in an initial sample.)";
 
     // LOAD VALUES
     if (HIST_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "HIST_INPUT" << endl;
       n_obs = load_histogram(input_file_name, counts_hist);
     }
     else if (VALS_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "VALS_INPUT" << endl;
       n_obs = load_counts(input_file_name, counts_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
-      const size_t MAX_READS_TO_HOLD = 5000000;
-      size_t n_paired = 0;
-      size_t n_mates = 0;
-      n_obs =
-        load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
-                           MAX_READS_TO_HOLD, n_paired, n_mates, counts_hist);
-      if (VERBOSE) {
-        cerr << "MERGED PAIRED END READS = " << n_paired << endl;
-        cerr << "MATES PROCESSED = " << n_mates << endl;
-      }
+      n_obs = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
     }
     else if (BAM_FORMAT_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BAM_INPUT" << endl;
-      n_obs = load_counts_BAM_se(input_file_name, counts_hist);
+      n_obs = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
     }
 #endif
     else if (PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BED_INPUT" << endl;
       n_obs = load_counts_BED_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED_INPUT" << endl;
       n_obs = load_counts_BED_se(input_file_name, counts_hist);
     }
@@ -193,7 +220,7 @@ of observed species in an initial sample.)";
     vector<double> measure_moments;
     // mu_r = (r + 1)! n_{r+1} / n_1
     size_t idx = 1;
-    while (counts_hist[idx] > 0 && idx <= counts_hist.size()) {
+    while (idx < counts_hist.size() && counts_hist[idx]) {
       // idx + 1 because function calculates (x-1)!
       measure_moments.push_back(
         exp(factorial(idx + 1) + log(counts_hist[idx]) - log(counts_hist[1])));
@@ -201,24 +228,21 @@ of observed species in an initial sample.)";
         measure_moments.pop_back();
         break;
       }
-      idx++;
+      ++idx;
     }
 
-    if (VERBOSE) {
+    if (verbose) {
       cerr << "TOTAL OBSERVATIONS     = " << n_obs << endl
            << "DISTINCT OBSERVATIONS  = " << distinct_obs << endl
            << "MAX COUNT              = " << counts_hist.size() - 1 << endl;
-
-      // OUTPUT THE ORIGINAL HISTOGRAM
-      cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
-      for (size_t i = 0; i < counts_hist.size(); i++)
-        if (counts_hist[i] > 0)
-          cerr << i << '\t' << setprecision(16) << counts_hist[i] << endl;
 
       cerr << "OBSERVED MOMENTS" << endl;
       for (size_t i = 0; i < measure_moments.size(); i++)
         cerr << std::setprecision(16) << measure_moments[i] << endl;
     }
+
+    if (!histogram_outfile.empty())
+      report_histogram(histogram_outfile, counts_hist);
 
     if (QUICK_MODE) {
       if (measure_moments.size() < 2 * max_num_points)
@@ -226,13 +250,13 @@ of observed species in an initial sample.)";
       else
         measure_moments.resize(2 * max_num_points);
       size_t n_points = 0;
-      n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, VERBOSE);
-      if (VERBOSE)
+      n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, verbose);
+      if (verbose)
         cerr << "n_points = " << n_points << endl;
 
       MomentSequence obs_mom_seq(measure_moments);
 
-      if (VERBOSE) {
+      if (verbose) {
         for (size_t k = 0; k < obs_mom_seq.alpha.size(); k++)
           cerr << "alpha_" << k << '\t';
         cerr << endl;
@@ -249,8 +273,8 @@ of observed species in an initial sample.)";
       }
 
       vector<double> points, weights;
-      obs_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance, max_iter,
-                                         points, weights);
+      obs_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter, points,
+                                         weights);
 
       // renormalize if needed
       const double weights_sum = accumulate(begin(weights), end(weights), 0.0);
@@ -258,7 +282,7 @@ of observed species in an initial sample.)";
         for (size_t i = 0; i < weights.size(); i++)
           weights[i] = weights[i] / weights_sum;
 
-      if (VERBOSE) {
+      if (verbose) {
         cerr << "points = " << endl;
         for (size_t i = 0; i < points.size(); i++)
           cerr << points[i] << '\t';
@@ -284,7 +308,7 @@ of observed species in an initial sample.)";
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -298,7 +322,6 @@ of observed species in an initial sample.)";
       vector<double> quad_estimates;
 
       // setup rng
-      srand(time(0) + getpid());
       mt19937 rng(seed);
 
       // hist may be sparse, to speed up bootstrapping
@@ -313,7 +336,7 @@ of observed species in an initial sample.)";
 
       for (size_t iter = 0;
            iter < max_iter && quad_estimates.size() < n_bootstraps; ++iter) {
-        if (VERBOSE)
+        if (verbose)
           cerr << "iter=" << "\t" << iter << endl;
 
         vector<double> sample_hist;
@@ -333,16 +356,17 @@ of observed species in an initial sample.)";
 
         size_t n_points = 0;
         n_points =
-          ensure_pos_def_mom_seq(bootstrap_moments, tolerance, VERBOSE);
+          ensure_pos_def_mom_seq(bootstrap_moments, tolerance, verbose);
         n_points = min(n_points, max_num_points);
-        if (VERBOSE)
+        if (verbose)
           cerr << "n_points = " << n_points << endl;
 
         MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
-        vector<double> points, weights;
-        bootstrap_mom_seq.Lower_quadrature_rules(VERBOSE, n_points, tolerance,
-                                                 max_iter, points, weights);
+        vector<double> points;
+        vector<double> weights;
+        bootstrap_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter,
+                                                 points, weights);
 
         // renormalize if needed
         const double weights_sum =
@@ -363,37 +387,9 @@ of observed species in an initial sample.)";
           n_points = 0;
         }
 
-        if (VERBOSE) {
-          cerr << "bootstrapped_moments=" << endl;
-          for (size_t i = 0; i < bootstrap_moments.size(); i++)
-            cerr << bootstrap_moments[i] << endl;
-        }
-        if (VERBOSE) {
-          for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-            cerr << "alpha_" << k << '\t';
-          cerr << endl;
-          for (size_t k = 0; k < bootstrap_mom_seq.alpha.size(); k++)
-            cerr << bootstrap_mom_seq.alpha[k] << '\t';
-          cerr << endl;
-
-          for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-            cerr << "beta_" << k << '\t';
-          cerr << endl;
-          for (size_t k = 0; k < bootstrap_mom_seq.beta.size(); k++)
-            cerr << bootstrap_mom_seq.beta[k] << '\t';
-          cerr << endl;
-        }
-        if (VERBOSE) {
-          cerr << "points=" << "\t";
-          for (size_t i = 0; i < points.size(); i++)
-            cerr << points[i] << "\t";
-          cerr << endl;
-          cerr << "weights=" << "\t";
-          for (size_t i = 0; i < weights.size(); i++)
-            cerr << weights[i] << "\t";
-          cerr << endl;
-          cerr << "estimated_unobs=" << "\t" << estimated_unobs << endl;
-        }
+        if (verbose)
+          report_bootstrapped_moments(bootstrap_moments, bootstrap_mom_seq,
+                                      points, weights, estimated_unobs);
 
         quad_estimates.push_back(estimated_unobs);
       }
@@ -404,7 +400,7 @@ of observed species in an initial sample.)";
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -415,8 +411,8 @@ of observed species in an initial sample.)";
       out << median_estimate << '\t' << lower_ci << '\t' << upper_ci << endl;
     }
   }
-  catch (runtime_error &e) {
-    cerr << "ERROR:\t" << e.what() << endl;
+  catch (const std::exception &e) {
+    cerr << e.what() << endl;
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

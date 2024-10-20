@@ -26,6 +26,8 @@
 #include <OptionParser.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -33,14 +35,16 @@
 #include <string>
 #include <vector>
 
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::endl;
 using std::min;
 using std::runtime_error;
+using std::size_t;
 using std::string;
+using std::uint32_t;
 using std::vector;
-
-namespace fs = std::filesystem;
 
 // ADS: functions same, header different (above and this one)
 static void
@@ -53,7 +57,7 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
   static constexpr double one_hundred = 100.0;
   std::ofstream of;
   if (!outfile.empty())
-    of.open(outfile.c_str());
+    of.open(outfile);
   std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
   const double percentile = one_hundred * c_level;
@@ -80,33 +84,41 @@ gc_extrap_main(const int argc, const char *argv[]) {
   try {
     const size_t MIN_REQUIRED_COUNTS = 4;
 
+    string outfile;
+    string histogram_outfile;
+
     int diagonal = 0;
     size_t orig_max_terms = 100;
     size_t bin_size = 10;
-    bool VERBOSE = false;
-    string outfile;
+    bool verbose = false;
     double base_step_size = 1.0e8;
     size_t max_width = 10000;
     bool SINGLE_ESTIMATE = false;
     double max_extrap = 1.0e12;
     size_t n_bootstraps = 100;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
     bool allow_defects = false;
 
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
+#ifdef HAVE_HTSLIB
+    bool BAM_FORMAT_INPUT = false;
+    uint32_t n_threads{1};
+#endif
 
     const string description = R"(
-      "Extrapolate the size of the covered genome by mapped reads. This \
-      approach is described in Daley & Smith (2014). The method is the  \
-      same as for lc_extrap: using rational function approximation to   \
-      a power-series expansion for the number of \"unobserved\" bases   \
-      in the initial sample. The gc_extrap method is adapted to deal    \
-      with individual nucleotides rather than distinct reads.)";
+Extrapolate the size of the covered genome by mapped reads. This
+approach is described in Daley & Smith (2014). The method is the same
+as for lc_extrap: using rational function approximation to a
+power-series expansion for the number of "unobserved" bases in the
+initial sample. The gc_extrap method is adapted to deal with
+individual nucleotides rather than distinct reads.
+)";
+    string program_name = std::filesystem::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
-    OptionParser opt_parse(fs::path(argv[1]).filename(), description,
-                           "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o',
                       "coverage yield output file (default: stdout)", false,
                       outfile);
@@ -125,7 +137,9 @@ gc_extrap_main(const int argc, const char *argv[]) {
                       c_level);
     opt_parse.add_opt("terms", 'x', "maximum number of terms", false,
                       orig_max_terms);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
+    opt_parse.add_opt("hist-out", '\0', "output histogram to this file", false,
+                      histogram_outfile);
     opt_parse.add_opt("bed", 'B',
                       "input is in bed format without sequence information",
                       false, NO_SEQUENCE);
@@ -136,6 +150,12 @@ gc_extrap_main(const int argc, const char *argv[]) {
     opt_parse.add_opt("defects", 'D',
                       "defects mode to extrapolate without testing for defects",
                       false, allow_defects);
+#ifdef HAVE_HTSLIB
+    opt_parse.add_opt("bam", '\0', "input is in BAM format", false,
+                      BAM_FORMAT_INPUT);
+    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
+                      false, n_threads);
+#endif
     opt_parse.add_opt("seed", 'r', "seed for random number generator", false,
                       seed);
     opt_parse.set_show_defaults();
@@ -144,9 +164,6 @@ gc_extrap_main(const int argc, const char *argv[]) {
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.about_requested()) {
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
@@ -158,34 +175,42 @@ gc_extrap_main(const int argc, const char *argv[]) {
       cerr << opt_parse.help_message() << endl;
       return EXIT_SUCCESS;
     }
-    const string input_file_name = leftover_args.front();
+    const string infile = leftover_args.front();
     // ****************************************************************
 
     vector<double> coverage_hist;
     size_t n_reads = 0;
-    if (VERBOSE)
+    if (verbose)
       cerr << "LOADING READS" << endl;
 
     if (NO_SEQUENCE) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED FORMAT" << endl;
-      n_reads = load_coverage_counts_GR(input_file_name, seed, bin_size,
-                                        max_width, coverage_hist);
+      n_reads = load_coverage_counts_GR(infile, seed, bin_size, max_width,
+                                        coverage_hist);
     }
+#ifdef HAVE_HTSLIB
+    else if (BAM_FORMAT_INPUT) {
+      if (verbose)
+        cerr << "BAM_INPUT" << endl;
+      n_reads = load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
+                                         max_width, coverage_hist);
+    }
+#endif
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "MAPPED READ FORMAT" << endl;
-      n_reads = load_coverage_counts_MR(VERBOSE, input_file_name, seed,
-                                        bin_size, max_width, coverage_hist);
+      n_reads = load_coverage_counts_MR(infile, seed, bin_size, max_width,
+                                        coverage_hist);
     }
 
     const double total_bins = get_counts_from_hist(coverage_hist);
 
     const double distinct_bins =
-      accumulate(coverage_hist.begin(), coverage_hist.end(), 0.0);
+      accumulate(cbegin(coverage_hist), cend(coverage_hist), 0.0);
 
     const double avg_bins_per_read = total_bins / n_reads;
-    double bin_step_size = base_step_size / bin_size;
+    const double bin_step_size = base_step_size / bin_size;
 
     const size_t max_observed_count = coverage_hist.size() - 1;
 
@@ -196,7 +221,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
     orig_max_terms = min(orig_max_terms, first_zero - 1);
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "TOTAL READS         = " << n_reads << endl
            << "BASE STEP SIZE      = " << base_step_size << endl
            << "BIN STEP SIZE       = " << bin_step_size << endl
@@ -208,14 +233,8 @@ gc_extrap_main(const int argc, const char *argv[]) {
            << "MAX COVERAGE COUNT  = " << max_observed_count << endl
            << "COUNTS OF 1         = " << coverage_hist[1] << endl;
 
-    if (VERBOSE) {
-      // OUTPUT THE ORIGINAL HISTOGRAM
-      cerr << "OBSERVED BIN COUNTS (" << coverage_hist.size() << ")" << endl;
-      for (size_t i = 0; i < coverage_hist.size(); i++)
-        if (coverage_hist[i] > 0)
-          cerr << i << '\t' << coverage_hist[i] << endl;
-      cerr << endl;
-    }
+    if (!histogram_outfile.empty())
+      report_histogram(histogram_outfile, coverage_hist);
 
     // catch if all reads are distinct
     if (orig_max_terms < MIN_REQUIRED_COUNTS)
@@ -229,14 +248,14 @@ gc_extrap_main(const int argc, const char *argv[]) {
       throw runtime_error("Library expected to saturate in doubling of "
                           "experiment size, unable to extrapolate");
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "[ESTIMATING COVERAGE CURVE]" << endl;
 
     vector<double> coverage_estimates;
 
     if (SINGLE_ESTIMATE) {
       bool SINGLE_ESTIMATE_SUCCESS = extrap_single_estimate(
-        VERBOSE, allow_defects, coverage_hist, orig_max_terms, diagonal,
+        verbose, allow_defects, coverage_hist, orig_max_terms, diagonal,
         bin_step_size, max_extrap / bin_size, coverage_estimates);
       // IF FAILURE, EXIT
       if (!SINGLE_ESTIMATE_SUCCESS)
@@ -245,7 +264,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out << "TOTAL_BASES\tEXPECTED_DISTINCT" << endl;
@@ -259,24 +278,24 @@ gc_extrap_main(const int argc, const char *argv[]) {
             << coverage_estimates[i] * bin_size << endl;
     }
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
 
       const size_t max_iter = 10 * n_bootstraps;
 
       vector<vector<double>> bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, allow_defects, seed, coverage_hist,
+      extrap_bootstrap(verbose, allow_defects, seed, coverage_hist,
                        n_bootstraps, orig_max_terms, diagonal, bin_step_size,
                        max_extrap / bin_size, max_iter, bootstrap_estimates);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       vector<double> coverage_upper_ci_lognorm, coverage_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
                            coverage_lower_ci_lognorm,
                            coverage_upper_ci_lognorm);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[WRITING OUTPUT]" << endl;
 
       write_predicted_coverage_curve(
@@ -284,7 +303,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
         coverage_lower_ci_lognorm, coverage_upper_ci_lognorm);
     }
   }
-  catch (std::exception &e) {
+  catch (const std::exception &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }

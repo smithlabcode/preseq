@@ -26,6 +26,8 @@
 #include <OptionParser.hpp>
 
 #include <algorithm>
+#include <cstddef>  // std::size_t
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -33,16 +35,18 @@
 #include <string>
 #include <vector>
 
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::count_if;
 using std::endl;
 using std::min;
 using std::runtime_error;
+using std::size_t;
 using std::string;
 using std::to_string;
+using std::uint32_t;
 using std::vector;
-
-namespace fs = std::filesystem;
 
 int
 pop_size_main(const int argc, const char *argv[]) {
@@ -53,6 +57,7 @@ pop_size_main(const int argc, const char *argv[]) {
       to_string(min_required_counts) + ") duplicates removed";
 
     string outfile;
+    string histogram_outfile;
 
     size_t orig_max_terms = 100;
     double max_extrap = 0.0;
@@ -61,10 +66,10 @@ pop_size_main(const int argc, const char *argv[]) {
     size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
 
     /* FLAGS */
-    bool VERBOSE = false;
+    bool verbose = false;
     bool VALS_INPUT = false;
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
@@ -74,19 +79,22 @@ pop_size_main(const int argc, const char *argv[]) {
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
     size_t MAX_SEGMENT_LENGTH = 5000;
+    uint32_t n_threads{1};
 #endif
 
-    const string description =
-      "Estimate the total population size using the approach described in "
-      "Daley & Smith (2013), extrapolating to very long range. Default "
-      "parameters assume that the initial sample represents at least"
-      "1e-9 of the population, which is sufficient for every example "
-      "application we have seen.";
+    const string description = R"(
+Estimate the total population size using the approach described in
+Daley & Smith (2013), extrapolating to very long range. Default
+parameters assume that the initial sample represents at least 1e-9 of
+the population, which is sufficient for every example application we
+have seen.
+)";
+    string program_name = std::filesystem::path(argv[0]).filename();
+    program_name += " " + string(argv[1]);
 
     /********** GET COMMAND LINE ARGUMENTS  FOR LC EXTRAP ***********/
 
-    OptionParser opt_parse(fs::path(argv[1]).filename(), description,
-                           "<input-file>");
+    OptionParser opt_parse(program_name, description, "<input-file>");
     opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
                       false, outfile);
     opt_parse.add_opt("extrap", 'e', "maximum extrapolation", false,
@@ -98,7 +106,7 @@ pop_size_main(const int argc, const char *argv[]) {
                       c_level);
     opt_parse.add_opt("terms", 'x', "maximum terms in estimator", false,
                       orig_max_terms);
-    opt_parse.add_opt("verbose", 'v', "print more info", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more info", false, verbose);
 #ifdef HAVE_HTSLIB
     opt_parse.add_opt("bam", 'B', "input is in BAM format", false,
                       BAM_FORMAT_INPUT);
@@ -106,6 +114,8 @@ pop_size_main(const int argc, const char *argv[]) {
                       "maximum segment length when merging "
                       "paired end bam reads",
                       false, MAX_SEGMENT_LENGTH);
+    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
+                      false, n_threads);
 #endif
     opt_parse.add_opt("pe", 'P', "input is paired end read file", false,
                       PAIRED_END);
@@ -115,6 +125,9 @@ pop_size_main(const int argc, const char *argv[]) {
     opt_parse.add_opt("hist", 'H',
                       "input is a text file containing the observed histogram",
                       false, HIST_INPUT);
+    opt_parse.add_opt("hist-out", '\0',
+                      "output histogram to this file (for non-hist input)",
+                      false, histogram_outfile);
     opt_parse.add_opt("quick", 'Q',
                       "quick mode (no bootstraps) for confidence intervals",
                       false, SINGLE_ESTIMATE);
@@ -128,9 +141,6 @@ pop_size_main(const int argc, const char *argv[]) {
     opt_parse.parse(argc - 1, argv + 1, leftover_args);
     if (argc == 2 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.about_requested()) {
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
@@ -150,43 +160,34 @@ pop_size_main(const int argc, const char *argv[]) {
 
     /************ loading input ***************************************/
     if (HIST_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "HIST_INPUT" << endl;
       n_reads = load_histogram(input_file_name, counts_hist);
     }
     else if (VALS_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "VALS_INPUT" << endl;
       n_reads = load_counts(input_file_name, counts_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BAM_INPUT" << endl;
-      const size_t MAX_READS_TO_HOLD = 5000000;
-      size_t n_paired = 0;
-      size_t n_mates = 0;
-      n_reads =
-        load_counts_BAM_pe(VERBOSE, input_file_name, MAX_SEGMENT_LENGTH,
-                           MAX_READS_TO_HOLD, n_paired, n_mates, counts_hist);
-      if (VERBOSE) {
-        cerr << "MERGED PAIRED END READS = " << n_paired << endl;
-        cerr << "MATES PROCESSED = " << n_mates << endl;
-      }
+      n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
     }
     else if (BAM_FORMAT_INPUT) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "BAM_INPUT" << endl;
-      n_reads = load_counts_BAM_se(input_file_name, counts_hist);
+      n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
     }
 #endif
     else if (PAIRED_END) {
-      if (VERBOSE)
+      if (verbose)
         cerr << "PAIRED_END_BED_INPUT" << endl;
       n_reads = load_counts_BED_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
-      if (VERBOSE)
+      if (verbose)
         cerr << "BED_INPUT" << endl;
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
@@ -194,7 +195,7 @@ pop_size_main(const int argc, const char *argv[]) {
 
     const size_t max_observed_count = counts_hist.size() - 1;
     const double distinct_reads =
-      accumulate(begin(counts_hist), end(counts_hist), 0.0);
+      accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t first_zero = 1;
@@ -213,7 +214,7 @@ pop_size_main(const int argc, const char *argv[]) {
       std::count_if(begin(counts_hist), end(counts_hist),
                     [](const double x) { return x > 0.0; });
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "TOTAL READS     = " << n_reads << endl
            << "DISTINCT READS  = " << distinct_reads << endl
            << "DISTINCT COUNTS = " << distinct_counts << endl
@@ -221,14 +222,8 @@ pop_size_main(const int argc, const char *argv[]) {
            << "COUNTS OF 1     = " << counts_hist[1] << endl
            << "MAX TERMS       = " << orig_max_terms << endl;
 
-    if (VERBOSE) {
-      // OUTPUT THE ORIGINAL HISTOGRAM
-      cerr << "OBSERVED COUNTS (" << counts_hist.size() << ")" << endl;
-      for (size_t i = 0; i < counts_hist.size(); i++)
-        if (counts_hist[i] > 0)
-          cerr << i << '\t' << static_cast<size_t>(counts_hist[i]) << endl;
-      cerr << endl;
-    }
+    if (!histogram_outfile.empty())
+      report_histogram(histogram_outfile, counts_hist);
 
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
@@ -244,14 +239,14 @@ pop_size_main(const int argc, const char *argv[]) {
     if (orig_max_terms < min_required_counts)
       throw runtime_error(min_required_counts_error_message);
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "[ESTIMATING YIELD CURVE]" << endl;
 
     vector<double> yield_estimates;
 
     if (SINGLE_ESTIMATE) {
       const bool single_estimate_success = extrap_single_estimate(
-        VERBOSE, allow_defects, counts_hist, orig_max_terms, diagonal,
+        verbose, allow_defects, counts_hist, orig_max_terms, diagonal,
         step_size, max_extrap, yield_estimates);
       // IF FAILURE, EXIT
       if (!single_estimate_success)
@@ -272,31 +267,29 @@ pop_size_main(const int argc, const char *argv[]) {
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << endl;
     }
     else {
-      if (VERBOSE)
+      if (verbose)
         cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
 
       const size_t max_iter = 100 * n_bootstraps;
 
       vector<vector<double>> bootstrap_estimates;
-      extrap_bootstrap(VERBOSE, allow_defects, seed, counts_hist, n_bootstraps,
+      extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
                        orig_max_terms, diagonal, step_size, max_extrap,
                        max_iter, bootstrap_estimates);
 
-      if (VERBOSE)
+      if (verbose)
         cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
       // yield ci
       vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
 
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
-
-      /////////////////////////////////////////////////////////////////////
-      if (VERBOSE)
+      if (verbose)
         cerr << "[WRITING OUTPUT]" << endl;
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -318,7 +311,7 @@ pop_size_main(const int argc, const char *argv[]) {
       out << endl;
     }
   }
-  catch (std::exception &e) {
+  catch (const std::exception &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }

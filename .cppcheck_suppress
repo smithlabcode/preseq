@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 # This file is part of preseq
 #
 # Copyright (C) 2024: Andrew D. Smith
@@ -16,15 +14,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 
-infile=tests/lc_extrap_input.vals
-outfile=tests/lc_extrap_output.txt
-if [[ -e "${infile}" ]]; then
-    ./preseq lc_extrap -o "${outfile}" -V "${infile}"
-    x=$(md5sum -c tests/md5sum.txt | grep "${outfile}:" | cut -d ' ' -f 2)
-    if [[ "${x}" != "OK" ]]; then
-        exit 1;
-    fi
-else
-    echo "${infile} not found";
-    exit 77;
-fi
+missingIncludeSystem
+constVariablePointer
+checkersReport
+unusedFunction:src/bam_record_utils.hpp
+unusedFunction:src/bam_record_utils.cpp
+*:src/smithlab_cpp*
+unusedStructMember:src/*.hpp

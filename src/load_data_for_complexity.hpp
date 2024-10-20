@@ -26,13 +26,13 @@
 #include <vector>
 
 std::size_t
-load_coverage_counts_MR(const bool VERBOSE, const std::string input_file_name,
+load_coverage_counts_MR(const std::string &input_file_name,
                         const std::uint64_t seed, const std::size_t bin_size,
                         const std::size_t max_width,
                         std::vector<double> &coverage_hist);
 
 std::size_t
-load_coverage_counts_GR(const std::string input_file_name,
+load_coverage_counts_GR(const std::string &input_file_name,
                         const std::uint64_t seed, const std::size_t bin_size,
                         const std::size_t max_width,
                         std::vector<double> &coverage_hist);
@@ -45,23 +45,31 @@ load_counts(const std::string &input_file_name,
             std::vector<double> &counts_hist);
 
 std::size_t
-load_counts_BED_pe(const std::string input_file_name,
+load_counts_BED_pe(const std::string &input_file_name,
                    std::vector<double> &counts_hist);
 
 std::size_t
-load_counts_BED_se(const std::string input_file_name,
+load_counts_BED_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist);
 
 #ifdef HAVE_HTSLIB
 std::size_t
-load_counts_BAM_pe(const bool VERBOSE, const std::string &input_file_name,
-                   const std::size_t MAX_SEGMENT_LENGTH,
-                   const std::size_t MAX_READS_TO_HOLD, std::size_t &n_paired,
-                   std::size_t &n_mates, std::vector<double> &counts_hist);
+load_counts_BAM_pe(const std::uint32_t n_threads,
+                   const std::string &input_file_name,
+                   std::vector<double> &counts_hist);
 
 std::size_t
-load_counts_BAM_se(const std::string &input_file_name,
+load_counts_BAM_se(const std::uint32_t n_threads,
+                   const std::string &input_file_name,
                    std::vector<double> &counts_hist);
+
+std::size_t
+load_coverage_counts_BAM(const std::uint32_t n_threads,
+                         const std::string &input_file_name,
+                         const std::uint64_t seed, const std::size_t bin_size,
+                         const std::size_t max_width,
+                         std::vector<double> &coverage_hist);
+
 #endif  // HAVE_HTSLIB
 
 #endif  // SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
