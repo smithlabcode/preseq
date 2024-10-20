@@ -54,8 +54,6 @@ struct ContinuedFraction {
 
 // get continued fraction with lower degree
 void
-decrease_degree(const size_t decrement, ContinuedFraction &cf);
-void
 truncate_degree(const size_t truncated_degree, ContinuedFraction &cf);
 
 std::ostream &

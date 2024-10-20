@@ -122,15 +122,6 @@ quotdiff_below_diagonal(const vector<double> &ps_coeffs, const size_t offset,
   offset_coeffs.resize(offset);
 }
 
-/* decrease degree of CF keeping coeffs equal to original */
-void
-decrease_degree(const size_t decrement, ContinuedFraction &the_cf) {
-  assert(decrement < the_cf.degree);
-  the_cf.ps_coeffs.resize(the_cf.ps_coeffs.size() - decrement);
-  the_cf.cf_coeffs.resize(the_cf.cf_coeffs.size() - decrement);
-  the_cf.degree -= decrement;
-}
-
 void
 truncate_degree(const size_t n_terms, ContinuedFraction &the_cf) {
   if (the_cf.degree < n_terms) {
