@@ -1,0 +1,54 @@
+# This file is part of preseq
+#
+# Copyright (C) 2024: Andrew D. Smith
+#
+# Authors: Andrew D. Smith
+#
+# This is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+name: Linting with cppcheck
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Python setup ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install cppcheck
+      run: |
+        conda install -c conda-forge cppcheck
+
+    - name: Run cppcheck
+      run: |
+        cppcheck \
+          --std=c++17 \
+          --enable=all \
+          --check-level=exhaustive \
+          --suppressions-list=.cppcheck_suppress \
+          -I src/smithlab_cpp \
+          $(git ls-files '*.*pp')
