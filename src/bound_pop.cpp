@@ -26,13 +26,12 @@
 
 #include <OptionParser.hpp>
 
-#include <unistd.h>
-
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <random>
+#include <random>  // std::mt19937
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -43,8 +42,8 @@ using std::isfinite;
 using std::min;
 using std::mt19937;
 using std::runtime_error;
-using std::setprecision;
 using std::string;
+using std::uint32_t;
 using std::vector;
 
 static void
@@ -104,7 +103,7 @@ bound_pop_main(const int argc, const char *argv[]) {
     size_t n_bootstraps = 500;
     double c_level = 0.95;
     size_t max_iter = 100;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
 
     const string description = R"(
 Estimate a bound on the size of the underlying population based on
@@ -323,7 +322,6 @@ counts of observed species in an initial sample.
       vector<double> quad_estimates;
 
       // setup rng
-      srand(time(0) + getpid());
       mt19937 rng(seed);
 
       // hist may be sparse, to speed up bootstrapping

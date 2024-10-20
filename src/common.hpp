@@ -46,7 +46,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
-                 const std::uint64_t seed, const std::vector<double> &orig_hist,
+                 const std::uint32_t seed, const std::vector<double> &orig_hist,
                  const std::size_t n_bootstraps,
                  const std::size_t orig_max_terms, const int diagonal,
                  const double bin_step_size, const double max_extrap,

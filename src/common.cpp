@@ -38,6 +38,8 @@
 
 using std::array;
 using std::begin;
+using std::cbegin;
+using std::cend;
 using std::cerr;
 using std::end;
 using std::endl;
@@ -46,7 +48,7 @@ using std::mt19937;
 using std::runtime_error;
 using std::size_t;
 using std::string;
-using std::uint64_t;
+using std::uint32_t;
 using std::vector;
 
 double
@@ -110,7 +112,7 @@ interpolate_distinct(const vector<double> &hist, const size_t N, const size_t S,
       numer[i] = exp(x - denom) * hist[i];
     }
   }
-  return S - accumulate(begin(numer), end(numer), 0);
+  return S - accumulate(cbegin(numer), cend(numer), 0);
 }
 
 static void
@@ -136,7 +138,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
   yield_estimate.clear();
 
   const double vals_sum = get_counts_from_hist(hist);
-  const double initial_distinct = accumulate(begin(hist), end(hist), 0.0);
+  const double initial_distinct = accumulate(cbegin(hist), cend(hist), 0.0);
 
   // interpolate complexity curve by random sampling w/out replacement
   const size_t upper_limit = vals_sum;
@@ -197,7 +199,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
-                 const uint64_t seed, const vector<double> &orig_hist,
+                 const uint32_t seed, const vector<double> &orig_hist,
                  const size_t n_bootstraps, const size_t orig_max_terms,
                  const int diagonal, const double bin_step_size,
                  const double max_extrap, const size_t max_iter,
@@ -206,11 +208,10 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
   bootstrap_estimates.clear();
 
   // setup rng
-  srand(time(0) + getpid());
   mt19937 rng(seed);
 
   const double initial_distinct =
-    std::accumulate(begin(orig_hist), end(orig_hist), 0.0);
+    std::accumulate(cbegin(orig_hist), cend(orig_hist), 0.0);
 
   vector<size_t> orig_hist_distinct_counts;
   vector<double> distinct_orig_hist;
@@ -236,7 +237,7 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
       hist.pop_back();
 
     // compute complexity curve by random sampling w/out replacement
-    const size_t distinct = accumulate(begin(hist), end(hist), 0.0);
+    const size_t distinct = accumulate(cbegin(hist), cend(hist), 0.0);
     size_t curr_sample_sz = bin_step_size;
     while (curr_sample_sz < sample_vals_sum) {
       yield_vector.push_back(
@@ -364,7 +365,7 @@ resample_hist(mt19937 &gen, const vector<size_t> &vals_hist_distinct_counts,
   vector<uint32_t> sample_distinct_counts_hist(hist_size, 0);
 
   const uint32_t distinct =
-    accumulate(begin(distinct_counts_hist), end(distinct_counts_hist), 0.0);
+    accumulate(cbegin(distinct_counts_hist), cend(distinct_counts_hist), 0.0);
 
   multinomial(gen, distinct_counts_hist, distinct, sample_distinct_counts_hist);
 

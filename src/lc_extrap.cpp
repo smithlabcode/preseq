@@ -21,13 +21,12 @@
 #include "lc_extrap.hpp"
 
 #include "common.hpp"
-
 #include "load_data_for_complexity.hpp"
 
-#include "OptionParser.hpp"
+#include <OptionParser.hpp>
 
 #include <algorithm>
-#include <cstddef>
+#include <cstddef>  // std::size_t
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -48,7 +47,6 @@ using std::size_t;
 using std::string;
 using std::to_string;
 using std::uint32_t;
-using std::uint64_t;
 using std::vector;
 
 int
@@ -68,7 +66,7 @@ lc_extrap_main(const int argc, const char **argv) {
     size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
 
     /* FLAGS */
     bool verbose = false;

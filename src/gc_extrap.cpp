@@ -26,6 +26,8 @@
 #include <OptionParser.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -39,7 +41,9 @@ using std::cerr;
 using std::endl;
 using std::min;
 using std::runtime_error;
+using std::size_t;
 using std::string;
+using std::uint32_t;
 using std::vector;
 
 // ADS: functions same, header different (above and this one)
@@ -92,7 +96,7 @@ gc_extrap_main(const int argc, const char *argv[]) {
     bool SINGLE_ESTIMATE = false;
     double max_extrap = 1.0e12;
     size_t n_bootstraps = 100;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
     bool allow_defects = false;
 
     bool NO_SEQUENCE = false;

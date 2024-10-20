@@ -20,8 +20,8 @@
 
 #include "load_data_for_complexity.hpp"
 
-#include "GenomicRegion.hpp"
-#include "MappedRead.hpp"
+#include <GenomicRegion.hpp>
+#include <MappedRead.hpp>
 
 #ifdef HAVE_HTSLIB
 #include "bam_record_utils.hpp"  // from dnmtools
@@ -29,11 +29,9 @@
 #include <htslib_wrapper.hpp>
 #endif  // HAVE_HTSLIB
 
-#include <unistd.h>
-
-#include <algorithm>  // std::min
-#include <cstddef>
-#include <cstdint>
+#include <algorithm>   // std::min
+#include <cstddef>     // std::size_t
+#include <cstdint>     // std::uint32_t
 #include <functional>  // std::greater
 #include <iostream>
 #include <queue>
@@ -51,7 +49,7 @@ using std::runtime_error;
 using std::size;
 using std::size_t;
 using std::string;
-using std::uint64_t;
+using std::uint32_t;
 using std::unordered_map;
 using std::vector;
 
@@ -413,11 +411,9 @@ SplitMappedRead(const MappedRead &inputMR, mt19937 &generator,
 }
 
 size_t
-load_coverage_counts_MR(const string &input_file_name, const uint64_t seed,
+load_coverage_counts_MR(const string &input_file_name, const uint32_t seed,
                         const size_t bin_size, const size_t max_width,
                         vector<double> &coverage_hist) {
-  srand(time(0) + getpid());
-  // Runif runif(rand());
   std::mt19937 generator(seed);
 
   std::ifstream in(input_file_name);
@@ -465,10 +461,9 @@ load_coverage_counts_MR(const string &input_file_name, const uint64_t seed,
 }
 
 size_t
-load_coverage_counts_GR(const string &input_file_name, const uint64_t seed,
+load_coverage_counts_GR(const string &input_file_name, const uint32_t seed,
                         const size_t bin_size, const size_t max_width,
                         vector<double> &coverage_hist) {
-  srand(time(0) + getpid());
   std::mt19937 generator(seed);
 
   std::ifstream in(input_file_name);
@@ -724,10 +719,9 @@ update_coverage_hist(const T &curr, const T &prev, vector<double> &counts_hist,
 // first mate for each mapped read
 size_t
 load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
-                         const uint64_t seed, const size_t bin_size,
+                         const uint32_t seed, const size_t bin_size,
                          const size_t max_width,
                          vector<double> &coverage_hist) {
-  srand(time(0) + getpid());
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);

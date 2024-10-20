@@ -29,17 +29,11 @@
 #include <smithlab_os.hpp>
 #include <smithlab_utils.hpp>
 
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstddef>
+#include <cstddef>  // std::size_t
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <random>
@@ -47,20 +41,15 @@
 #include <vector>
 
 using std::accumulate;
-using std::array;
 using std::cbegin;
 using std::cend;
 using std::cerr;
 using std::endl;
-using std::isfinite;
-using std::max;
-using std::min;
 using std::mt19937;
-using std::runtime_error;
-using std::setprecision;
 using std::size;
+using std::size_t;
 using std::string;
-using std::uint64_t;
+using std::uint32_t;
 using std::vector;
 
 template <typename T>
@@ -83,7 +72,7 @@ c_curve_main(const int argc, const char *argv[]) {
     bool PAIRED_END = false;
     bool HIST_INPUT = false;
     bool VALS_INPUT = false;
-    uint64_t seed = 408;
+    uint32_t seed = 408;
 
     string outfile;
     string histogram_outfile;
@@ -158,7 +147,6 @@ instead resamples from the given data.
     /******************************************************************/
 
     // Setup the random number generator
-    srand(time(0) + getpid());  // random seed
     mt19937 rng(seed);
 
     vector<double> counts_hist;
@@ -198,7 +186,7 @@ instead resamples from the given data.
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
 
-    const size_t max_observed_count = counts_hist.size() - 1;
+    const size_t max_observed_count = size(counts_hist) - 1;
     const double distinct_reads =
       accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
 
