@@ -1,0 +1,57 @@
+# This file is part of preseq
+#
+# Copyright (C) 2024: Andrew D. Smith
+#
+# Authors: Andrew D. Smith
+#
+# This is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+name: preseq builds on Ubuntu
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install dependencies
+      run: sudo apt-get install -y libhts-dev
+
+    - name: Generate configure script
+      run: ./autogen.sh
+
+    - name: Configure for g++
+      run: ./configure CXX="g++"
+
+    - name: Build with g++
+      run: make -j2
+
+    - name: Test the g++ build
+      run: make check
+
+    - name: Cleanup after the g++ build
+      run: make distclean
+
+    - name: Configure for clang++
+      run: ./configure CXX="clang++"
+
+    - name: Build with clang++
+      run: make -j2
+
+    - name: Test the clang++ build
+      run: make check
+
+    - name: Cleanup after the clang++ build
+      run: make distclean
