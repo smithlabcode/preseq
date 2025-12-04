@@ -1,6 +1,6 @@
 [submodule "preseqR"]
-	path = preseqR
-	url = ../preseqR.git
+        path = preseqR
+        url = ../preseqR.git
 [submodule "src/bamxx"]
         path = src/bamxx
-        url = https://github.com/smithlabcode/bamxx
+        url = ../bamxx.git
