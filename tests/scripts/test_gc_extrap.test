@@ -19,7 +19,7 @@
 infile=tests/gc_extrap_input.mr
 outfile=tests/gc_extrap_output.txt
 if [[ -e "${infile}" ]]; then
-    ./preseq gc_extrap -o "${outfile}" "${infile}"
+    ./preseq gc_extrap -o "${outfile}" -i "${infile}"
     x=$(md5sum -c tests/md5sum.txt | grep "${outfile}:" | cut -d ' ' -f 2)
     if [[ "${x}" != "OK" ]]; then
         exit 1;
