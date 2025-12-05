@@ -18,6 +18,18 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+static constexpr auto about_msg = R"(
+preseq gc_extrap: Extrapolate the size of the covered genome by mapped reads.
+)";
+
+static constexpr auto footer_msg = R"(
+This approach is described in Daley & Smith (2014). The method is the same as
+for lc_extrap: using rational function approximation to a power-series
+expansion for the number of "unobserved" bases in the initial sample. The
+gc_extrap method is adapted to deal with individual nucleotides rather than
+distinct reads.
+)";
+
 #include "gc_extrap.hpp"
 
 #include "common.hpp"
@@ -37,23 +49,13 @@
 #include <string>
 #include <vector>
 
-using std::cbegin;
-using std::cend;
-using std::min;
-using std::runtime_error;
-using std::size_t;
-using std::string;
-using std::uint32_t;
-using std::vector;
-
 // ADS: functions same, header different (above and this one)
 static void
-write_predicted_coverage_curve(const string &outfile, const double c_level,
-                               const double base_step_size,
-                               const size_t bin_size,
-                               const vector<double> &cvrg_estimates,
-                               const vector<double> &cvrg_lower_ci_lognorm,
-                               const vector<double> &cvrg_upper_ci_lognorm) {
+write_predicted_coverage_curve(
+  const std::string &outfile, const double c_level, const double base_step_size,
+  const std::size_t bin_size, const std::vector<double> &cvrg_estimates,
+  const std::vector<double> &cvrg_lower_ci_lognorm,
+  const std::vector<double> &cvrg_upper_ci_lognorm) {
   static constexpr double one_hundred = 100.0;
   std::ofstream of;
   if (!outfile.empty())
@@ -73,52 +75,48 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
   out.precision(1);
 
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
-  for (size_t i = 0; i < cvrg_estimates.size(); ++i)
-    out << (i + 1) * base_step_size << '\t' << cvrg_estimates[i] * bin_size
-        << '\t' << cvrg_lower_ci_lognorm[i] * bin_size << '\t'
+  for (std::size_t i = 0; i < std::size(cvrg_estimates); ++i) {
+    // clang-format off
+    out << (i + 1) * base_step_size << '\t'
+        << cvrg_estimates[i] * bin_size << '\t'
+        << cvrg_lower_ci_lognorm[i] * bin_size << '\t'
         << cvrg_upper_ci_lognorm[i] * bin_size << '\n';
+    // clang-format on
+  }
 }
 
 int
 gc_extrap_main(int argc, char *argv[]) {
   try {
-    const size_t MIN_REQUIRED_COUNTS = 4;
+    static constexpr auto MIN_REQUIRED_COUNTS = 4;
 
-    string outfile;
-    string infile;
-    string histogram_outfile;
+    std::string outfile;
+    std::string infile;
+    std::string histogram_outfile;
 
     int diagonal = 0;
-    size_t orig_max_terms = 100;
-    size_t bin_size = 10;
+    std::size_t orig_max_terms = 100;
+    std::size_t bin_size = 10;
     bool verbose = false;
     double base_step_size = 1.0e8;
-    size_t max_width = 10000;
+    std::size_t max_width = 10000;
     bool SINGLE_ESTIMATE = false;
     double max_extrap = 1.0e12;
-    size_t n_bootstraps = 100;
-    uint32_t seed = 408;
+    std::size_t n_bootstraps = 100;
+    std::uint32_t seed = 408;
     bool allow_defects = false;
 
     bool NO_SEQUENCE = false;
     double c_level = 0.95;
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
-    uint32_t n_threads{1};
+    std::uint32_t n_threads{1};
 #endif
-
-    constexpr auto description = R"(
-Extrapolate the size of the covered genome by mapped reads. This approach is
-described in Daley & Smith (2014). The method is the same as for lc_extrap:
-using rational function approximation to a power-series expansion for the
-number of "unobserved" bases in the initial sample. The gc_extrap method is
-adapted to deal with individual nucleotides rather than distinct reads.
-)";
-    CLI::App app{rlstrip(description)};
+    CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
-    // app.usage(usage);
-    // if (argc >= 2)
-    //   app.footer(description);
+    app.usage("\nUsage: preseq gc_extrap [OPTIONS]");
+    if (argc >= 3)
+      app.footer(rlstrip(footer_msg));
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
@@ -137,6 +135,9 @@ adapted to deal with individual nucleotides rather than distinct reads.
     app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum number of terms");
+#ifdef HAVE_HTSLIB
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+#endif
     app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-B,--bed", NO_SEQUENCE, "input is in bed format without sequence information");
     app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
@@ -153,8 +154,8 @@ adapted to deal with individual nucleotides rather than distinct reads.
     }
     CLI11_PARSE(app, argc, argv);
 
-    vector<double> coverage_hist;
-    size_t n_reads = 0;
+    std::vector<double> coverage_hist;
+    std::size_t n_reads = 0;
     if (verbose)
       std::cerr << "LOADING READS\n";
 
@@ -179,22 +180,21 @@ adapted to deal with individual nucleotides rather than distinct reads.
                                         coverage_hist);
     }
 
-    const double total_bins = get_counts_from_hist(coverage_hist);
-
-    const double distinct_bins =
-      accumulate(cbegin(coverage_hist), cend(coverage_hist), 0.0);
-
+    const auto total_bins = get_counts_from_hist(coverage_hist);
+    const auto distinct_bins = std::accumulate(std::cbegin(coverage_hist),
+                                               std::cend(coverage_hist), 0.0);
     const double avg_bins_per_read = total_bins / n_reads;
     const double bin_step_size = base_step_size / bin_size;
 
-    const size_t max_observed_count = coverage_hist.size() - 1;
+    const std::size_t max_observed_count = std::size(coverage_hist) - 1;
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    size_t first_zero = 1;
-    while (first_zero < coverage_hist.size() && coverage_hist[first_zero] > 0)
+    std::size_t first_zero{1};
+    while (first_zero < std::size(coverage_hist) &&
+           coverage_hist[first_zero] > 0)
       ++first_zero;
 
-    orig_max_terms = min(orig_max_terms, first_zero - 1);
+    orig_max_terms = std::min(orig_max_terms, first_zero - 1);
 
     if (verbose)
       std::cerr << "TOTAL READS         = " << n_reads << '\n'
@@ -213,20 +213,20 @@ adapted to deal with individual nucleotides rather than distinct reads.
 
     // catch if all reads are distinct
     if (orig_max_terms < MIN_REQUIRED_COUNTS)
-      throw runtime_error("max count before zero is les than min required "
-                          "count (4), sample not sufficiently deep or "
-                          "duplicates removed");
+      throw std::runtime_error("max count before zero is les than min required "
+                               "count (4), sample not sufficiently deep or "
+                               "duplicates removed");
 
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(coverage_hist);
     if (two_fold_extrap < 0.0)
-      throw runtime_error("Library expected to saturate in doubling of "
-                          "experiment size, unable to extrapolate");
+      throw std::runtime_error("Library expected to saturate in doubling of "
+                               "experiment size, unable to extrapolate");
 
     if (verbose)
       std::cerr << "[ESTIMATING COVERAGE CURVE]\n";
 
-    vector<double> coverage_estimates;
+    std::vector<double> coverage_estimates;
 
     if (SINGLE_ESTIMATE) {
       bool SINGLE_ESTIMATE_SUCCESS = extrap_single_estimate(
@@ -234,8 +234,8 @@ adapted to deal with individual nucleotides rather than distinct reads.
         bin_step_size, max_extrap / bin_size, coverage_estimates);
       // IF FAILURE, EXIT
       if (!SINGLE_ESTIMATE_SUCCESS)
-        throw runtime_error("SINGLE ESTIMATE FAILED, NEED TO RUN IN "
-                            "FULL MODE FOR ESTIMATES");
+        throw std::runtime_error("SINGLE ESTIMATE FAILED, NEED TO RUN IN "
+                                 "FULL MODE FOR ESTIMATES");
 
       std::ofstream of;
       if (!outfile.empty())
@@ -248,7 +248,7 @@ adapted to deal with individual nucleotides rather than distinct reads.
       out.precision(1);
 
       out << 0 << '\t' << 0 << '\n';
-      for (size_t i = 0; i < coverage_estimates.size(); ++i)
+      for (std::size_t i = 0; i < std::size(coverage_estimates); ++i)
         out << (i + 1) * base_step_size << '\t'
             << coverage_estimates[i] * bin_size << '\n';
     }
@@ -256,16 +256,16 @@ adapted to deal with individual nucleotides rather than distinct reads.
       if (verbose)
         std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
-      const size_t max_iter = 10 * n_bootstraps;
+      const std::size_t max_iter = 10 * n_bootstraps;
 
-      vector<vector<double>> bootstrap_estimates;
+      std::vector<std::vector<double>> bootstrap_estimates;
       extrap_bootstrap(verbose, allow_defects, seed, coverage_hist,
                        n_bootstraps, orig_max_terms, diagonal, bin_step_size,
                        max_extrap / bin_size, max_iter, bootstrap_estimates);
 
       if (verbose)
         std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
-      vector<double> coverage_upper_ci_lognorm, coverage_lower_ci_lognorm;
+      std::vector<double> coverage_upper_ci_lognorm, coverage_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
                            coverage_lower_ci_lognorm,
                            coverage_upper_ci_lognorm);
