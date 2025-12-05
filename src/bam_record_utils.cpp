@@ -14,17 +14,21 @@
  */
 
 #include "bam_record_utils.hpp"
+#include "dnmt_error.hpp"
+
+#include <bamxx.hpp>
 
 #include <htslib/sam.h>
 
 #include <algorithm>
+#include <cassert>
+#include <cerrno>
+#include <cstdlib>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "dnmt_error.hpp"
-#include "smithlab_utils.hpp"
 
 using std::runtime_error;
 using std::string;
@@ -34,6 +38,8 @@ using std::vector;
 
 using bamxx::bam_header;
 using bamxx::bam_rec;
+
+// NOLINTBEGIN(*-pointer-arithmetic,*-avoid-magic-numbers,*-type-reinterpret-cast,*-owning-memory,*-no-malloc,*-narrowing-conversions,*-avoid-c-arrays,*-constant-array-index)
 
 /// functions in place of undefd macro
 static inline bool
@@ -465,8 +471,10 @@ revcomp_byte_then_reverse(unsigned char *const a, unsigned char *const b) {
     *p1 = byte_revcomp_table[*p1];
 }
 
+/// Take an alignment in bam1_t format and reverse complement the sequence
+/// directly by manipulating the bytes in the binary encoding.
 static inline void
-revcomp_seq_by_byte(bam1_t *const aln) {
+revcomp_seq_by_byte_impl(bam1_t *const aln) {
   const size_t l_qseq = get_l_qseq(aln);
   auto seq = bam_get_seq(aln);
   const size_t num_bytes = (l_qseq + 1) / 2;  // integer ceil / 2
@@ -480,6 +488,11 @@ revcomp_seq_by_byte(bam1_t *const aln) {
     }
     seq[num_bytes - 1] <<= 4;
   }
+}
+
+void
+revcomp_qseq(bam_rec &aln) {
+  revcomp_seq_by_byte_impl(aln.b);
 }
 
 // places seq of b at the end of seq of c
@@ -543,7 +556,7 @@ static inline void
 flip_conversion(bam1_t *aln) {
   aln->core.flag ^= BAM_FREVERSE;  // ADS: flip the "reverse" bit
 
-  revcomp_seq_by_byte(aln);
+  revcomp_seq_by_byte_impl(aln);
 
   // ADS: don't like *(cv + 1) below, but no HTSlib function for it?
   auto cv = bam_aux_get(aln, "CV");
@@ -873,7 +886,7 @@ standardize_format(const string &input_format, bam1_t *aln) {
 
     // reverse complement if needed
     if (bam_is_rev(aln))
-      revcomp_seq_by_byte(aln);
+      revcomp_seq_by_byte_impl(aln);
   }
   else if (input_format == "bismark") {
     // ADS: Previously we modified the read names at the first
@@ -905,7 +918,7 @@ standardize_format(const string &input_format, bam1_t *aln) {
       throw dnmt_error(err_code, "bam_aux_append");
 
     if (bam_is_rev(aln))
-      revcomp_seq_by_byte(aln);  // reverse complement if needed
+      revcomp_seq_by_byte_impl(aln);  // reverse complement if needed
   }
   // ADS: the condition below should be checked much earlier, ideally
   // before the output file is created
@@ -920,7 +933,8 @@ standardize_format(const string &input_format, bam1_t *aln) {
 }
 
 void
-standardize_format(const string &input_format, bam_rec &aln) {
+standardize_format(const string &input_format,
+                   bam_rec &aln) {  // cppcheck-suppress constParameterReference
   standardize_format(input_format, aln.b);
 }
 
@@ -981,7 +995,9 @@ to_string(const bam_header &hdr, const bam_rec &aln) {
   if (ret < 0) {
     throw runtime_error("Can't format record: " + to_string(hdr, aln));
   }
-  if (ks.s != nullptr)
-    free(ks.s);
-  return string(ks.s);
+  const std::string s = string(ks.s);
+  ks_free(&ks);
+  return s;
 }
+
+// NOLINTEND(*-pointer-arithmetic,*-avoid-magic-numbers,*-type-reinterpret-cast,*-owning-memory,*-no-malloc,*-narrowing-conversions,*-avoid-c-arrays,*-constant-array-index)
