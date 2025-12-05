@@ -18,6 +18,18 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+static constexpr auto about_msg = R"(
+preseq pop_size: Estimate the total population size using a small sample from
+the population.
+)";
+
+static constexpr auto footer_msg = R"(
+Estimate the total population size using the approach described in Daley &
+Smith (2013), extrapolating to very long range. Default parameters assume that
+the initial sample represents at least 1e-9 of the population, which is
+sufficient for every example application we have seen.
+)";
+
 #include "pop_size.hpp"
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
@@ -41,7 +53,6 @@ using std::cend;
 using std::count_if;
 using std::min;
 using std::runtime_error;
-using std::size_t;
 using std::string;
 using std::to_string;
 using std::uint32_t;
@@ -50,7 +61,7 @@ using std::vector;
 int
 pop_size_main(int argc, char *argv[]) {
   try {
-    static const size_t min_required_counts = 4;
+    static const std::size_t min_required_counts = 4;
     static const string min_required_counts_error_message =
       "max count before zero is less than min required count (" +
       to_string(min_required_counts) + ") duplicates removed";
@@ -59,11 +70,11 @@ pop_size_main(int argc, char *argv[]) {
     string input_file_name;
     string histogram_outfile;
 
-    size_t orig_max_terms = 100;
+    std::size_t orig_max_terms = 100;
     double max_extrap = 0.0;
     double step_size = 0.0;
-    size_t n_desired_steps = 50;
-    size_t n_bootstraps = 100;
+    std::size_t n_desired_steps = 50;
+    std::size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
     uint32_t seed = 408;
@@ -78,22 +89,14 @@ pop_size_main(int argc, char *argv[]) {
 
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
-    size_t MAX_SEGMENT_LENGTH = 5000;
+    std::size_t MAX_SEGMENT_LENGTH = 5000;
     uint32_t n_threads{1};
 #endif
-
-    const auto description = R"(
-Estimate the total population size using the approach described in
-Daley & Smith (2013), extrapolating to very long range. Default
-parameters assume that the initial sample represents at least
-1e-9 of the population, which is sufficient for every example
-application we have seen.
-)";
-    CLI::App app{rlstrip(description)};
+    CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
-    // app.usage(usage);
-    // if (argc >= 2)
-    //   app.footer(description);
+    app.usage("\nUsage: preseq pop_size [OPTIONS]");
+    if (argc >= 2)
+      app.footer(rlstrip(footer_msg));
 
     // clang-format off
     app.add_option("-i,--input", input_file_name, "input file")
@@ -107,17 +110,20 @@ application we have seen.
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
 #ifdef HAVE_HTSLIB
-    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
-    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH, "maximum segment length when merging paired end bam reads");
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
+                   "maximum segment length when merging paired end bam reads");
 #endif
-    app.add_option("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_option("-V,--vals", VALS_INPUT, "input is a text file containing only the observed counts");
-    app.add_option("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
-    app.add_option("-Q,--quick", SINGLE_ESTIMATE,
-                   "quick mode (no bootstraps) for confidence intervals");
-    app.add_option("-D,--defects", allow_defects, "no testing for defects");
+    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
+    app.add_flag("-V,--vals", VALS_INPUT,
+                   "input is a text file containing only the observed counts");
+    app.add_flag("-H,--hist", HIST_INPUT,
+                   "input is a text file containing the observed histogram");
+    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
+                 "quick mode (no bootstraps) for confidence intervals");
+    app.add_flag("-D,--defects", allow_defects, "no testing for defects");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_option("-v,--verbose", verbose, "print more info");
+    app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
 
     if (argc < 3) {
@@ -128,7 +134,7 @@ application we have seen.
     CLI11_PARSE(app, argc, argv);
 
     vector<double> counts_hist;
-    size_t n_reads = 0;
+    std::size_t n_reads = 0;
 
     /************ loading input ***************************************/
     if (HIST_INPUT) {
@@ -165,13 +171,13 @@ application we have seen.
     }
     /************ done loading input **********************************/
 
-    const size_t max_observed_count = counts_hist.size() - 1;
-    const double distinct_reads =
-      accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
+    const std::size_t max_observed_count = std::size(counts_hist) - 1;
+    const auto distinct_reads =
+      std::accumulate(std::cbegin(counts_hist), std::cend(counts_hist), 0.0);
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    size_t first_zero = 1;
-    while (first_zero < counts_hist.size() && counts_hist[first_zero] > 0)
+    std::size_t first_zero = 1;
+    while (first_zero < std::size(counts_hist) && counts_hist[first_zero] > 0)
       ++first_zero;
 
     orig_max_terms = min(orig_max_terms, first_zero - 1);
@@ -182,8 +188,8 @@ application we have seen.
     if (step_size < 1.0)
       step_size = (max_extrap - distinct_reads) / n_desired_steps;
 
-    const size_t distinct_counts =
-      std::count_if(begin(counts_hist), end(counts_hist),
+    const std::size_t distinct_counts =
+      std::count_if(std::cbegin(counts_hist), std::cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
     if (verbose)
@@ -203,7 +209,7 @@ application we have seen.
       throw runtime_error("Saturation expected at double initial sample size."
                           " Unable to extrapolate");
 
-    // const size_t total_reads = get_counts_from_hist(counts_hist);
+    // const std::size_t total_reads = get_counts_from_hist(counts_hist);
 
     // assert(total_reads == n_reads); // ADS: why commented out?
 
@@ -235,14 +241,14 @@ application we have seen.
       out.precision(1);
 
       out << 0 << '\t' << 0 << '\n';
-      for (size_t i = 0; i < yield_estimates.size(); ++i)
+      for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
     }
     else {
       if (verbose)
         std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
-      const size_t max_iter = 100 * n_bootstraps;
+      const std::size_t max_iter = 100 * n_bootstraps;
 
       vector<vector<double>> bootstrap_estimates;
       extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
@@ -267,7 +273,7 @@ application we have seen.
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
       out.precision(1);
 
-      const size_t n_ests = yield_estimates.size() - 1;
+      const std::size_t n_ests = std::size(yield_estimates) - 1;
       if (n_ests < 2)
         throw runtime_error("problem with number of estimates in pop_size");
 
