@@ -20,20 +20,17 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include <config.h>
-
-#include "common.hpp"
-
-// the preseq commands
 #include "bound_pop.hpp"
 #include "c_curve.hpp"
 #include "gc_extrap.hpp"
 #include "lc_extrap.hpp"
 #include "pop_size.hpp"
 
-#include <fstream>
-#include <iomanip>
+#include <config.h>
+
+#include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 static std::string
@@ -54,9 +51,9 @@ usage_message() {
 }
 
 int
-main(const int argc, const char *argv[]) {
+main(int argc, char *argv[]) {
   if (argc < 2) {
-    std::cerr << usage_message() << std::endl;
+    std::cerr << usage_message() << '\n';
     return EXIT_SUCCESS;
   }
 
@@ -77,8 +74,8 @@ main(const int argc, const char *argv[]) {
   if (cmd == "pop_size")
     return pop_size_main(argc, argv);
 
-  std::cerr << "Error: unrecognized command: " << argv[1] << std::endl
-            << usage_message() << std::endl;
+  std::cerr << "Error: unrecognized command: " << argv[1] << '\n'
+            << usage_message() << '\n';
 
   return EXIT_FAILURE;
 }
