@@ -18,6 +18,18 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+constexpr auto about_msg = R"(
+preseq lc_extrap: Estimate the complexity curve for a sequencing library.
+)";
+
+constexpr auto footer_msg = R"(
+This is the approach described in Daley & Smith (2013). The method applies
+rational function approximation via continued fractions with the original goal
+of estimating the number of distinct reads that a sequencing library would
+yield upon deeper sequencing.  This method has been used for many different
+purposes since then.
+)";
+
 #include "lc_extrap.hpp"
 
 #include "common.hpp"
@@ -32,6 +44,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -81,18 +94,12 @@ lc_extrap_main(int argc, char *argv[]) {
     size_t MAX_SEGMENT_LENGTH = 5000;
     uint32_t n_threads{1};
 #endif
-    const auto description = R"(
-Extrapolate the complexity of a library. This is the approach described in
-Daley & Smith (2013). The method applies rational function approximation via
-continued fractions with the original goal of estimating the number of
-distinct reads that a sequencing library would yield upon deeper sequencing.
-This method has been used for many different purposes since then.
-)";
-    CLI::App app{rlstrip(description)};
+    CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
-    // app.usage(usage);
-    // if (argc >= 2)
-    //   app.footer(rlstrip(description));
+    app.formatter(std::make_shared<preseq_formatter>());
+    app.usage("\nUsage: preseq lc_extrap [OPTIONS]");
+    if (argc >= 3)
+      app.footer(rlstrip(footer_msg));
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
@@ -110,7 +117,7 @@ This method has been used for many different purposes since then.
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
     app.add_option("-r,--seed", seed, "seed for random number generator");
 #ifdef HAVE_HTSLIB
-    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
     app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
                    "maximum segment length when merging paired end bam reads");
 #endif
@@ -172,13 +179,13 @@ This method has been used for many different purposes since then.
     }
     /************ done loading input **********************************/
 
-    const size_t max_observed_count = counts_hist.size() - 1;
+    const size_t max_observed_count = std::size(counts_hist) - 1;
     const double distinct_reads =
       std::accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     size_t first_zero = 1;
-    while (first_zero < counts_hist.size() && counts_hist[first_zero] > 0)
+    while (first_zero < std::size(counts_hist) && counts_hist[first_zero] > 0)
       ++first_zero;
 
     // make sure the max terms is at most one less than the first zero
@@ -233,7 +240,7 @@ This method has been used for many different purposes since then.
       out.precision(1);
 
       out << 0 << '\t' << 0 << '\n';
-      for (size_t i = 0; i < yield_estimates.size(); ++i)
+      for (size_t i = 0; i < std::size(yield_estimates); ++i)
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
     }
     else {
