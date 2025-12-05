@@ -22,6 +22,6 @@
 #define SRC_BOUND_POP_HPP_
 
 int
-bound_pop_main(const int argc, const char *argv[]);
+bound_pop_main(int argc, char *argv[]);
 
 #endif  // SRC_BOUND_POP_HPP_
