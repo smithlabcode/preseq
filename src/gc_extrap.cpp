@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2024 University of Southern California and
+/* Copyright (C) 2013-2025 University of Southern California and
  *                         Andrew D. Smith and Timothy Daley
  *
  * Authors: Timothy Daley and Andrew Smith
@@ -23,22 +23,22 @@
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include <OptionParser.hpp>
+#include "CLI11.hpp"
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
-#include <filesystem>
+#include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 using std::cbegin;
 using std::cend;
-using std::cerr;
-using std::endl;
 using std::min;
 using std::runtime_error;
 using std::size_t;
@@ -66,25 +66,26 @@ write_predicted_coverage_curve(const string &outfile, const double c_level,
       << "EXPECTED_COVERED_BASES" << '\t'
       << "LOWER_" << percentile << "%CI" << '\t'
       << "UPPER_" << percentile << "%CI"
-      << endl;
+      << '\n';
   // clang-format on
 
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
 
-  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
+  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
   for (size_t i = 0; i < cvrg_estimates.size(); ++i)
     out << (i + 1) * base_step_size << '\t' << cvrg_estimates[i] * bin_size
         << '\t' << cvrg_lower_ci_lognorm[i] * bin_size << '\t'
-        << cvrg_upper_ci_lognorm[i] * bin_size << endl;
+        << cvrg_upper_ci_lognorm[i] * bin_size << '\n';
 }
 
 int
-gc_extrap_main(const int argc, const char *argv[]) {
+gc_extrap_main(int argc, char *argv[]) {
   try {
     const size_t MIN_REQUIRED_COUNTS = 4;
 
     string outfile;
+    string infile;
     string histogram_outfile;
 
     int diagonal = 0;
@@ -106,100 +107,74 @@ gc_extrap_main(const int argc, const char *argv[]) {
     uint32_t n_threads{1};
 #endif
 
-    const string description = R"(
-Extrapolate the size of the covered genome by mapped reads. This
-approach is described in Daley & Smith (2014). The method is the same
-as for lc_extrap: using rational function approximation to a
-power-series expansion for the number of "unobserved" bases in the
-initial sample. The gc_extrap method is adapted to deal with
-individual nucleotides rather than distinct reads.
+    constexpr auto description = R"(
+Extrapolate the size of the covered genome by mapped reads. This approach is
+described in Daley & Smith (2014). The method is the same as for lc_extrap:
+using rational function approximation to a power-series expansion for the
+number of "unobserved" bases in the initial sample. The gc_extrap method is
+adapted to deal with individual nucleotides rather than distinct reads.
 )";
-    string program_name = std::filesystem::path(argv[0]).filename();
-    program_name += " " + string(argv[1]);
+    CLI::App app{rlstrip(description)};
+    argv = app.ensure_utf8(argv);
+    // app.usage(usage);
+    // if (argc >= 2)
+    //   app.footer(description);
 
-    // ********* GET COMMAND LINE ARGUMENTS  FOR GC EXTRAP **********
-    OptionParser opt_parse(program_name, description, "<input-file>");
-    opt_parse.add_opt("output", 'o',
-                      "coverage yield output file (default: stdout)", false,
-                      outfile);
-    opt_parse.add_opt("max_width", 'w',
-                      "max fragment length, "
-                      "set equal to read length for single end reads",
-                      false, max_width);
-    opt_parse.add_opt("bin_size", 'b', "bin size", false, bin_size);
-    opt_parse.add_opt("extrap", 'e', "maximum extrapolation in base pairs",
-                      false, max_extrap);
-    opt_parse.add_opt("step", 's', "step size in bases between extrapolations",
-                      false, base_step_size);
-    opt_parse.add_opt("bootstraps", 'n', "number of bootstraps", false,
-                      n_bootstraps);
-    opt_parse.add_opt("cval", 'c', "level for confidence intervals", false,
-                      c_level);
-    opt_parse.add_opt("terms", 'x', "maximum number of terms", false,
-                      orig_max_terms);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
-    opt_parse.add_opt("hist-out", '\0', "output histogram to this file", false,
-                      histogram_outfile);
-    opt_parse.add_opt("bed", 'B',
-                      "input is in bed format without sequence information",
-                      false, NO_SEQUENCE);
-    opt_parse.add_opt("quick", 'Q',
-                      "quick mode: run gc_extrap without "
-                      "bootstrapping for confidence intervals",
-                      false, SINGLE_ESTIMATE);
-    opt_parse.add_opt("defects", 'D',
-                      "defects mode to extrapolate without testing for defects",
-                      false, allow_defects);
-#ifdef HAVE_HTSLIB
-    opt_parse.add_opt("bam", '\0', "input is in BAM format", false,
-                      BAM_FORMAT_INPUT);
-    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
-                      false, n_threads);
-#endif
-    opt_parse.add_opt("seed", 'r', "seed for random number generator", false,
-                      seed);
-    opt_parse.set_show_defaults();
+    // clang-format off
+    app.set_help_flag("-h,--help", "print a detailed help message and exit");
+    app.add_option("-i,--input", infile, "input file")
+      ->option_text("FILE")
+      ->required()
+      ->check(CLI::ExistingFile);
+    app.add_option("-o,--output", outfile, "coverage yield output file")
+      ->option_text("FILE")
+      ->required();
+    app.add_option("-w,--max_width", max_width,
+                   "max fragment length, set equal to read length for single end reads");
+    app.add_option("-b,--bin_size", bin_size, "bin size");
+    app.add_option("-e,--extrap", max_extrap, "maximum extrapolation in base pairs");
+    app.add_option("-s,--step", base_step_size, "step size in bases between extrapolations");
+    app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
+    app.add_option("-c,--cval", c_level, "level for confidence intervals");
+    app.add_option("-x,--terms", orig_max_terms, "maximum number of terms");
+    app.add_option("-r,--seed", seed, "seed for random number generator");
+    app.add_flag("-B,--bed", NO_SEQUENCE, "input is in bed format without sequence information");
+    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
+                 "quick mode: run gc_extrap without bootstrapping for confidence intervals");
+    app.add_flag("-D,--defects", allow_defects,
+                 "defects mode to extrapolate without testing for defects");
+    app.add_flag("-v,--verbose", verbose, "print more info");
+    // clang-format on
 
-    vector<string> leftover_args;
-    opt_parse.parse(argc - 1, argv + 1, leftover_args);
-    if (argc == 2 || opt_parse.help_requested()) {
-      cerr << opt_parse.help_message() << endl;
-      cerr << opt_parse.about_message() << endl;
+    if (argc < 3) {
+      // std::println("{}", app.help());
+      std::cout << app.help() << std::endl;
       return EXIT_SUCCESS;
     }
-    if (opt_parse.option_missing()) {
-      cerr << opt_parse.option_missing_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (leftover_args.empty()) {
-      cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    const string infile = leftover_args.front();
-    // ****************************************************************
+    CLI11_PARSE(app, argc, argv);
 
     vector<double> coverage_hist;
     size_t n_reads = 0;
     if (verbose)
-      cerr << "LOADING READS" << endl;
+      std::cerr << "LOADING READS\n";
 
     if (NO_SEQUENCE) {
       if (verbose)
-        cerr << "BED FORMAT" << endl;
+        std::cerr << "BED FORMAT\n";
       n_reads = load_coverage_counts_GR(infile, seed, bin_size, max_width,
                                         coverage_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT) {
       if (verbose)
-        cerr << "BAM_INPUT" << endl;
+        std::cerr << "BAM_INPUT\n";
       n_reads = load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
                                          max_width, coverage_hist);
     }
 #endif
     else {
       if (verbose)
-        cerr << "MAPPED READ FORMAT" << endl;
+        std::cerr << "MAPPED READ FORMAT\n";
       n_reads = load_coverage_counts_MR(infile, seed, bin_size, max_width,
                                         coverage_hist);
     }
@@ -222,16 +197,16 @@ individual nucleotides rather than distinct reads.
     orig_max_terms = min(orig_max_terms, first_zero - 1);
 
     if (verbose)
-      cerr << "TOTAL READS         = " << n_reads << endl
-           << "BASE STEP SIZE      = " << base_step_size << endl
-           << "BIN STEP SIZE       = " << bin_step_size << endl
-           << "TOTAL BINS          = " << total_bins << endl
-           << "BINS PER READ       = " << avg_bins_per_read << endl
-           << "DISTINCT BINS       = " << distinct_bins << endl
-           << "TOTAL BASES         = " << total_bins * bin_size << endl
-           << "TOTAL COVERED BASES = " << distinct_bins * bin_size << endl
-           << "MAX COVERAGE COUNT  = " << max_observed_count << endl
-           << "COUNTS OF 1         = " << coverage_hist[1] << endl;
+      std::cerr << "TOTAL READS         = " << n_reads << '\n'
+                << "BASE STEP SIZE      = " << base_step_size << '\n'
+                << "BIN STEP SIZE       = " << bin_step_size << '\n'
+                << "TOTAL BINS          = " << total_bins << '\n'
+                << "BINS PER READ       = " << avg_bins_per_read << '\n'
+                << "DISTINCT BINS       = " << distinct_bins << '\n'
+                << "TOTAL BASES         = " << total_bins * bin_size << '\n'
+                << "TOTAL COVERED BASES = " << distinct_bins * bin_size << '\n'
+                << "MAX COVERAGE COUNT  = " << max_observed_count << '\n'
+                << "COUNTS OF 1         = " << coverage_hist[1] << '\n';
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, coverage_hist);
@@ -249,7 +224,7 @@ individual nucleotides rather than distinct reads.
                           "experiment size, unable to extrapolate");
 
     if (verbose)
-      cerr << "[ESTIMATING COVERAGE CURVE]" << endl;
+      std::cerr << "[ESTIMATING COVERAGE CURVE]\n";
 
     vector<double> coverage_estimates;
 
@@ -267,19 +242,19 @@ individual nucleotides rather than distinct reads.
         of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-      out << "TOTAL_BASES\tEXPECTED_DISTINCT" << endl;
+      out << "TOTAL_BASES\tEXPECTED_DISTINCT\n";
 
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
       out.precision(1);
 
-      out << 0 << '\t' << 0 << endl;
+      out << 0 << '\t' << 0 << '\n';
       for (size_t i = 0; i < coverage_estimates.size(); ++i)
         out << (i + 1) * base_step_size << '\t'
-            << coverage_estimates[i] * bin_size << endl;
+            << coverage_estimates[i] * bin_size << '\n';
     }
     else {
       if (verbose)
-        cerr << "[BOOTSTRAPPING HISTOGRAM]" << endl;
+        std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
       const size_t max_iter = 10 * n_bootstraps;
 
@@ -289,14 +264,14 @@ individual nucleotides rather than distinct reads.
                        max_extrap / bin_size, max_iter, bootstrap_estimates);
 
       if (verbose)
-        cerr << "[COMPUTING CONFIDENCE INTERVALS]" << endl;
+        std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
       vector<double> coverage_upper_ci_lognorm, coverage_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
                            coverage_lower_ci_lognorm,
                            coverage_upper_ci_lognorm);
 
       if (verbose)
-        cerr << "[WRITING OUTPUT]" << endl;
+        std::cerr << "[WRITING OUTPUT]\n";
 
       write_predicted_coverage_curve(
         outfile, c_level, base_step_size, bin_size, coverage_estimates,
@@ -304,7 +279,7 @@ individual nucleotides rather than distinct reads.
     }
   }
   catch (const std::exception &e) {
-    cerr << e.what() << endl;
+    std::cerr << e.what() << '\n';
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

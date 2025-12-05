@@ -22,6 +22,6 @@
 #define SRC_LC_EXTRAP_HPP_
 
 int
-lc_extrap_main(const int argc, const char *argv[]);
+lc_extrap_main(int argc, char *argv[]);
 
 #endif  // SRC_LC_EXTRAP_HPP_
