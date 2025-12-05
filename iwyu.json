@@ -1,0 +1,5 @@
+[
+    { "include": ["<pstl/glue_algorithm_defs.h>", "private", "<algorithm>", "public"] },
+    { "include": ["@[\"<]htslib/kstring.h[\">]", "private", "<htslib/sam.h>", "public"] },
+    { "include": ["@[\"<]htslib/hts.h[\">]", "private", "<htslib/sam.h>", "public"] },
+]
