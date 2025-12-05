@@ -1,4 +1,6 @@
-/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2025
+ *               University of Southern California and
+ *               Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -18,10 +20,26 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
-#include <ranges>
+#include <string>
+#include <utility>  // IWYU pragma: keep
 #include <vector>
+
+using std::begin;
+using std::cbegin;
+using std::cend;
+using std::endl;
+using std::find_if;
+using std::isfinite;
+using std::isinf;
+using std::max;
+using std::setprecision;
+using std::string;
+using std::swap;
+using std::transform;
+using std::vector;
 
 void
 LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
@@ -97,7 +115,7 @@ ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
   std::size_t hankel_dim = 2;
   if (std::size(moments) < 2 * hankel_dim) {
     if (VERBOSE)
-      std::cerr << "too few moments" << std::endl;
+      std::cerr << "too few moments\n";
     return min_hankel_dim;
   }
 
@@ -126,9 +144,9 @@ ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
 
     if (VERBOSE) {
       std::cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det"
-                << std::endl;
+                << '\n';
       std::cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
-                << shift_hankel_mat_det << std::endl;
+                << shift_hankel_mat_det << '\n';
     }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
