@@ -21,7 +21,6 @@
 #define SRC_MOMENT_SEQUENCE_HPP_
 
 #include <cstddef>
-#include <numeric>
 #include <vector>
 
 // test Hankel moment matrix to ensure the moment sequence
@@ -39,17 +38,19 @@ struct MomentSequence {
 
   // Estimate 3-term recurrence
   // these will be removed from the header when they are tested
-  void unmodified_Chebyshev();
+  void
+  unmodified_Chebyshev();
 
-  void full_3term_recurrence(std::vector<double> &full_alpha,
-                             std::vector<double> &full_beta);
+  void
+  full_3term_recurrence(std::vector<double> &full_alpha,
+                        std::vector<double> &full_beta);
 
   // quadrature rules using QR on Jacobi matrix
-  bool Lower_quadrature_rules(const std::size_t n_points,
-                              const double tolerance,
-                              const std::size_t max_iter,
-                              std::vector<double> &points,
-                              std::vector<double> &weights);
+  bool
+  Lower_quadrature_rules(const std::size_t n_points, const double tolerance,
+                         const std::size_t max_iter,
+                         std::vector<double> &points,
+                         std::vector<double> &weights);
 
   std::vector<double> moments;
   // 3-term recurrence

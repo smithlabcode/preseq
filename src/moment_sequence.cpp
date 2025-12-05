@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2015
+/* Copyright (C) 2013-2025
  *               University of Southern California and
  *               Andrew D. Smith and Timothy Daley
  *
@@ -22,20 +22,17 @@
 #include "moment_sequence.hpp"
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <numeric>
+#include <iterator>
 #include <string>
-#include <utility>  // std::swap
+#include <utility>  // IWYU pragma: keep
 #include <vector>
 
 using std::begin;
 using std::cbegin;
 using std::cend;
-using std::cerr;
 using std::endl;
 using std::find_if;
 using std::isfinite;
@@ -116,7 +113,7 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
   size_t hankel_dim = 2;
   if (moments.size() < 2 * hankel_dim) {
     if (VERBOSE)
-      cerr << "too few moments" << endl;
+      std::cerr << "too few moments\n";
     return min_hankel_dim;
   }
 
@@ -143,10 +140,10 @@ ensure_pos_def_mom_seq(vector<double> &moments, const double tolerance,
       LU_determinant(shift_hankel_matrix, s_perm);
 
     if (VERBOSE) {
-      cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det"
-           << endl;
-      cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
-           << shift_hankel_mat_det << endl;
+      std::cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det"
+                << '\n';
+      std::cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
+                << shift_hankel_mat_det << '\n';
     }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
