@@ -22,8 +22,6 @@
 
 #include <cstddef>
 #include <fstream>
-#include <iomanip>
-#include <numeric>
 #include <vector>
 
 struct ContinuedFraction {
@@ -33,17 +31,22 @@ struct ContinuedFraction {
                     const size_t dg);
 
   // Evaluate the continued fraction
-  double operator()(const double val) const;
+  double
+  operator()(const double val) const;
 
   //////////////////////////////////////////
   // Extrapolation functions
 
   // Evaluate the continued fraction estimating distinct
   // along a curve from 0 to max_value
-  void extrapolate_distinct(const double max_value, const double step_size,
-                            std::vector<double> &estimates) const;
+  void
+  extrapolate_distinct(const double max_value, const double step_size,
+                       std::vector<double> &estimates) const;
 
-  bool is_valid() const { return !cf_coeffs.empty(); }
+  bool
+  is_valid() const {
+    return !cf_coeffs.empty();
+  }
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
