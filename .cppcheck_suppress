@@ -1,6 +1,6 @@
 # This file is part of preseq
 #
-# Copyright (C) 2024: Andrew D. Smith
+# Copyright (C) 2024-2025 Andrew D. Smith
 #
 # Authors: Andrew D. Smith
 #
@@ -17,7 +17,17 @@
 missingIncludeSystem
 constVariablePointer
 checkersReport
-unusedFunction:src/bam_record_utils.hpp
-unusedFunction:src/bam_record_utils.cpp
-*:src/smithlab_cpp*
-unusedStructMember:src/*.hpp
+unknownMacro
+unmatchedSuppression
+# Ignore unused function because it's too hard to get right
+unusedFunction
+# Ignore unused struct member because this won't go unnoticed anyway
+unusedStructMember
+# Ignore missing includes because if they are real things won't build
+missingInclude
+# Exclude external files
+*:*smithlab_cpp*
+# Problem caused by external files
+toomanyconfigs
+# More problems caused by external files -- with too many ifdefs
+normalCheckLevelMaxBranches
