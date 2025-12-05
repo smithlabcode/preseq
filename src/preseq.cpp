@@ -60,19 +60,19 @@ main(int argc, char *argv[]) {
   static const std::string cmd = argv[1];
 
   if (cmd == "lc_extrap")
-    return lc_extrap_main(argc, argv);
+    return lc_extrap_main(argc - 1, argv + 1);
 
   if (cmd == "c_curve")
-    return c_curve_main(argc, argv);
+    return c_curve_main(argc - 1, argv + 1);
 
   if (cmd == "gc_extrap")
-    return gc_extrap_main(argc, argv);
+    return gc_extrap_main(argc - 1, argv + 1);
 
   if (cmd == "bound_pop")
-    return bound_pop_main(argc, argv);
+    return bound_pop_main(argc - 1, argv + 1);
 
   if (cmd == "pop_size")
-    return pop_size_main(argc, argv);
+    return pop_size_main(argc - 1, argv + 1);
 
   std::cerr << "Error: unrecognized command: " << argv[1] << '\n'
             << usage_message() << '\n';
