@@ -14,32 +14,17 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "continued_fraction.hpp"
-#include "load_data_for_complexity.hpp"
-#include "moment_sequence.hpp"
-
-#include "CLI11/CLI11.hpp"
+#include "bound_pop.hpp"
+#include "c_curve.hpp"
+#include "gc_extrap.hpp"
+#include "lc_extrap.hpp"
+#include "pop_size.hpp"
 
 #include <config.h>
 
-#include <unistd.h>
-
-#include <algorithm>
-#include <cassert>
-#include <cmath>
 #include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <exception>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <iterator>
-#include <numbers>
-#include <numeric>
-#include <print>
-#include <random>
-#include <stdexcept>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1715,21 +1700,8 @@ application we have seen.
 
 int
 main(int argc, char *argv[]) {
-  static const auto usage_message = R"(
-preseq: a program for analyzing library complexity
-
-Usage: preseq <command> [OPTIONS]
-
-<command>:  c_curve    generate complexity curve for a library
-            lc_extrap  predict the yield for future experiments
-            gc_extrap  predict genome coverage low input sequencing experiments
-            bound_pop  lower bound on population size
-            pop_size   estimate number of unique species
-
-Version: )" + std::string(VERSION);
-
   if (argc < 2) {
-    std::println(std::cerr, "{}", rlstrip(usage_message));
+    std::cerr << usage_message() << '\n';
     return EXIT_SUCCESS;
   }
 
@@ -1748,7 +1720,11 @@ Version: )" + std::string(VERSION);
   if (std::strcmp(argv[1], "pop_size") == 0)
     return pop_size(argc - 1, argv + 1);
 
-  std::println(std::cerr, "unrecognized command: {}", std::string(argv[1]));
-  std::println(std::cerr, "{}", usage_message);
-  return EXIT_SUCCESS;
+  if (cmd == "pop_size")
+    return pop_size_main(argc, argv);
+
+  std::cerr << "Error: unrecognized command: " << argv[1] << '\n'
+            << usage_message() << '\n';
+
+  return EXIT_FAILURE;
 }
