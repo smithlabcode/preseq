@@ -14,7 +14,7 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
 if(USE_HTSLIB)
-  find_package(HTSLIB 1.20 REQUIRED)
+  find_package(HTSLIB REQUIRED)
 endif()
 find_package(Threads REQUIRED)
 
