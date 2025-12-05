@@ -27,7 +27,6 @@ add_subdirectory(smithlab_cpp)
 
 add_executable(preseq
   preseq.cpp
-  bam_record_utils.cpp
   bound_pop.cpp
   c_curve.cpp
   common.cpp
@@ -38,12 +37,18 @@ add_executable(preseq
   moment_sequence.cpp
   pop_size.cpp
 )
+if(USE_HTSLIB)
+  target_sources(preseq PRIVATE bam_record_utils.cpp)
+endif()
+
 # ADS: below, for config.h
 target_include_directories(preseq PUBLIC ${CMAKE_BINARY_DIR})
 target_link_libraries(preseq PUBLIC
   smithlab_cpp
-  bamxx
 )
 if(USE_HTSLIB)
-  target_link_libraries(preseq PUBLIC HTSLIB::HTSLIB)
+  target_link_libraries(preseq PUBLIC
+    bamxx
+    HTSLIB::HTSLIB
+  )
 endif()
