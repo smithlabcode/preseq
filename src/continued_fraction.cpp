@@ -17,8 +17,9 @@
 #include "continued_fraction.hpp"
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
+#include <iomanip>
+#include <iterator>
 #include <vector>
 
 using std::fabs;

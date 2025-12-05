@@ -20,7 +20,6 @@
 #include <cstddef>
 #include <format>
 #include <fstream>
-#include <string>
 #include <vector>
 
 struct ContinuedFraction {
@@ -33,31 +32,21 @@ struct ContinuedFraction {
                     const std::size_t max_terms);
 
   // Evaluate the continued fraction
-  [[nodiscard]] auto evaluate(const double val) const -> double;
-
-  // Evaluate the continued fraction
-  [[nodiscard]] auto operator()(const double val) const -> double {
-    return evaluate(val);
-  }
+  double
+  operator()(const double val) const;
 
   // Extrapolation functions
 
-  // Evaluate the continued fraction estimating distinct along a curve from 0
-  // to max_value
-  [[nodiscard]] auto
-  extrapolate_distinct(const double max_value,
-                       const double step_size) const -> std::vector<double>;
+  // Evaluate the continued fraction estimating distinct
+  // along a curve from 0 to max_value
+  void
+  extrapolate_distinct(const double max_value, const double step_size,
+                       std::vector<double> &estimates) const;
 
-  [[nodiscard]] auto is_valid() const -> bool { return !cf_coeffs.empty(); }
-
-  [[nodiscard]] auto return_degree() const -> std::size_t { return degree; }
-
-  void extrapolate_curve(const double initial_distinct, const double vals_sum,
-                         const double initial_sample_size,
-                         const double step_size, const double max_sample_size,
-                         std::vector<double> &estimates) const;
-
-  [[nodiscard]] auto tostring() const -> std::string;
+  bool
+  is_valid() const {
+    return !cf_coeffs.empty();
+  }
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
