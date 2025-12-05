@@ -24,6 +24,7 @@
 #include "CLI11.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -31,6 +32,7 @@
 #include <iterator>
 #include <numeric>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -165,7 +167,6 @@ public:
     }
     return r;
   }
-  // static const int column_width_default = 30;
 };
 
 #endif  // SRC_COMMON_HPP_
