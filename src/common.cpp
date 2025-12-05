@@ -22,15 +22,12 @@
 
 #include "continued_fraction.hpp"
 
-#include <unistd.h>
-
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <iostream>
 #include <random>
 #include <string>
@@ -66,15 +63,20 @@ factorial(double x) {
   // constants
   static constexpr double LogRootTwoPi = 0.9189385332046727;
   static constexpr double Euler = 2.71828182845904523536028747135;
-  array<double, 9> Lanczos{0.99999999999980993227684700473478,
-                           676.520368121885098567009190444019,
-                           -1259.13921672240287047156078755283,
-                           771.3234287776530788486528258894,
-                           -176.61502916214059906584551354,
-                           12.507343278686904814458936853,
-                           -0.13857109526572011689554707,
-                           9.984369578019570859563e-6,
-                           1.50563273514931155834e-7};
+
+  // clang-format off
+  const auto Lanczos = std::array<double, 9>{
+    0.99999999999980993227684700473478,
+    676.520368121885098567009190444019,
+    -1259.13921672240287047156078755283,
+    771.3234287776530788486528258894,
+    -176.61502916214059906584551354,
+    12.507343278686904814458936853,
+    -0.13857109526572011689554707,
+    9.984369578019570859563e-6,
+    1.50563273514931155834e-7,
+  };
+  // clang-format on
 
   // Approximation for factorial is actually x-1
   x -= 1.0;

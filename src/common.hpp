@@ -21,14 +21,29 @@
 #ifndef SRC_COMMON_HPP_
 #define SRC_COMMON_HPP_
 
-#include <cstddef>  // std::size_t
-#include <cstdint>  // std::uint64_t
+#include "CLI11.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
-#include <ostream>
+#include <initializer_list>
+#include <iterator>
+#include <numeric>
 #include <random>
 #include <stdexcept>
 #include <string>
-#include <vector>  // has std::size
+#include <vector>
+
+[[nodiscard]] static inline auto
+rlstrip(const std::string &s) noexcept -> std::string {
+  constexpr auto is_graph = [](const auto c) { return std::isgraph(c); };
+  const auto start_itr = std::find_if(std::cbegin(s), std::cend(s), is_graph);
+  auto stop_itr = std::end(s);
+  while (stop_itr != std::cbegin(s) && !is_graph(*(stop_itr - 1)))
+    --stop_itr;
+  return std::string(start_itr, stop_itr);
+}
 
 double
 GoodToulmin2xExtrap(const std::vector<double> &counts_hist);
@@ -125,5 +140,32 @@ report_histogram(const std::string &outfile, const H &h) {
     if (h[i] > 0)
       out << i << '\t' << static_cast<std::uint32_t>(h[i]) << '\n';
 }
+
+class preseq_formatter : public CLI::Formatter {
+public:
+  auto
+  make_option_desc(const CLI::Option *opt) const -> std::string override {
+    static constexpr auto max_descr_width = 50;
+    std::istringstream iss{opt->get_description()};
+    const std::vector<std::string> words{
+      std::istream_iterator<std::string>{iss}, {}};
+    std::string r{words[0]};
+    std::uint32_t width = std::size(words[0]);
+    for (auto i = 1u; i < std::size(words); ++i) {
+      if (width == 0 || width + std::size(words[i]) < max_descr_width) {
+        r += ' ';
+        ++width;
+      }
+      else {
+        r += '\n';
+        width = 0;
+      }
+      r += words[i];
+      width += std::size(words[i]);
+    }
+    return r;
+  }
+  // static const int column_width_default = 30;
+};
 
 #endif  // SRC_COMMON_HPP_
