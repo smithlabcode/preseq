@@ -22,6 +22,6 @@
 #define SRC_POP_SIZE_HPP_
 
 int
-pop_size_main(const int argc, const char *argv[]);
+pop_size_main(int argc, char *argv[]);
 
 #endif  // SRC_POP_SIZE_HPP_

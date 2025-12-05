@@ -22,6 +22,6 @@
 #define SRC_C_CURVE_HPP_
 
 int
-c_curve_main(const int argc, const char *argv[]);
+c_curve_main(int argc, char *argv[]);
 
 #endif  // SRC_C_CURVE_HPP_

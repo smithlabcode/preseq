@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2024 University of Southern California and
+/* Copyright (C) 2013-2025 University of Southern California and
  *                         Andrew D. Smith and Timothy Daley
  *
  * Authors: Timothy Daley and Andrew Smith
@@ -21,20 +21,17 @@
 #include "c_curve.hpp"
 
 #include "common.hpp"
-#include "continued_fraction.hpp"
 #include "load_data_for_complexity.hpp"
-#include "moment_sequence.hpp"
 
-#include <OptionParser.hpp>
-#include <smithlab_os.hpp>
-#include <smithlab_utils.hpp>
+#include "CLI11.hpp"
 
 #include <algorithm>
-#include <cstddef>  // std::size_t
 #include <cstdint>
-#include <filesystem>
+#include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <numeric>
 #include <random>
 #include <string>
@@ -43,8 +40,6 @@
 using std::accumulate;
 using std::cbegin;
 using std::cend;
-using std::cerr;
-using std::endl;
 using std::mt19937;
 using std::size;
 using std::size_t;
@@ -66,7 +61,7 @@ median_from_sorted_vector(const vector<T> &sorted_data, const size_t stride,
 }
 
 int
-c_curve_main(const int argc, const char *argv[]) {
+c_curve_main(int argc, char *argv[]) {
   try {
     bool verbose = false;
     bool PAIRED_END = false;
@@ -75,6 +70,7 @@ c_curve_main(const int argc, const char *argv[]) {
     uint32_t seed = 408;
 
     string outfile;
+    string input_file_name;
     string histogram_outfile;
 
     double step_size = 1e6;
@@ -83,68 +79,41 @@ c_curve_main(const int argc, const char *argv[]) {
     size_t MAX_SEGMENT_LENGTH = 5000;
     uint32_t n_threads{1};
 #endif
-
-    const string description =
-      R"(
-Generate the complexity curve for data. This does not extrapolate, but
-instead resamples from the given data.
+    const auto description = R"(
+Generate the complexity curve for data. This does not extrapolate, but instead
+resamples from the given data.
 )";
-    string program_name = std::filesystem::path(argv[0]).filename();
-    program_name += " " + string(argv[1]);
+    CLI::App app{rlstrip(description)};
+    argv = app.ensure_utf8(argv);
+    app.usage("Usage: preseq c_curve [OPTIONS]");
+    // if (argc >= 2)
+    //   app.footer(description);
 
-    /********** GET COMMAND LINE ARGUMENTS  FOR C_CURVE ***********/
-    OptionParser opt_parse(program_name, description, "<input-file>");
-    opt_parse.add_opt("output", 'o', "yield output file (default: stdout)",
-                      false, outfile);
-    opt_parse.add_opt("step", 's', "step size in extrapolations", false,
-                      step_size);
-    opt_parse.add_opt("verbose", 'v', "print more information", false, verbose);
-    opt_parse.add_opt("pe", 'P', "input paired end read file", false,
-                      PAIRED_END);
-    opt_parse.add_opt("hist", 'H',
-                      "input is text file containing observed histogram", false,
-                      HIST_INPUT);
-    opt_parse.add_opt("hist-out", '\0',
-                      "output histogram to this file (for non-hist input)",
-                      false, histogram_outfile);
-    opt_parse.add_opt("vals", 'V',
-                      "input is text file containing only observed counts",
-                      false, VALS_INPUT);
+    // clang-format off
+    app.add_option("-i,--input", input_file_name, "input file")
+      ->option_text("FILE")
+      ->required()
+      ->check(CLI::ExistingFile);
+    app.add_option("-o,--output", outfile, "yield output file (default: stdout)");
+    app.add_option("-s,--step", step_size, "step size in extrapolations");
+    app.add_option("-P,--pe", PAIRED_END, "input is paired end read file");
+    app.add_option("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
+    app.add_option("-V,--vals", VALS_INPUT,
+                   "input is a text file containing only the observed counts");
 #ifdef HAVE_HTSLIB
-    opt_parse.add_opt("bam", 'B', "input is in BAM format", false,
-                      BAM_FORMAT_INPUT);
-    opt_parse.add_opt("seg_len", 'l',
-                      "maximum segment length when merging "
-                      "paired end bam reads",
-                      false, MAX_SEGMENT_LENGTH);
-    opt_parse.add_opt("threads", 't', "number of threads for decompressing BAM",
-                      false, n_threads);
+    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH, "maximum segment length when merging paired end bam reads");
 #endif
-    opt_parse.add_opt("seed", 'r', "seed for random number generator", false,
-                      seed);
-    opt_parse.set_show_defaults();
+    app.add_option("-r,--seed", seed, "seed for random number generator");
+    app.add_option("-v,--verbose", verbose, "print more info");
+    // clang-format on
 
-    vector<string> leftover_args;
-    opt_parse.parse(argc - 1, argv + 1, leftover_args);
-    if (argc == 2 || opt_parse.help_requested()) {
-      cerr << opt_parse.help_message() << endl;
-      cerr << opt_parse.about_message() << endl;
+    if (argc < 3) {
+      // std::println("{}", app.help());
+      std::cout << app.help() << std::endl;
       return EXIT_SUCCESS;
     }
-    if (opt_parse.about_requested()) {
-      cerr << opt_parse.about_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.option_missing()) {
-      cerr << opt_parse.option_missing_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (leftover_args.empty()) {
-      cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    const string input_file_name = leftover_args.front();
-    /******************************************************************/
+    CLI11_PARSE(app, argc, argv);
 
     // Setup the random number generator
     mt19937 rng(seed);
@@ -155,34 +124,34 @@ instead resamples from the given data.
     // LOAD VALUES
     if (HIST_INPUT) {
       if (verbose)
-        cerr << "INPUT_HIST" << endl;
+        std::cerr << "INPUT_HIST\n";
       n_reads = load_histogram(input_file_name, counts_hist);
     }
     else if (VALS_INPUT) {
       if (verbose)
-        cerr << "VALS_INPUT" << endl;
+        std::cerr << "VALS_INPUT\n";
       n_reads = load_counts(input_file_name, counts_hist);
     }
 #ifdef HAVE_HTSLIB
     else if (BAM_FORMAT_INPUT && PAIRED_END) {
       if (verbose)
-        cerr << "PAIRED_END_BAM_INPUT" << endl;
+        std::cerr << "PAIRED_END_BAM_INPUT\n";
       n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
     }
     else if (BAM_FORMAT_INPUT) {
       if (verbose)
-        cerr << "BAM_INPUT" << endl;
+        std::cerr << "BAM_INPUT\n";
       n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
     }
 #endif
     else if (PAIRED_END) {
       if (verbose)
-        cerr << "PAIRED_END_BED_INPUT" << endl;
+        std::cerr << "PAIRED_END_BED_INPUT\n";
       n_reads = load_counts_BED_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
       if (verbose)
-        cerr << "BED_INPUT" << endl;
+        std::cerr << "BED_INPUT\n";
       n_reads = load_counts_BED_se(input_file_name, counts_hist);
     }
 
@@ -197,12 +166,12 @@ instead resamples from the given data.
                     [](const double x) { return x > 0.0; });
 
     if (verbose)
-      cerr << "TOTAL READS     = " << n_reads << endl
-           << "COUNTS_SUM      = " << total_reads << endl
-           << "DISTINCT READS  = " << distinct_reads << endl
-           << "DISTINCT COUNTS = " << distinct_counts << endl
-           << "MAX COUNT       = " << max_observed_count << endl
-           << "COUNTS OF 1     = " << counts_hist[1] << endl;
+      std::cerr << "TOTAL READS     = " << n_reads << '\n'
+                << "COUNTS_SUM      = " << total_reads << '\n'
+                << "DISTINCT READS  = " << distinct_reads << '\n'
+                << "DISTINCT COUNTS = " << distinct_counts << '\n'
+                << "MAX COUNT       = " << max_observed_count << '\n'
+                << "COUNTS OF 1     = " << counts_hist[1] << '\n';
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
@@ -217,18 +186,18 @@ instead resamples from the given data.
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
     // prints the complexity curve
-    out << "total_reads" << "\t" << "distinct_reads" << endl;
-    out << 0 << '\t' << 0 << endl;
+    out << "total_reads" << "\t" << "distinct_reads\n";
+    out << 0 << '\t' << 0 << '\n';
     for (size_t i = step_size; i <= upper_limit; i += step_size) {
       if (verbose)
-        cerr << "sample size: " << i << endl;
+        std::cerr << "sample size: " << i << '\n';
       out << i << "\t"
           << interpolate_distinct(counts_hist, total_reads, distinct_reads, i)
-          << endl;
+          << '\n';
     }
   }
   catch (const std::exception &e) {
-    cerr << "ERROR:\t" << e.what() << endl;
+    std::cerr << "ERROR:\t" << e.what() << '\n';
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
