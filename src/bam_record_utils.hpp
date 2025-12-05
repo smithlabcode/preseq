@@ -27,8 +27,12 @@
    means they should be system symbols.
 */
 
+#include <htslib/sam.h>
+
 #include <bamxx.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #ifdef bam_is_rev
