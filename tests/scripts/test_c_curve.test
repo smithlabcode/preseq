@@ -19,7 +19,7 @@
 infile=tests/c_curve_input.hist
 outfile=tests/c_curve_output.txt
 if [[ -e "${infile}" ]]; then
-    ./preseq c_curve -o "${outfile}" -s 100000 -H "${infile}"
+    ./preseq c_curve -o "${outfile}" -s 100000 -H -i "${infile}"
     x=$(md5sum -c tests/md5sum.txt | grep "${outfile}:" | cut -d ' ' -f 2)
     if [[ "${x}" != "OK" ]]; then
         exit 1;
