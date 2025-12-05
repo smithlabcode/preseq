@@ -16,28 +16,51 @@
 
 #include "load_data_for_complexity.hpp"
 
-#include "bamxx/bamxx.hpp"
-
 #include <htslib/sam.h>
 
-#include "GenomicRegion.hpp"
-#include "MappedRead.hpp"
+#include <GenomicRegion.hpp>
+#include <MappedRead.hpp>
 
-#include <unistd.h>
-
-#include <algorithm>  // std::min
-#include <cassert>
-#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <fstream>
+#include <functional>
+#include <iterator>
 #include <queue>
 #include <random>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <unordered_map>
-#include <utility>  // std::swap
+#include <utility>
+#include <vector>
 
-[[nodiscard]] static auto
-update_pe_duplicate_counts_hist(const auto &curr, const auto &prev,
-                                std::vector<double> &counts_hist,
-                                std::size_t &current_count) -> bool {
+#ifdef HAVE_HTSLIB
+#include "bam_record_utils.hpp"
+#include <bamxx.hpp>
+#endif
+
+using std::min;
+using std::mt19937;
+using std::priority_queue;
+using std::runtime_error;
+using std::size;
+using std::size_t;
+using std::string;
+using std::uint32_t;
+using std::unordered_map;
+using std::vector;
+
+//////////////////////////////////////////////////////////////////////
+// Data imputation
+
+static bool
+update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
+                                const GenomicRegion &prev_gr,
+                                vector<double> &counts_hist,
+                                size_t &current_count) {
   // check if reads are sorted
   if (curr.same_chrom(prev) && curr.get_start() < prev.get_start() &&
       curr.get_end() < prev.get_end()) {
@@ -104,16 +127,16 @@ end_greater(const auto &a, const auto &b) -> bool {
 /******************************************************************************/
 
 struct GenomicRegionOrderChecker {
-  [[nodiscard]] auto operator()(const GenomicRegion &prev,
-                                const GenomicRegion &gr) const -> bool {
+  bool
+  operator()(const GenomicRegion &prev, const GenomicRegion &gr) const {
     return start_check(prev, gr);
   }
-  [[nodiscard]] static auto start_check(const GenomicRegion &prev,
-                                        const GenomicRegion &gr) -> bool {
-    return chrom_greater(prev, gr) ||                           //
-           (prev.same_chrom(gr) && start_greater(prev, gr)) ||  //
-           (prev.same_chrom(gr) && same_start(prev, gr) &&
-            end_greater(prev, gr));
+  static bool
+  start_check(const GenomicRegion &prev, const GenomicRegion &gr) {
+    return (
+      chrom_greater(prev, gr) ||
+      (prev.same_chrom(gr) && start_greater(prev, gr)) ||
+      (prev.same_chrom(gr) && same_start(prev, gr) && end_greater(prev, gr)));
   }
 };
 
@@ -890,13 +913,16 @@ struct aln_pos {
   aln_pos(const int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
   explicit aln_pos(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)} {}
-  bool operator<(const aln_pos &rhs) const {
+  bool
+  operator<(const aln_pos &rhs) const {
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
   }
-  bool operator>(const aln_pos &rhs) const {
+  bool
+  operator>(const aln_pos &rhs) const {
     return tid > rhs.tid || (tid == rhs.tid && pos > rhs.pos);
   }
-  bool operator!=(const aln_pos &rhs) const {
+  bool
+  operator!=(const aln_pos &rhs) const {
     // ADS: ordered to check pos first
     return pos != rhs.pos || tid != rhs.tid;
   }
@@ -909,11 +935,13 @@ struct aln_pos_pair {
   hts_pos_t mpos{};
   explicit aln_pos_pair(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
-  bool operator<(const aln_pos_pair &rhs) const {
+  bool
+  operator<(const aln_pos_pair &rhs) const {
     // ADS: only compares on tid and pos, NOT mtid or mpos
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
   }
-  bool operator!=(const aln_pos_pair &rhs) const {
+  bool
+  operator!=(const aln_pos_pair &rhs) const {
     // ADS: ordered to check pos first
     return pos != rhs.pos || tid != rhs.tid || mtid != rhs.mtid ||
            mpos != rhs.mpos;
@@ -1017,7 +1045,8 @@ struct genomic_interval {
   int32_t tid{};  // indicates uninitialized
   hts_pos_t start{};
   hts_pos_t stop{};
-  bool operator<(const genomic_interval &rhs) const {
+  bool
+  operator<(const genomic_interval &rhs) const {
     // clang-format off
     return (tid < rhs.tid ||
             (tid == rhs.tid &&
