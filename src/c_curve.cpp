@@ -27,7 +27,7 @@ extrapolate, but instead resamples from the given data.
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -40,8 +40,10 @@ extrapolate, but instead resamples from the given data.
 #include <string>
 #include <vector>
 
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+
 int
-c_curve_main(int argc, char *argv[]) {
+c_curve_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
   try {
     bool verbose = false;
     bool PAIRED_END = false;
@@ -88,7 +90,7 @@ c_curve_main(int argc, char *argv[]) {
 
     if (argc < 3) {
       // std::println("{}", app.help());
-      std::cout << app.help() << std::endl;
+      std::cout << app.help() << '\n';
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
@@ -176,3 +178,5 @@ c_curve_main(int argc, char *argv[]) {
   }
   return EXIT_SUCCESS;
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
