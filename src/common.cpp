@@ -39,7 +39,6 @@ using std::cbegin;
 using std::cend;
 using std::cerr;
 using std::end;
-using std::endl;
 using std::min;
 using std::mt19937;
 using std::runtime_error;
@@ -47,6 +46,8 @@ using std::size_t;
 using std::string;
 using std::uint32_t;
 using std::vector;
+
+// NOLINTBEGIN(*-avoid-magic-numbers,*-init-variables,*-narrowing-conversions,*-constant-array-index)
 
 double
 GoodToulmin2xExtrap(const vector<double> &counts_hist) {
@@ -173,7 +174,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
                       max_extrap, yield_estimate);
 
     if (VERBOSE)
-      cerr << defect_cf << endl;
+      cerr << defect_cf << '\n';
     // NO FAIL! defect mode doesn't care about failure
   }
   else {
@@ -193,7 +194,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
     }
 
     if (VERBOSE)
-      cerr << lower_cf << endl;
+      cerr << lower_cf << '\n';
   }
   // SUCCESS!!
   return true;
@@ -226,7 +227,7 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
   for (size_t iter = 0;
        (iter < max_iter && bootstrap_estimates.size() < n_bootstraps); ++iter) {
     if (VERBOSE && iter > 0 && iter % 72 == 0)
-      cerr << endl;  // bootstrap success progress only 72 char wide
+      cerr << '\n';  // bootstrap success progress only 72 char wide
 
     vector<double> yield_vector;
     vector<double> hist;
@@ -295,7 +296,7 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
       cerr << (successful_bootstrap ? '.' : '_');
   }
   if (VERBOSE)
-    cerr << endl;
+    cerr << '\n';
   if (bootstrap_estimates.size() < n_bootstraps)
     throw runtime_error("too many defects in the approximation, "
                         "consider running in defect mode");
@@ -350,11 +351,11 @@ write_predicted_complexity_curve(const string &outfile, const double c_level,
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out.precision(1);
 
-  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << endl;
+  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
   for (size_t i = 0; i < yield_estimates.size(); ++i)
     out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\t'
         << yield_lower_ci_lognorm[i] << '\t' << yield_upper_ci_lognorm[i]
-        << endl;
+        << '\n';
 }
 
 // vals_hist[j] = n_{j} = # (counts = j)
@@ -382,7 +383,7 @@ resample_hist(mt19937 &gen, const vector<size_t> &vals_hist_distinct_counts,
 
 template <typename T>
 T
-median_from_sorted_vector(const vector<T> sorted_data, const size_t stride,
+median_from_sorted_vector(const vector<T> &sorted_data, const size_t stride,
                           const size_t n) {
   if (n == 0 || sorted_data.empty())
     return 0.0;
@@ -431,3 +432,5 @@ median_and_ci(vector<double> estimates,  // by val so we can sort them
   upper_ci_estimate =
     quantile_from_sorted_vector(estimates, 1, N, 1.0 - alpha / 2);
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-init-variables,*-narrowing-conversions,*-constant-array-index)

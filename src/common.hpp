@@ -21,7 +21,7 @@
 #ifndef SRC_COMMON_HPP_
 #define SRC_COMMON_HPP_
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cctype>
