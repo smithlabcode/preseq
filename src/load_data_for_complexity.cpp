@@ -31,7 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
-#include <functional>
+#include <functional>  // IWYU pragma: keep
 #include <iterator>
 #include <queue>
 #include <random>
