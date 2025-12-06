@@ -20,41 +20,24 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
 #include <iostream>
 #include <iterator>
-#include <string>
 #include <utility>  // IWYU pragma: keep
 #include <vector>
 
-using std::begin;
-using std::cbegin;
-using std::cend;
-using std::endl;
-using std::find_if;
-using std::isfinite;
-using std::isinf;
-using std::max;
-using std::setprecision;
-using std::string;
-using std::swap;
-using std::transform;
-using std::vector;
-
 void
 LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
-  const std::size_t N = std::size(A);
+  const std::size_t N = A.size();
   double absA{};
   std::size_t i{};
-  std::size_t j{};
   std::size_t k{};
 
   P.clear();
   for (std::size_t x = 0; x <= N; x++)
-    P.push_back(x);
+    P.push_back(static_cast<int>(x));
 
-  for (i = 0; i < N; ++i) {
-    double maxA{};
+  for (i = 0; i < N; i++) {
+    double maxA = 0.0;
     std::size_t imax = i;
 
     for (k = i; k < N; k++)
@@ -67,19 +50,18 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
       // pivoting P
       std::size_t j = P[i];
       P[i] = P[imax];
-      P[imax] = j;
+      P[imax] = static_cast<int>(j);
 
       // pivoting rows of A
-      std::swap(A[i], A[imax]);
-      // std::vector<double> ptr(A[i]);
-      // A[i] = A[imax];
-      // A[imax] = ptr;
+      std::vector<double> ptr(A[i]);
+      A[i] = A[imax];
+      A[imax] = ptr;
 
       // counting pivots starting from N (for determinant)
       ++P[N];
     }
 
-    for (j = i + 1; j < N; ++j) {
+    for (std::size_t j = i + 1; j < N; j++) {
       A[j][i] /= A[i][i];
 
       for (k = i + 1; k < N; k++)
@@ -88,13 +70,12 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
   }
 }
 
-auto
-LU_determinant(std::vector<std::vector<double>> &A,
-               std::vector<int> &P) -> double {
-  const std::size_t N = std::size(A);
+double
+LU_determinant(const std::vector<std::vector<double>> &A,
+               const std::vector<int> &P) {
+  const std::size_t N = A.size();
 
   double det = A[0][0];
-
   for (std::size_t i = 1; i < N; ++i)
     det *= A[i][i];
 
@@ -108,19 +89,18 @@ LU_determinant(std::vector<std::vector<double>> &A,
 // test Hankel moment matrix
 // ensure moment sequence is positive definite
 // truncate moment sequence to ensure pos def
-auto
+std::size_t
 ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
-                       const bool VERBOSE) -> std::size_t {
+                       const bool VERBOSE) {
   const std::size_t min_hankel_dim = 1;
   std::size_t hankel_dim = 2;
-  if (std::size(moments) < 2 * hankel_dim) {
+  if (moments.size() < 2 * hankel_dim) {
     if (VERBOSE)
       std::cerr << "too few moments\n";
     return min_hankel_dim;
   }
 
-  bool ACCEPT_HANKEL = true;
-  while (ACCEPT_HANKEL && (2 * hankel_dim - 1 < std::size(moments))) {
+  while (2 * hankel_dim - 1 < moments.size()) {
     std::vector<std::vector<double>> hankel_mat(
       hankel_dim, std::vector<double>(hankel_dim, 0.0));
     for (std::size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
@@ -173,7 +153,8 @@ check_three_term_relation(std::vector<double> &a, std::vector<double> &b) {
     a.clear();
     b.clear();
   }
-  for (std::size_t i = 0; i < std::size(b); ++i)
+
+  for (std::size_t i = 0; i < b.size(); i++)
     // ADS: some strange logic here
     if (b[i] <= 0.0 || !std::isfinite(b[i]) || a[i + 1] <= 0.0 ||
         !std::isfinite(a[i + 1])) {
@@ -190,7 +171,7 @@ check_moment_sequence(std::vector<double> &obs_moms) {
   if (obs_moms[0] <= 0.0 || !std::isfinite(obs_moms[0]))
     obs_moms.clear();
 
-  for (std::size_t i = 1; i < std::size(obs_moms); ++i)
+  for (std::size_t i = 1; i < obs_moms.size(); i++) {
     if (obs_moms[i] <= 0.0 || !std::isfinite(obs_moms[i])) {
       obs_moms.resize(i + 1);
       break;
@@ -199,7 +180,7 @@ check_moment_sequence(std::vector<double> &obs_moms) {
 
 void
 MomentSequence::unmodified_Chebyshev() {
-  const auto n_points = static_cast<std::size_t>(floor(std::size(moments) / 2));
+  const std::size_t n_points = std::size(moments) / 2;
   std::vector<double> a(n_points, 0.0);
   std::vector<double> b(n_points - 1, 0.0);
 
@@ -232,7 +213,7 @@ MomentSequence::unmodified_Chebyshev() {
 void
 MomentSequence::full_3term_recurrence(std::vector<double> &full_alpha,
                                       std::vector<double> &full_beta) {
-  const auto n_points = static_cast<std::size_t>(floor(std::size(moments) / 2));
+  const std::size_t n_points = std::size(moments) / 2;
   std::vector<double> a(n_points, 0.0);
   std::vector<double> b(n_points - 1, 0.0);
 
@@ -286,27 +267,27 @@ static void
 QRiteration(std::vector<double> &alpha, std::vector<double> &beta,
             std::vector<double> &weights) {
   // initialize variables
-  std::vector<double> sin_theta(std::size(alpha), 0.0);
-  std::vector<double> cos_theta(std::size(alpha), 0.0);
+  std::vector<double> sin_theta(alpha.size(), 0.0);
+  std::vector<double> cos_theta(alpha.size(), 0.0);
 
-  std::vector<double> a(std::size(alpha), 0.0);
-  std::vector<double> a_bar(std::size(alpha), 0.0);
+  std::vector<double> a(alpha.size(), 0.0);
+  std::vector<double> a_bar(alpha.size(), 0.0);
   a_bar[0] = alpha[0];
 
   std::vector<double> b(beta);
-  std::vector<double> b_bar(std::size(alpha), 0.0);
+  std::vector<double> b_bar(alpha.size(), 0.0);
   b_bar[0] = alpha[0];
-  std::vector<double> b_tilde(std::size(alpha), 0.0);
+  std::vector<double> b_tilde(alpha.size(), 0.0);
   b_tilde[0] = beta[0];
 
-  std::vector<double> d(std::size(alpha), 0.0);
+  std::vector<double> d(alpha.size(), 0.0);
   d[0] = beta[0];
 
   std::vector<double> z(weights);
-  std::vector<double> z_bar(std::size(weights), 0.0);
+  std::vector<double> z_bar(weights.size(), 0.0);
   z_bar[0] = z[0];
 
-  for (std::size_t j = 0; j + 1 < std::size(alpha); ++j) {
+  for (std::size_t j = 0; j < alpha.size() - 1; j++) {
     // for d and b_bar, j here is j-1 in G&W
     if (d[j] == 0.0 && b_bar[j] == 0.0) {
       sin_theta[j] = 0.0;
@@ -351,51 +332,49 @@ QRiteration(std::vector<double> &alpha, std::vector<double> &beta,
   std::swap(weights, z);
 }
 
-static auto
+[[nodiscard]] static inline auto
 check_positivity(const std::vector<double> &v) -> bool {
-  const auto not_positive = [](const auto x) {
-    return x <= 0.0 || std::isinf(x);
-  };
-  return std::ranges::find_if(v, not_positive) == std::cend(v);
+  const auto non_pos = [](const double x) { return x <= 0.0 || std::isinf(x); };
+  return std::find_if(std::cbegin(v), std::cend(v), non_pos) == std::cend(v);
 }
 
-auto
+bool
 MomentSequence::Lower_quadrature_rules(const std::size_t n_points,
                                        const double tol,
                                        const std::size_t max_iter,
                                        std::vector<double> &points,
-                                       std::vector<double> &weights) -> bool {
-  // make sure that std::size(points) will be less than n_points
+                                       std::vector<double> &weights) {
+  // make sure that points.size() will be less than n_points
   std::vector<double> a(alpha);
-  a.resize((n_points < std::size(alpha)) ? n_points : std::size(alpha));
+  a.resize((n_points < alpha.size()) ? n_points : alpha.size());
   std::vector<double> b(beta);
-  b.resize((n_points - 1 < std::size(beta)) ? n_points - 1 : std::size(beta));
+  b.resize((n_points - 1 < beta.size()) ? n_points - 1 : beta.size());
 
   check_three_term_relation(a, b);
 
   // See Gautschi pgs 10-13,
   // the nu here is the square of the off-diagonal
   // of the Jacobi matrix
-  for (double &b_val : b)
-    b_val = std::sqrt(b_val);
+  for (std::size_t i = 0; i < b.size(); i++)
+    b[i] = sqrt(b[i]);
 
-  std::vector<double> eigenvec(std::size(a), 0.0);
+  std::vector<double> eigenvec(a.size(), 0.0);
   eigenvec[0] = 1.0;
   std::vector<double> eigenvals(a);
   std::vector<double> qr_beta(b);
 
   // in QR, off-diagonals go to zero use off diags for convergence
-  double error_sum{};
-  for (const double val : qr_beta)
-    error_sum += std::fabs(val);
+  double error_sum = 0.0;
+  for (std::size_t i = 0; i < qr_beta.size(); i++)
+    error_sum += fabs(qr_beta[i]);
 
-  std::size_t iter{};
+  std::size_t iter = 0;
   while (iter < max_iter && error_sum > tol) {
     QRiteration(eigenvals, qr_beta, eigenvec);
 
     error_sum = 0.0;
-    for (const double val : qr_beta)
-      error_sum += std::fabs(val);
+    for (std::size_t i = 0; i < qr_beta.size(); i++)
+      error_sum += fabs(qr_beta[i]);
     iter++;
   }
 
@@ -407,8 +386,8 @@ MomentSequence::Lower_quadrature_rules(const std::size_t n_points,
   }
 
   // square entries in the weights vector
-  const auto sqr = [](const auto x) { return x * x; };
-  std::ranges::transform(weights, std::begin(weights), sqr);
+  std::transform(std::cbegin(weights), std::cend(weights), std::begin(weights),
+                 [](const double x) { return x * x; });
 
   return points_are_positive;
 }
