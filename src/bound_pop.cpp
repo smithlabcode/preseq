@@ -29,7 +29,7 @@ counts of observed species in an initial sample.
 #include "load_data_for_complexity.hpp"
 #include "moment_sequence.hpp"
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -45,6 +45,8 @@ counts of observed species in an initial sample.
 #include <random>
 #include <string>
 #include <vector>
+
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
 static void
 report_bootstrapped_moments(const std::vector<double> &bootstrap_moments,
@@ -80,7 +82,7 @@ report_bootstrapped_moments(const std::vector<double> &bootstrap_moments,
 
 // bounding n_0
 int
-bound_pop_main(int argc, char *argv[]) {
+bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
   try {
     bool verbose = false;
     bool PAIRED_END = false;
@@ -143,7 +145,7 @@ bound_pop_main(int argc, char *argv[]) {
 
     if (argc < 3) {
       // std::println("{}", app.help());
-      std::cout << app.help() << std::endl;
+      std::cout << app.help() << '\n';
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
@@ -218,12 +220,11 @@ bound_pop_main(int argc, char *argv[]) {
       report_histogram(histogram_outfile, counts_hist);
 
     if (QUICK_MODE) {
-      if (std::size(measure_moments) < 2 * max_num_points)
-        max_num_points = std::floor(std::size(measure_moments) / 2.0);
-      else
+      if (std::size(measure_moments) > 2 * max_num_points)
         measure_moments.resize(2 * max_num_points);
-      std::size_t n_points = 0;
-      n_points = ensure_pos_def_mom_seq(measure_moments, tolerance, verbose);
+
+      std::size_t n_points =
+        ensure_pos_def_mom_seq(measure_moments, tolerance, verbose);
       if (verbose)
         std::cerr << "n_points = " << n_points << '\n';
 
@@ -329,8 +330,7 @@ bound_pop_main(int argc, char *argv[]) {
                                                std::log(sample_hist[i + 2]) -
                                                std::log(sample_hist[1])));
 
-        std::size_t n_points = 0;
-        n_points =
+        std::size_t n_points =
           ensure_pos_def_mom_seq(bootstrap_moments, tolerance, verbose);
         n_points = std::min(n_points, max_num_points);
         if (verbose)
@@ -357,10 +357,8 @@ bound_pop_main(int argc, char *argv[]) {
 
         if (estimated_unobs > 0.0)
           estimated_unobs += sampled_distinct;
-        else {
+        else
           estimated_unobs = sampled_distinct;
-          n_points = 0;
-        }
 
         if (verbose)
           report_bootstrapped_moments(bootstrap_moments, bootstrap_mom_seq,
@@ -394,3 +392,5 @@ bound_pop_main(int argc, char *argv[]) {
   }
   return EXIT_SUCCESS;
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
