@@ -35,7 +35,7 @@ distinct reads.
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -48,6 +48,8 @@ distinct reads.
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
 // ADS: functions same, header different (above and this one)
 static void
@@ -86,7 +88,7 @@ write_predicted_coverage_curve(
 }
 
 int
-gc_extrap_main(int argc, char *argv[]) {
+gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
   try {
     static constexpr auto MIN_REQUIRED_COUNTS = 4;
 
@@ -149,7 +151,7 @@ gc_extrap_main(int argc, char *argv[]) {
 
     if (argc < 3) {
       // std::println("{}", app.help());
-      std::cout << app.help() << std::endl;
+      std::cout << app.help() << '\n';
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
@@ -284,3 +286,5 @@ gc_extrap_main(int argc, char *argv[]) {
   }
   return EXIT_SUCCESS;
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)

@@ -35,7 +35,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #ifdef HAVE_HTSLIB
@@ -44,11 +43,7 @@
 #include <htslib/sam.h>
 #endif
 
-using std::mt19937;
-using std::size;
-using std::string;
-
-// Data imputation
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions,*-avoid-do-while)
 
 static bool
 update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
@@ -81,7 +76,7 @@ update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
 static void
 update_se_duplicate_counts_hist(const GenomicRegion &curr_gr,
                                 const GenomicRegion &prev_gr,
-                                const string &input_file_name,
+                                const std::string &input_file_name,
                                 std::vector<double> &counts_hist,
                                 std::size_t &current_count) {
   // check if reads are sorted
@@ -150,7 +145,7 @@ is_ready_to_pop(const ReadPQ &pq, const GenomicRegion &gr,
 static void
 empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
          std::size_t &current_count, std::vector<double> &counts_hist,
-         ReadPQ &read_pq, const string &input_file_name) {
+         ReadPQ &read_pq, const std::string &input_file_name) {
   curr_gr = read_pq.top();
   read_pq.pop();
 
@@ -171,7 +166,7 @@ empty_pq(GenomicRegion &curr_gr, GenomicRegion &prev_gr,
 /* this code is for BED file input */
 
 std::size_t
-load_counts_BED_se(const string &input_file_name,
+load_counts_BED_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist) {
   // resize vals_hist
   counts_hist.clear();
@@ -203,7 +198,7 @@ load_counts_BED_se(const string &input_file_name,
 }
 
 std::size_t
-load_counts_BED_pe(const string &input_file_name,
+load_counts_BED_pe(const std::string &input_file_name,
                    std::vector<double> &counts_hist) {
   // resize vals_hist
   counts_hist.clear();
@@ -242,13 +237,14 @@ load_counts_BED_pe(const string &input_file_name,
 
 /* text file input */
 std::size_t
-load_counts(const string &input_file_name, std::vector<double> &counts_hist) {
+load_counts(const std::string &input_file_name,
+            std::vector<double> &counts_hist) {
   std::ifstream in(input_file_name);
   if (!in)
     throw std::runtime_error("problem opening file: " + input_file_name);
 
   std::size_t n_counts = 0;
-  string buffer;
+  std::string buffer;
   while (getline(in, buffer)) {
     if (find(begin(buffer), end(buffer), '\r') != end(buffer))
       throw std::runtime_error("carriage returns in values file "
@@ -256,7 +252,7 @@ load_counts(const string &input_file_name, std::vector<double> &counts_hist) {
 
     std::istringstream iss(buffer);
     if (iss.good()) {
-      double val;
+      double val{};
       iss >> val;
       if (val > 0) {
         const std::size_t count = static_cast<std::size_t>(val);
@@ -277,7 +273,7 @@ load_counts(const string &input_file_name, std::vector<double> &counts_hist) {
 
 // returns number of reads from file containing counts histogram
 std::size_t
-load_histogram(const string &filename, std::vector<double> &counts_hist) {
+load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
   counts_hist.clear();
 
   std::ifstream in(filename);
@@ -286,7 +282,7 @@ load_histogram(const string &filename, std::vector<double> &counts_hist) {
 
   std::size_t n_reads = 0;
   std::size_t line_count = 0ul, prev_read_count = 0ul;
-  string buffer;
+  std::string buffer;
   while (getline(in, buffer)) {
     if (find(begin(buffer), end(buffer), '\r') != end(buffer))
       throw std::runtime_error("carriage returns in histogram file "
@@ -325,7 +321,7 @@ load_histogram(const string &filename, std::vector<double> &counts_hist) {
 // probabilistically split genomic regions into mutiple
 // genomic regions of width equal to bin_size
 static void
-SplitGenomicRegion(const GenomicRegion &inputGR, mt19937 &generator,
+SplitGenomicRegion(const GenomicRegion &inputGR, std::mt19937 &generator,
                    const std::size_t bin_size,
                    std::vector<GenomicRegion> &outputGRs) {
   outputGRs.clear();
@@ -365,7 +361,7 @@ SplitGenomicRegion(const GenomicRegion &inputGR, mt19937 &generator,
 // split a mapped read into multiple genomic regions
 // based on the number of bases in each
 static void
-SplitMappedRead(const MappedRead &inputMR, mt19937 &generator,
+SplitMappedRead(const MappedRead &inputMR, std::mt19937 &generator,
                 const std::size_t bin_size,
                 std::vector<GenomicRegion> &outputGRs) {
   outputGRs.clear();
@@ -411,8 +407,9 @@ SplitMappedRead(const MappedRead &inputMR, mt19937 &generator,
 }
 
 std::size_t
-load_coverage_counts_MR(const string &input_file_name, const std::uint32_t seed,
-                        const std::size_t bin_size, const std::size_t max_width,
+load_coverage_counts_MR(const std::string &input_file_name,
+                        const std::uint32_t seed, const std::size_t bin_size,
+                        const std::size_t max_width,
                         std::vector<double> &coverage_hist) {
   std::mt19937 generator(seed);
 
@@ -462,8 +459,9 @@ load_coverage_counts_MR(const string &input_file_name, const std::uint32_t seed,
 }
 
 std::size_t
-load_coverage_counts_GR(const string &input_file_name, const std::uint32_t seed,
-                        const std::size_t bin_size, const std::size_t max_width,
+load_coverage_counts_GR(const std::string &input_file_name,
+                        const std::uint32_t seed, const std::size_t bin_size,
+                        const std::size_t max_width,
                         std::vector<double> &coverage_hist) {
   std::mt19937 generator(seed);
 
@@ -516,11 +514,6 @@ not_mapped(const bamxx::bam_rec &aln) {
   return get_tid(aln) == -1;
 }
 
-static inline void
-swap(bamxx::bam_rec &a, bamxx::bam_rec &b) {
-  std::swap(a.b, b.b);
-}
-
 struct aln_pos {
   int32_t tid{};
   hts_pos_t pos{};
@@ -570,7 +563,7 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
                                  std::size_t &current_count) {
   if (prev != curr) {
     // next read is new, update counts_hist to include current_count
-    if (size(counts_hist) < current_count + 1) {
+    if (std::size(counts_hist) < current_count + 1) {
       // histogram is too small, resize
       counts_hist.resize(current_count + 1, 0.0);
     }
@@ -583,7 +576,7 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
 
 template <typename aln_pos_t>
 std::size_t
-load_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
+load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
                 std::vector<double> &counts_hist) {
   bamxx::bam_tpool tp(n_threads);
 
@@ -637,7 +630,7 @@ load_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
   }
 
   // account for the last read
-  if (size(counts_hist) < current_count + 1)
+  if (std::size(counts_hist) < current_count + 1)
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
 
@@ -645,13 +638,13 @@ load_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
 }
 
 std::size_t
-load_counts_BAM_se(const std::uint32_t n_threads, const string &inputfile,
+load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile,
                    std::vector<double> &counts_hist) {
   return load_counts_BAM<aln_pos>(n_threads, inputfile, counts_hist);
 }
 
 std::size_t
-load_counts_BAM_pe(const std::uint32_t n_threads, const string &inputfile,
+load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile,
                    std::vector<double> &counts_hist) {
   return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
 }
@@ -673,7 +666,7 @@ struct genomic_interval {
 };
 
 static inline std::uint32_t
-size(const genomic_interval &gi) {
+width(const genomic_interval &gi) {
   return gi.stop - gi.start;
 }
 
@@ -689,7 +682,7 @@ round_prob(const T x, const std::uint32_t bin_size, const double frac) {
 // split a mapped read into multiple genomic intervals based on the
 // number of base pairs in each
 static void
-split_genomic_interval(const genomic_interval &gi, mt19937 &generator,
+split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
                        const hts_pos_t bin_size, std::vector<aln_pos> &output) {
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
@@ -726,8 +719,9 @@ update_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the
 // first mate for each mapped read
 std::size_t
-load_coverage_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
-                         const std::uint32_t seed, const std::size_t bin_size,
+load_coverage_counts_BAM(const std::uint32_t n_threads,
+                         const std::string &inputfile, const std::uint32_t seed,
+                         const std::size_t bin_size,
                          const std::size_t max_width,
                          std::vector<double> &coverage_hist) {
   std::mt19937 generator(seed);
@@ -780,9 +774,9 @@ load_coverage_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
       chroms_seen[curr.tid] = true;
     }
 
-    if (size(curr) > max_width)
-      throw std::runtime_error("read " + string(bam_get_qname(aln)) +
-                               " covers " + std::to_string(size(curr)) +
+    if (width(curr) > max_width)
+      throw std::runtime_error("read " + std::string(bam_get_qname(aln)) +
+                               " covers " + std::to_string(width(curr)) +
                                "bp; increase max width or reconsider data");
 
     parts.clear();  // need new vec, but keep capacity
@@ -817,3 +811,5 @@ load_coverage_counts_BAM(const std::uint32_t n_threads, const string &inputfile,
 }
 
 #endif  // HAVE_HTSLIB
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions,*-avoid-do-while)

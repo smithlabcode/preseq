@@ -31,6 +31,8 @@ using std::min;
 using std::pow;
 using std::vector;
 
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+
 // ADS: the std::pow function is used frequently to get (-1)^x for
 // integer x. This doesn't make sense, and should be replaced at some
 // point.
@@ -277,8 +279,11 @@ ContinuedFraction::extrapolate_distinct(const double max_value,
                                         vector<double> &estimates) const {
   estimates.clear();
   estimates.push_back(0);
-  for (double t = step_size; t <= max_value; t += step_size)
-    estimates.push_back(t * operator()(t));
+  double t{step_size};
+  while (t <= max_value) {
+    estimates.push_back(t * evaluate(t));
+    t += step_size;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -353,3 +358,5 @@ CFA::optimal_cont_frac_distinct(const vector<double> &counts_hist) const {
   // no stable continued fraction: return null
   return ContinuedFraction();
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
