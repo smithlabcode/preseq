@@ -34,7 +34,7 @@ sufficient for every example application we have seen.
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -58,8 +58,10 @@ using std::to_string;
 using std::uint32_t;
 using std::vector;
 
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+
 int
-pop_size_main(int argc, char *argv[]) {
+pop_size_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
   try {
     static const std::size_t min_required_counts = 4;
     static const string min_required_counts_error_message =
@@ -128,7 +130,7 @@ pop_size_main(int argc, char *argv[]) {
 
     if (argc < 3) {
       // std::println("{}", app.help());
-      std::cout << app.help() << std::endl;
+      std::cout << app.help() << '\n';
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
@@ -295,3 +297,5 @@ pop_size_main(int argc, char *argv[]) {
   }
   return EXIT_SUCCESS;
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)

@@ -57,7 +57,7 @@ main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
   }
 
-  static const std::string cmd = argv[1];
+  static const std::string cmd = argv[1];  // NOLINT(*-pointer-arithmetic)
 
   if (cmd == "lc_extrap")
     return lc_extrap_main(argc - 1, argv + 1);
@@ -74,7 +74,9 @@ main(int argc, char *argv[]) {
   if (cmd == "pop_size")
     return pop_size_main(argc - 1, argv + 1);
 
-  std::cerr << "Error: unrecognized command: " << argv[1] << '\n'
+  std::cerr << "Error: unrecognized command: "
+            << argv[1]  // NOLINT(*-pointer-arithmetic)
+            << '\n'
             << usage_message() << '\n';
 
   return EXIT_FAILURE;

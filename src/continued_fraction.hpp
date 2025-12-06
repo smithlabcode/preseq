@@ -31,8 +31,14 @@ struct ContinuedFraction {
                     const size_t dg);
 
   // Evaluate the continued fraction
-  double
+  [[nodiscard]] double
   operator()(const double val) const;
+
+  // Evaluate the continued fraction
+  [[nodiscard]] double
+  evaluate(const double val) const {
+    return (*this)(val);
+  };
 
   //////////////////////////////////////////
   // Extrapolation functions

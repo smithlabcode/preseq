@@ -35,7 +35,7 @@ purposes since then.
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11.hpp"
+#include "CLI11/CLI11.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -50,36 +50,27 @@ purposes since then.
 #include <string>
 #include <vector>
 
-using std::begin;
-using std::cbegin;
-using std::cend;
-using std::end;
-using std::runtime_error;
-using std::size_t;
-using std::string;
-using std::to_string;
-using std::uint32_t;
-using std::vector;
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
 int
-lc_extrap_main(int argc, char *argv[]) {
+lc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
   try {
-    static const size_t min_required_counts = 4;
-    static const string min_required_counts_error_message =
+    static const std::size_t min_required_counts = 4;
+    static const std::string min_required_counts_error_message =
       "max count before zero is less than min required count (" +
-      to_string(min_required_counts) + ") duplicates removed";
+      std::to_string(min_required_counts) + ") duplicates removed";
 
-    string outfile;
-    string input_file_name;
-    string histogram_outfile;
+    std::string outfile;
+    std::string input_file_name;
+    std::string histogram_outfile;
 
-    size_t orig_max_terms = 100;
+    std::size_t orig_max_terms = 100;
     double max_extrap = 1.0e10;
     double step_size = 1e6;
-    size_t n_bootstraps = 100;
+    std::size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    uint32_t seed = 408;
+    std::uint32_t seed = 408;
 
     /* FLAGS */
     bool verbose = false;
@@ -91,8 +82,8 @@ lc_extrap_main(int argc, char *argv[]) {
 
 #ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
-    size_t MAX_SEGMENT_LENGTH = 5000;
-    uint32_t n_threads{1};
+    std::size_t MAX_SEGMENT_LENGTH = 5000;
+    std::uint32_t n_threads{1};
 #endif
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
@@ -134,13 +125,13 @@ lc_extrap_main(int argc, char *argv[]) {
 
     if (argc < 3) {
       // std::println("{}", app.help());
-      std::cout << app.help() << std::endl;
+      std::cout << app.help() << '\n';
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
 
-    vector<double> counts_hist;
-    size_t n_reads = 0;
+    std::vector<double> counts_hist;
+    std::size_t n_reads = 0;
 
     /************ loading input ***************************************/
     if (HIST_INPUT) {
@@ -179,12 +170,12 @@ lc_extrap_main(int argc, char *argv[]) {
     }
     /************ done loading input **********************************/
 
-    const size_t max_observed_count = std::size(counts_hist) - 1;
+    const std::size_t max_observed_count = std::size(counts_hist) - 1;
     const double distinct_reads =
-      std::accumulate(cbegin(counts_hist), cend(counts_hist), 0.0);
+      std::accumulate(std::cbegin(counts_hist), std::cend(counts_hist), 0.0);
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    size_t first_zero = 1;
+    std::size_t first_zero = 1;
     while (first_zero < std::size(counts_hist) && counts_hist[first_zero] > 0)
       ++first_zero;
 
@@ -192,8 +183,8 @@ lc_extrap_main(int argc, char *argv[]) {
     orig_max_terms = std::min(orig_max_terms, first_zero - 1);
     orig_max_terms = orig_max_terms - (orig_max_terms % 2 == 1);
 
-    const size_t distinct_counts =
-      std::count_if(cbegin(counts_hist), cend(counts_hist),
+    const std::size_t distinct_counts =
+      std::count_if(std::cbegin(counts_hist), std::cend(counts_hist),
                     [](const double x) { return x > 0.0; });
 
     if (verbose)
@@ -210,16 +201,17 @@ lc_extrap_main(int argc, char *argv[]) {
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
     if (two_fold_extrap < 0.0)
-      throw runtime_error("Saturation expected at double initial sample size. "
-                          "Unable to extrapolate.");
+      throw std::runtime_error(
+        "Saturation expected at double initial sample size. "
+        "Unable to extrapolate.");
 
     // check that min required count is satisfied
     if (orig_max_terms < min_required_counts)
-      throw runtime_error(min_required_counts_error_message);
+      throw std::runtime_error(min_required_counts_error_message);
 
     if (verbose)
       std::cerr << "[ESTIMATING YIELD CURVE]\n";
-    vector<double> yield_estimates;
+    std::vector<double> yield_estimates;
 
     if (SINGLE_ESTIMATE) {
       const bool single_estimate_success = extrap_single_estimate(
@@ -227,7 +219,7 @@ lc_extrap_main(int argc, char *argv[]) {
         step_size, max_extrap, yield_estimates);
       // exit on failure
       if (!single_estimate_success)
-        throw runtime_error(
+        throw std::runtime_error(
           "single estimate failed, run full mode for estimates");
 
       std::ofstream of;
@@ -240,16 +232,16 @@ lc_extrap_main(int argc, char *argv[]) {
       out.precision(1);
 
       out << 0 << '\t' << 0 << '\n';
-      for (size_t i = 0; i < std::size(yield_estimates); ++i)
+      for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
     }
     else {
       if (verbose)
         std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
-      const size_t max_iter = 100 * n_bootstraps;
+      const std::size_t max_iter = 100 * n_bootstraps;
 
-      vector<vector<double>> bootstrap_estimates;
+      std::vector<std::vector<double>> bootstrap_estimates;
       extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
                        orig_max_terms, diagonal, step_size, max_extrap,
                        max_iter, bootstrap_estimates);
@@ -257,7 +249,7 @@ lc_extrap_main(int argc, char *argv[]) {
       if (verbose)
         std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
       // yield ci
-      vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
+      std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
 
@@ -275,3 +267,5 @@ lc_extrap_main(int argc, char *argv[]) {
   }
   return EXIT_SUCCESS;
 }
+
+// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
