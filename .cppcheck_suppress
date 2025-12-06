@@ -27,6 +27,7 @@ unusedStructMember
 missingInclude
 # Exclude external files
 *:*smithlab_cpp*
+*:*CLI11.hpp
 # Problem caused by external files
 toomanyconfigs
 # More problems caused by external files -- with too many ifdefs
