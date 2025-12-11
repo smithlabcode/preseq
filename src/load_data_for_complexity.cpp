@@ -24,7 +24,6 @@
 
 #include <GenomicRegion.hpp>
 #include <MappedRead.hpp>
-#include <smithlab_utils.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -45,7 +44,7 @@
 #include <htslib/sam.h>
 #endif
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTBEGIN(*-narrowing-conversions)
 
 static bool
 update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
@@ -275,7 +274,7 @@ load_counts(const std::string &input_file_name,
       }
       else if (val != 0)
         throw std::runtime_error("problem reading file at line " +
-                                 toa(n_counts + 1));
+                                 std::to_string(n_counts + 1));
     }
     in.peek();
   }
@@ -306,12 +305,12 @@ load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
     // error reading input
     if (!(is >> read_count >> frequency))
       throw std::runtime_error("bad histogram line format:\n" + buffer + "\n" +
-                               "(line " + toa(line_count) + ")");
+                               "(line " + std::to_string(line_count) + ")");
 
     // histogram is out of order?
     if (read_count < prev_read_count)
       throw std::runtime_error("bad line order in file " + filename + "\n" +
-                               "(line " + toa(line_count) + ")");
+                               "(line " + std::to_string(line_count) + ")");
     counts_hist.resize(read_count + 1, 0.0);
     counts_hist[read_count] = frequency;
     if (read_count == 0ul) {
@@ -325,17 +324,13 @@ load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
   return n_reads;
 }
 
-/////////////////////////////////////////////////////////
 // Loading coverage counts
-////////////////////////////////////////////////////////
 
-// probabilistically split genomic regions into mutiple
-// genomic regions of width equal to bin_size
+// probabilistically split genomic regions into mutiple genomic regions of
+// width equal to bin_size
 [[nodiscard]] static auto
-split_genomic_region(const GenomicRegion &inputGR, std::mt19937 &generator,
+split_genomic_region(GenomicRegion gr, std::mt19937 &generator,
                      const std::size_t bin_size) -> std::vector<GenomicRegion> {
-  GenomicRegion gr(inputGR);
-
   const auto frac = static_cast<double>(gr.get_start() % bin_size) / bin_size;
   const auto width = gr.get_width();
 
@@ -357,20 +352,18 @@ split_genomic_region(const GenomicRegion &inputGR, std::mt19937 &generator,
   return outputGRs;
 }
 
-// split a mapped read into multiple genomic regions
-// based on the number of bases in each
+// split a mapped read into multiple genomic regions based on the number of
+// bases in each
 [[nodiscard]] static auto
-SplitMappedRead(const MappedRead &inputMR, std::mt19937 &generator,
+SplitMappedRead(const MappedRead &mr, std::mt19937 &generator,
                 const std::size_t bin_size) -> std::vector<GenomicRegion> {
-  outputGRs.clear();
-
   std::size_t covered_bases{};
-  std::size_t read_idx{inputMR.r.get_start()};
+  std::size_t read_idx{mr.r.get_start()};
   std::size_t seq_idx{};
 
   std::vector<GenomicRegion> outputGRs;
-  while (seq_idx < std::size(inputMR.seq)) {
-    if (inputMR.seq[seq_idx] != 'N')
+  while (seq_idx < std::size(mr.seq)) {
+    if (mr.seq[seq_idx] != 'N')
       ++covered_bases;
 
     // if we reach the end of a bin, probabilistically create a binned read
@@ -381,9 +374,9 @@ SplitMappedRead(const MappedRead &inputMR, std::mt19937 &generator,
       if (dist(generator) <= frac) {
         const std::size_t curr_start = read_idx - (read_idx % bin_size);
         const std::size_t curr_end = curr_start + bin_size;
-        outputGRs.emplace_back(inputMR.r.get_chrom(), curr_start, curr_end,
-                               inputMR.r.get_name(), inputMR.r.get_score(),
-                               inputMR.r.get_strand());
+        outputGRs.emplace_back(mr.r.get_chrom(), curr_start, curr_end,
+                               mr.r.get_name(), mr.r.get_score(),
+                               mr.r.get_strand());
       }
       covered_bases = 0;
     }
@@ -396,10 +389,11 @@ SplitMappedRead(const MappedRead &inputMR, std::mt19937 &generator,
   if (dist(generator) <= frac) {
     const std::size_t curr_start = read_idx - (read_idx % bin_size);
     const std::size_t curr_end = curr_start + bin_size;
-    outputGRs.emplace_back(inputMR.r.get_chrom(), curr_start, curr_end,
-                           inputMR.r.get_name(), inputMR.r.get_score(),
-                           inputMR.r.get_strand());
+    outputGRs.emplace_back(mr.r.get_chrom(), curr_start, curr_end,
+                           mr.r.get_name(), mr.r.get_score(),
+                           mr.r.get_strand());
   }
+  return outputGRs;
 }
 
 std::size_t
@@ -425,7 +419,7 @@ load_coverage_counts_MR(const std::string &input_file_name,
     const MappedRead mr(line);
     if (mr.r.get_width() > max_width)
       throw std::runtime_error("Encountered read of width " +
-                               toa(mr.r.get_width()) +
+                               std::to_string(mr.r.get_width()) +
                                "max_width set too small");
 
     const auto splitGRs = SplitMappedRead(mr, generator, bin_size);
@@ -492,7 +486,6 @@ load_coverage_counts_GR(const std::string &infile, const std::uint32_t seed,
 }
 
 #ifdef HAVE_HTSLIB
-// Deal with SAM/BAM format only if we have htslib
 
 static inline bool
 not_mapped(const bamxx::bam_rec &aln) {
@@ -500,10 +493,10 @@ not_mapped(const bamxx::bam_rec &aln) {
 }
 
 struct aln_pos {
-  int32_t tid{};
+  std::int32_t tid{};
   hts_pos_t pos{};
   aln_pos() = default;
-  aln_pos(const int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
+  aln_pos(const std::int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
   explicit aln_pos(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)} {}
   bool
@@ -522,9 +515,9 @@ struct aln_pos {
 };
 
 struct aln_pos_pair {
-  int32_t tid{};
+  std::int32_t tid{};
   hts_pos_t pos{};
-  int32_t mtid{};
+  std::int32_t mtid{};
   hts_pos_t mpos{};
   explicit aln_pos_pair(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
@@ -635,7 +628,7 @@ load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile,
 }
 
 struct genomic_interval {
-  int32_t tid{};  // indicates uninitialized
+  std::int32_t tid{};  // indicates uninitialized
   hts_pos_t start{};
   hts_pos_t stop{};
   bool
@@ -664,8 +657,8 @@ round_prob(const T x, const std::uint32_t bin_size, const double frac) {
   return frac < (x - lo) ? lo : hi;
 }
 
-// split a mapped read into multiple genomic intervals based on the
-// number of base pairs in each
+// split a mapped read into multiple genomic intervals based on the number of
+// base pairs in each
 static void
 split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
                        const hts_pos_t bin_size, std::vector<aln_pos> &output) {
@@ -797,4 +790,4 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
 
 #endif  // HAVE_HTSLIB
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTEND(*-narrowing-conversions)
