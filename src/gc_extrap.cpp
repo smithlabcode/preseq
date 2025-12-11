@@ -108,10 +108,9 @@ gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t seed = 408;
     bool allow_defects = false;
 
-    bool NO_SEQUENCE = false;
     double c_level = 0.95;
-#ifdef HAVE_HTSLIB
     bool BAM_FORMAT_INPUT = false;
+#ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
 #endif
     CLI::App app{rlstrip(about_msg)};
@@ -141,7 +140,6 @@ gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
 #endif
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_flag("-B,--bed", NO_SEQUENCE, "input is in bed format without sequence information");
     app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
                  "quick mode: run gc_extrap without bootstrapping for confidence intervals");
     app.add_flag("-D,--defects", allow_defects,
@@ -156,31 +154,21 @@ gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
-    std::vector<double> coverage_hist;
-    std::size_t n_reads = 0;
+    const auto input_format = BAM_FORMAT_INPUT ? "BAM" : "BED";
     if (verbose)
-      std::cerr << "LOADING READS\n";
+      std::cerr << "LOADING READS (" << input_format << "format)\n";
 
-    if (NO_SEQUENCE) {
-      if (verbose)
-        std::cerr << "BED FORMAT\n";
-      n_reads = load_coverage_counts_GR(infile, seed, bin_size, max_width,
-                                        coverage_hist);
-    }
+    std::vector<double> coverage_hist;
+    const auto n_reads = [&] {
 #ifdef HAVE_HTSLIB
-    else if (BAM_FORMAT_INPUT) {
-      if (verbose)
-        std::cerr << "BAM_INPUT\n";
-      n_reads = load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
-                                         max_width, coverage_hist);
-    }
+      if (BAM_FORMAT_INPUT)
+        return load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
+                                        max_width, coverage_hist);
+      else
 #endif
-    else {
-      if (verbose)
-        std::cerr << "MAPPED READ FORMAT\n";
-      n_reads = load_coverage_counts_MR(infile, seed, bin_size, max_width,
-                                        coverage_hist);
-    }
+        return load_coverage_counts(infile, seed, bin_size, max_width,
+                                    coverage_hist);
+    }();
 
     const auto total_bins = get_counts_from_hist(coverage_hist);
     const auto distinct_bins = std::accumulate(std::cbegin(coverage_hist),
