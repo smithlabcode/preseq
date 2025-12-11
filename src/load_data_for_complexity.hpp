@@ -22,17 +22,11 @@
 #include <string>
 #include <vector>
 
-auto
-load_coverage_counts_MR(const std::string &input_file_name,
-                        const std::uint64_t seed, const std::size_t bin_size,
-                        const std::size_t max_width,
-                        std::vector<double> &coverage_hist) -> std::size_t;
-
-auto
-load_coverage_counts_GR(const std::string &input_file_name,
-                        const std::uint64_t seed, const std::size_t bin_size,
-                        const std::size_t max_width,
-                        std::vector<double> &coverage_hist) -> std::size_t;
+std::size_t
+load_coverage_counts(const std::string &input_file_name,
+                     const std::uint32_t seed, const std::size_t bin_size,
+                     const std::size_t max_width,
+                     std::vector<double> &coverage_hist);
 
 auto
 load_histogram(const std::string &filename,
@@ -42,13 +36,13 @@ auto
 load_counts(const std::string &input_file_name,
             std::vector<double> &counts_hist) -> std::size_t;
 
-auto
-load_counts_BED_pe(const std::string input_file_name,
-                   std::vector<double> &counts_hist) -> std::size_t;
+std::size_t
+load_counts_bed_pe(const std::string &input_file_name,
+                   std::vector<double> &counts_hist);
 
-auto
-load_counts_BED_se(const std::string input_file_name,
-                   std::vector<double> &counts_hist) -> std::size_t;
+std::size_t
+load_counts_bed_se(const std::string &input_file_name,
+                   std::vector<double> &counts_hist);
 
 #ifdef HAVE_HTSLIB
 auto
