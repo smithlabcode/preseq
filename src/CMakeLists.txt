@@ -20,10 +20,8 @@ find_package(Threads REQUIRED)
 
 if(USE_HTSLIB)
   add_compile_definitions(HAVE_HTSLIB)
+  add_subdirectory(bamxx)
 endif()
-
-add_subdirectory(bamxx)
-add_subdirectory(smithlab_cpp)
 
 add_executable(preseq
   preseq.cpp
@@ -36,6 +34,7 @@ add_executable(preseq
   load_data_for_complexity.cpp
   moment_sequence.cpp
   pop_size.cpp
+  Interval6.cpp
 )
 if(USE_HTSLIB)
   target_sources(preseq PRIVATE bam_record_utils.cpp)
@@ -43,9 +42,6 @@ endif()
 
 # ADS: below, for config.h
 target_include_directories(preseq PUBLIC ${CMAKE_BINARY_DIR})
-target_link_libraries(preseq PUBLIC
-  smithlab_cpp
-)
 if(USE_HTSLIB)
   target_link_libraries(preseq PUBLIC
     bamxx
