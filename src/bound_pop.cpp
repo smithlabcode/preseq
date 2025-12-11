@@ -179,12 +179,12 @@ bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
     else if (PAIRED_END) {
       if (verbose)
         std::cerr << "PAIRED_END_BED_INPUT\n";
-      n_obs = load_counts_BED_pe(input_file_name, counts_hist);
+      n_obs = load_counts_bed_pe(input_file_name, counts_hist);
     }
     else {  // default is single end bed file
       if (verbose)
         std::cerr << "BED_INPUT\n";
-      n_obs = load_counts_BED_se(input_file_name, counts_hist);
+      n_obs = load_counts_bed_se(input_file_name, counts_hist);
     }
 
     const double distinct_obs =
