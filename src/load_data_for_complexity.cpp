@@ -19,8 +19,7 @@
 
 #include "load_data_for_complexity.hpp"
 
-#include <GenomicRegion.hpp>
-#include <MappedRead.hpp>
+#include "Interval6.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -28,6 +27,7 @@
 #include <fstream>
 #include <functional>  // IWYU pragma: keep
 #include <iterator>
+#include <numeric>
 #include <queue>
 #include <random>
 #include <sstream>
@@ -43,22 +43,25 @@
 
 // NOLINTBEGIN(*-narrowing-conversions)
 
+template <typename T>
+[[nodiscard]] static inline auto
+width(const T &x) -> std::uint32_t {
+  return x.stop - x.start;
+}
+
 static bool
-update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
-                                const GenomicRegion &prev_gr,
+update_pe_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
                                 std::vector<double> &counts_hist,
                                 std::size_t &current_count) {
   // check if reads are sorted
-  if (curr_gr.same_chrom(prev_gr) &&
-      curr_gr.get_start() < prev_gr.get_start() &&
-      curr_gr.get_end() < prev_gr.get_end()) {
+  if (curr.chrom == prev.chrom && curr.start < prev.start &&
+      curr.stop < prev.stop)
     return false;
-  }
-  // check if next read is new, and if so update counts_hist to
-  // include current_count
-  if (!curr_gr.same_chrom(prev_gr) ||
-      curr_gr.get_start() != prev_gr.get_start() ||
-      curr_gr.get_end() != prev_gr.get_end()) {
+
+  // check if next read is new, and if so update counts_hist to include
+  // current_count
+  if (curr.chrom != prev.chrom || curr.start != prev.start ||
+      curr.stop != prev.stop) {
     // histogram is too small, resize
     if (std::size(counts_hist) < current_count + 1)
       counts_hist.resize(current_count + 1, 0.0);
@@ -72,17 +75,15 @@ update_pe_duplicate_counts_hist(const GenomicRegion &curr_gr,
 }
 
 static void
-update_se_duplicate_counts_hist(const GenomicRegion &curr_gr,
-                                const GenomicRegion &prev_gr,
+update_se_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
                                 const std::string &input_file_name,
                                 std::vector<double> &counts_hist,
                                 std::size_t &current_count) {
   // check if reads are sorted
-  if (curr_gr.same_chrom(prev_gr) && curr_gr.get_start() < prev_gr.get_start())
+  if (curr.chrom == prev.chrom && curr.start < prev.start)
     throw std::runtime_error("locations unsorted in: " + input_file_name);
 
-  if (!curr_gr.same_chrom(prev_gr) ||
-      curr_gr.get_start() != prev_gr.get_start()) {
+  if (curr.chrom != prev.chrom || curr.start != prev.start) {
     // next read is new, update counts_hist to include current_count
     // histogram is too small, resize
     if (std::size(counts_hist) < current_count + 1)
@@ -94,77 +95,49 @@ update_se_duplicate_counts_hist(const GenomicRegion &curr_gr,
     ++current_count;
 }
 
-// comparison function for priority queue
-
-/**************** FOR CLARITY BELOW WHEN COMPARING READS *************/
-static inline bool
-chrom_greater(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_chrom() > b.get_chrom();
-}
-static inline bool
-same_start(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_start() == b.get_start();
-}
-static inline bool
-start_greater(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_start() > b.get_start();
-}
-static inline bool
-end_greater(const GenomicRegion &a, const GenomicRegion &b) {
-  return a.get_end() > b.get_end();
-}
-/******************************************************************************/
-
-struct GenomicRegionOrderChecker {
+struct Interval6OrderChecker {
   bool
-  operator()(const GenomicRegion &prev, const GenomicRegion &gr) const {
-    return start_check(prev, gr);
-  }
-  static bool
-  start_check(const GenomicRegion &prev, const GenomicRegion &gr) {
-    return (
-      chrom_greater(prev, gr) ||
-      (prev.same_chrom(gr) && start_greater(prev, gr)) ||
-      (prev.same_chrom(gr) && same_start(prev, gr) && end_greater(prev, gr)));
+  operator()(const Interval6 &prev, const Interval6 &curr) const {
+    return curr < prev;  // prev > curr
   }
 };
 
-typedef std::priority_queue<GenomicRegion, std::vector<GenomicRegion>,
-                            GenomicRegionOrderChecker>
+typedef std::priority_queue<Interval6, std::vector<Interval6>,
+                            Interval6OrderChecker>
   ReadPQ;
 
 static bool
-is_ready_to_pop(const ReadPQ &pq, const GenomicRegion &gr,
+is_ready_to_pop(const ReadPQ &pq, const Interval6 &interval,
                 const std::size_t max_width) {
-  return !pq.top().same_chrom(gr) ||
-         pq.top().get_end() + max_width < gr.get_start();
+  return pq.top().chrom != interval.chrom ||
+         pq.top().stop + max_width < interval.start;
 }
 
 static void
-empty_pq(GenomicRegion &prev_gr, std::size_t &current_count,
+empty_pq(Interval6 &prev, std::size_t &current_count,
          std::vector<double> &counts_hist, ReadPQ &read_pq,
          const std::string &input_file_name) {
-  const auto curr_gr = read_pq.top();
+  const auto curr = read_pq.top();
   read_pq.pop();
 
   // update counts hist
-  const bool UPDATE_SUCCESS = update_pe_duplicate_counts_hist(
-    curr_gr, prev_gr, counts_hist, current_count);
-  if (!UPDATE_SUCCESS) {
+  const bool update_success =
+    update_pe_duplicate_counts_hist(curr, prev, counts_hist, current_count);
+  if (!update_success) {
     std::ostringstream oss;
     oss << "reads unsorted in: " << input_file_name << "\n"
-        << "prev = \t" << prev_gr << "\n"
-        << "curr = \t" << curr_gr << "\n"
+        << "prev = \t" << to_string(prev) << "\n"
+        << "curr = \t" << to_string(curr) << "\n"
         << "Increase seg_len if in paired end mode";
     throw std::runtime_error(oss.str());
   }
-  prev_gr = curr_gr;
+  prev = curr;
 }
 
 /* this code is for BED file input */
 
 std::size_t
-load_counts_BED_se(const std::string &input_file_name,
+load_counts_bed_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist) {
   // resize vals_hist
   counts_hist.clear();
@@ -174,17 +147,17 @@ load_counts_BED_se(const std::string &input_file_name,
   if (!in)
     throw std::runtime_error("problem opening file: " + input_file_name);
 
-  GenomicRegion curr_gr, prev_gr;
-  if (!(in >> prev_gr))
-    throw std::runtime_error("problem opening file: " + input_file_name);
+  std::size_t n_reads{};
+  std::size_t current_count{};
 
-  std::size_t n_reads = 1;
-  std::size_t current_count = 1;
-  while (in >> curr_gr) {
-    update_se_duplicate_counts_hist(curr_gr, prev_gr, input_file_name,
-                                    counts_hist, current_count);
+  Interval6 prev;
+  std::string line;
+  while (std::getline(in, line)) {
+    const auto curr = Interval6(line);
+    update_se_duplicate_counts_hist(curr, prev, input_file_name, counts_hist,
+                                    current_count);
     ++n_reads;
-    prev_gr.swap(curr_gr);
+    prev = curr;
   }
 
   // to account for the last read compared to the one before it.
@@ -196,7 +169,7 @@ load_counts_BED_se(const std::string &input_file_name,
 }
 
 std::size_t
-load_counts_BED_pe(const std::string &input_file_name,
+load_counts_bed_pe(const std::string &input_file_name,
                    std::vector<double> &counts_hist) {
   // resize vals_hist
   counts_hist.clear();
@@ -206,22 +179,21 @@ load_counts_BED_pe(const std::string &input_file_name,
   if (!in)
     throw std::runtime_error("problem opening file: " + input_file_name);
 
-  GenomicRegion curr_gr, prev_gr;
-  if (!(in >> prev_gr))
-    throw std::runtime_error("problem opening file: " + input_file_name);
+  std::size_t n_reads{};
+  std::size_t current_count{};
 
-  std::size_t n_reads = 1;
-  std::size_t current_count = 1;
+  Interval6 prev;
+  std::string line;
 
   // read in file and compare each gr with the one before it
-  while (in >> curr_gr) {
-    const bool UPDATE_SUCCESS = update_pe_duplicate_counts_hist(
-      curr_gr, prev_gr, counts_hist, current_count);
-    if (!UPDATE_SUCCESS)
+  while (std::getline(in, line)) {
+    const auto curr = Interval6(line);
+    const bool update_success =
+      update_pe_duplicate_counts_hist(curr, prev, counts_hist, current_count);
+    if (!update_success)
       throw std::runtime_error("reads unsorted in " + input_file_name);
-
     ++n_reads;
-    prev_gr.swap(curr_gr);
+    prev = curr;
   }
 
   if (std::size(counts_hist) < current_count + 1)
@@ -233,40 +205,26 @@ load_counts_BED_pe(const std::string &input_file_name,
   return n_reads;
 }
 
-/* text file input */
 std::size_t
-load_counts(const std::string &input_file_name,
-            std::vector<double> &counts_hist) {
-  std::ifstream in(input_file_name);
+load_counts(const std::string &infile, std::vector<double> &counts_hist) {
+  std::ifstream in(infile);
   if (!in)
-    throw std::runtime_error("problem opening file: " + input_file_name);
+    throw std::runtime_error("failed to open file: " + infile);
 
-  std::size_t n_counts = 0;
-  std::string buffer;
-  while (getline(in, buffer)) {
-    if (find(begin(buffer), end(buffer), '\r') != end(buffer))
-      throw std::runtime_error("carriage returns in values file "
-                               "(suggests dos or mac formatting)");
-
-    std::istringstream iss(buffer);
-    if (iss.good()) {
-      double val{};
-      iss >> val;
-      if (val > 0) {
-        const std::size_t count = static_cast<std::size_t>(val);
-        // histogram is too small, resize
-        if (std::size(counts_hist) < count + 1)
-          counts_hist.resize(count + 1, 0.0);
-        ++counts_hist[count];
-        n_counts += count;
-      }
-      else if (val != 0)
-        throw std::runtime_error("problem reading file at line " +
-                                 std::to_string(n_counts + 1));
-    }
-    in.peek();
+  std::vector<double> vals((std::istream_iterator<double>(in)),
+                           std::istream_iterator<double>());
+  if (vals.empty()) {
+    counts_hist.clear();
+    return 0;
   }
-  return n_counts;
+
+  const auto max_val = *std::max_element(std::cbegin(vals), std::cend(vals));
+  counts_hist = std::vector<double>(max_val + 1, 0.0);
+
+  for (const auto v : vals)
+    ++counts_hist[v];
+
+  return std::accumulate(std::cbegin(vals), std::cend(vals), 0ul);
 }
 
 // returns number of reads from file containing counts histogram
@@ -281,11 +239,7 @@ load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
   std::size_t n_reads = 0;
   std::size_t line_count = 0ul, prev_read_count = 0ul;
   std::string buffer;
-  while (getline(in, buffer)) {
-    if (find(begin(buffer), end(buffer), '\r') != end(buffer))
-      throw std::runtime_error("carriage returns in histogram file "
-                               "(suggests dos or mac formatting)");
-
+  while (std::getline(in, buffer)) {
     ++line_count;
     std::size_t read_count = 0ul;
     double frequency = 0.0;
@@ -314,126 +268,36 @@ load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
 
 // Loading coverage counts
 
-// probabilistically split genomic regions into mutiple genomic regions of
-// width equal to bin_size
+// probabilistically split intervals into mutiple intervals of width
+// equal to bin_size
 [[nodiscard]] static auto
-split_genomic_region(GenomicRegion gr, std::mt19937 &generator,
-                     const std::size_t bin_size) -> std::vector<GenomicRegion> {
-  const auto frac = static_cast<double>(gr.get_start() % bin_size) / bin_size;
-  const auto width = gr.get_width();
+split_genomic_region(Interval6 interval, std::mt19937 &generator,
+                     const std::uint32_t bin_size) -> std::vector<Interval6> {
+  const auto frac = static_cast<double>(interval.start % bin_size) / bin_size;
+  const auto w = width(interval);
 
   // ADS: this seems like a bunch of duplicated code just for a single
   // function difference
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   const auto start_diff = dist(generator) > frac ? 0 : bin_size - 1;
-  gr.set_start(((gr.get_start() + start_diff) / bin_size) * bin_size);
-  gr.set_end(gr.get_start() + width);
+  interval.start = ((interval.start + start_diff) / bin_size) * bin_size;
+  interval.stop = interval.start + w;
 
-  std::vector<GenomicRegion> outputGRs;
-  for (std::size_t i = 0; i < gr.get_width(); i += bin_size) {
-    const std::size_t curr_start = gr.get_start() + i;
-    const double curr_end = std::min(gr.get_end(), curr_start + bin_size);
+  std::vector<Interval6> output;
+  for (auto i = 0u; i < width(interval); i += bin_size) {
+    const std::uint32_t curr_start = interval.start + i;
+    const double curr_end = std::min(interval.stop, curr_start + bin_size);
     if (dist(generator) <= (curr_end - curr_start) / bin_size)
-      outputGRs.emplace_back(gr.get_chrom(), curr_start, curr_start + bin_size,
-                             gr.get_name(), gr.get_score(), gr.get_strand());
+      output.emplace_back(interval.chrom, curr_start, curr_start + bin_size,
+                          interval.name, interval.score, interval.strand);
   }
-  return outputGRs;
-}
-
-// split a mapped read into multiple genomic regions based on the number of
-// bases in each
-[[nodiscard]] static auto
-SplitMappedRead(const MappedRead &mr, std::mt19937 &generator,
-                const std::size_t bin_size) -> std::vector<GenomicRegion> {
-  std::size_t covered_bases{};
-  std::size_t read_idx{mr.r.get_start()};
-  std::size_t seq_idx{};
-
-  std::vector<GenomicRegion> outputGRs;
-  while (seq_idx < std::size(mr.seq)) {
-    if (mr.seq[seq_idx] != 'N')
-      ++covered_bases;
-
-    // if we reach the end of a bin, probabilistically create a binned read
-    // with probability proportional to the number of covered bases
-    if (read_idx % bin_size == bin_size - 1) {
-      const double frac = static_cast<double>(covered_bases) / bin_size;
-      std::uniform_real_distribution<double> dist(0.0, 1.0);
-      if (dist(generator) <= frac) {
-        const std::size_t curr_start = read_idx - (read_idx % bin_size);
-        const std::size_t curr_end = curr_start + bin_size;
-        outputGRs.emplace_back(mr.r.get_chrom(), curr_start, curr_end,
-                               mr.r.get_name(), mr.r.get_score(),
-                               mr.r.get_strand());
-      }
-      covered_bases = 0;
-    }
-    ++seq_idx;
-    ++read_idx;
-  }
-
-  const double frac = static_cast<double>(covered_bases) / bin_size;
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-  if (dist(generator) <= frac) {
-    const std::size_t curr_start = read_idx - (read_idx % bin_size);
-    const std::size_t curr_end = curr_start + bin_size;
-    outputGRs.emplace_back(mr.r.get_chrom(), curr_start, curr_end,
-                           mr.r.get_name(), mr.r.get_score(),
-                           mr.r.get_strand());
-  }
-  return outputGRs;
-}
-
-std::size_t
-load_coverage_counts_MR(const std::string &input_file_name,
-                        const std::uint32_t seed, const std::size_t bin_size,
-                        const std::size_t max_width,
-                        std::vector<double> &coverage_hist) {
-  std::mt19937 generator(seed);
-
-  std::ifstream in(input_file_name);
-  if (!in)
-    throw std::runtime_error("problem opening file: " + input_file_name);
-
-  // prioirty queue to reorder the split reads
-  ReadPQ PQ;
-
-  std::size_t n_reads{};
-  GenomicRegion prev_gr;
-  std::size_t current_count{1};
-
-  std::string line;
-  while (std::getline(in, line)) {
-    const MappedRead mr(line);
-    if (mr.r.get_width() > max_width)
-      throw std::runtime_error("Encountered read of width " +
-                               std::to_string(mr.r.get_width()) +
-                               "max_width set too small");
-
-    const auto splitGRs = SplitMappedRead(mr, generator, bin_size);
-    ++n_reads;
-
-    // add split Genomic Regions to the priority queue
-    for (std::size_t i = 0; i < std::size(splitGRs); i++)
-      PQ.push(splitGRs[i]);
-
-    // remove Genomic Regions from the priority queue
-    if (std::size(splitGRs) > 0)
-      while (!PQ.empty() && is_ready_to_pop(PQ, splitGRs.back(), max_width))
-        empty_pq(prev_gr, current_count, coverage_hist, PQ, input_file_name);
-  }
-
-  // done adding reads, now spit the rest out
-  while (!PQ.empty())
-    empty_pq(prev_gr, current_count, coverage_hist, PQ, input_file_name);
-
-  return n_reads;
+  return output;
 }
 
 [[nodiscard]] auto
-load_coverage_counts_GR(const std::string &infile, const std::uint32_t seed,
-                        const std::size_t bin_size, const std::size_t max_width,
-                        std::vector<double> &coverage_hist) -> std::size_t {
+load_coverage_counts(const std::string &infile, const std::uint32_t seed,
+                     const std::size_t bin_size, const std::size_t max_width,
+                     std::vector<double> &coverage_hist) -> std::size_t {
   std::mt19937 generator(seed);
 
   std::ifstream in(infile);
@@ -443,41 +307,51 @@ load_coverage_counts_GR(const std::string &infile, const std::uint32_t seed,
   // prioirty queue to reorder the split reads
   ReadPQ PQ;
 
-  // prev and current Genomic Regions to compare
-  GenomicRegion prev_gr;
+  Interval6 prev;
   std::size_t n_reads{};
   std::size_t current_count{1};
 
   std::string line;
   while (std::getline(in, line)) {
-    const auto inputGR = GenomicRegion(line);
-    const auto splitGRs = split_genomic_region(inputGR, generator, bin_size);
+    const auto interval = Interval6(line);
+    const auto splits = split_genomic_region(interval, generator, bin_size);
 
-    // add split Genomic Regions to the priority queue
-    for (std::size_t i = 0; i < std::size(splitGRs); i++)
-      PQ.push(splitGRs[i]);
+    // add split intervals to the priority queue
+    for (const auto &i : splits)
+      PQ.push(i);
 
-    if (std::size(splitGRs) > 0) {
-      // remove Genomic Regions from the priority queue
-      while (!PQ.empty() && is_ready_to_pop(PQ, splitGRs.back(), max_width))
-        empty_pq(prev_gr, current_count, coverage_hist, PQ, infile);
+    if (std::size(splits) > 0) {
+      // remove intervals from the priority queue
+      while (!PQ.empty() && is_ready_to_pop(PQ, splits.back(), max_width))
+        empty_pq(prev, current_count, coverage_hist, PQ, infile);
     }
-    n_reads++;
+    ++n_reads;
   }
 
   // done adding reads, now spit the rest out
   while (!PQ.empty())
-    empty_pq(prev_gr, current_count, coverage_hist, PQ, infile);
+    empty_pq(prev, current_count, coverage_hist, PQ, infile);
 
   return n_reads;
 }
 
 #ifdef HAVE_HTSLIB
 
-static inline bool
-not_mapped(const bamxx::bam_rec &aln) {
-  return get_tid(aln) == -1;
-}
+struct genomic_interval {
+  std::int32_t tid{-1};  // indicates uninitialized
+  hts_pos_t start{};
+  hts_pos_t stop{};
+  bool
+  operator<(const genomic_interval &rhs) const {
+    // clang-format off
+    return (tid < rhs.tid ||
+            (tid == rhs.tid &&
+             (start < rhs.start ||
+              (start == rhs.start &&
+               (stop < rhs.stop)))));
+    // clang-format on
+  }
+};
 
 struct aln_pos {
   std::int32_t tid{};
@@ -520,6 +394,36 @@ struct aln_pos_pair {
            mpos != rhs.mpos;
   }
 };
+
+template <typename T>
+[[nodiscard]] static inline T
+round_position(const T x, const std::uint32_t bin_size, const double frac) {
+  // probabilisticly round read ends so they are at bin boundaries
+  const double lo = (x / bin_size) * bin_size;
+  const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
+  return frac < (x - lo) ? lo : hi;
+}
+
+// split a mapped read into multiple genomic intervals based on the number of
+// base pairs in each
+static void
+split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
+                       const hts_pos_t bin_size, std::vector<aln_pos> &output) {
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+  // could shorten or lengthen; postcond: ends are at bin boundaries
+  const hts_pos_t r_start = round_position(gi.start, bin_size, dist(generator));
+  const hts_pos_t r_stop = round_position(gi.stop, bin_size, dist(generator));
+
+  // gather all the parts at bin offsets
+  for (auto pos = r_start; pos < r_stop; pos += bin_size)
+    output.emplace_back(gi.tid, pos);
+}
+
+static inline bool
+not_mapped(const bamxx::bam_rec &aln) {
+  return get_tid(aln) == -1;
+}
 
 template <typename T>
 static inline void
@@ -614,58 +518,6 @@ load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile,
   return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
 }
 
-struct genomic_interval {
-  std::int32_t tid{};  // indicates uninitialized
-  hts_pos_t start{};
-  hts_pos_t stop{};
-  bool
-  operator<(const genomic_interval &rhs) const {
-    // clang-format off
-    return (tid < rhs.tid ||
-            (tid == rhs.tid &&
-             (start < rhs.start ||
-              (start == rhs.start &&
-               (stop < rhs.stop)))));
-    // clang-format on
-  }
-};
-
-static inline std::uint32_t
-width(const genomic_interval &gi) {
-  return gi.stop - gi.start;
-}
-
-template <typename T>
-static inline T
-round_prob(const T x, const std::uint32_t bin_size, const double frac) {
-  // probabilisticly round read ends so they are at bin boundaries
-  const double lo = (x / bin_size) * bin_size;
-  const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
-  return frac < (x - lo) ? lo : hi;
-}
-
-// split a mapped read into multiple genomic intervals based on the number of
-// base pairs in each
-static void
-split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
-                       const hts_pos_t bin_size, std::vector<aln_pos> &output) {
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-
-  // could shorten or lengthen; postcond: ends are at bin boundaries
-  const hts_pos_t r_start = round_prob(gi.start, bin_size, dist(generator));
-  const hts_pos_t r_stop = round_prob(gi.stop, bin_size, dist(generator));
-
-  // gather all the parts at bin offsets
-  for (auto pos = r_start; pos < r_stop; pos += bin_size)
-    output.emplace_back(gi.tid, pos);
-}
-
-template <class T, class U>
-[[nodiscard]] static inline bool
-can_pop(const T &pq, const U &last, const hts_pos_t max_dist) {
-  return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
-}
-
 template <class T>
 static void
 update_coverage_hist(const T &curr, const T &prev,
@@ -681,8 +533,8 @@ update_coverage_hist(const T &curr, const T &prev,
     ++current_count;
 }
 
-// ADS: don't care if mapped reads are SE or PE, we only need the
-// first mate for each mapped read
+// ADS: don't care if mapped reads are SE or PE, we only need the first mate
+// for each mapped read
 std::size_t
 load_coverage_counts_BAM(const std::uint32_t n_threads,
                          const std::string &inputfile, const std::uint32_t seed,
@@ -726,6 +578,10 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
   // full reads being sorted
   const hts_pos_t max_dist = bin_size + max_width;
 
+  const auto can_pop = [&](const auto &last) {
+    return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
+  };
+
   while (hts.read(hdr, aln)) {
     if (not_mapped(aln))
       continue;  // check that read is mapped
@@ -753,7 +609,7 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
       pq.push(i);
 
     // remove genomic interval parts from the priority queue
-    while (!pq.empty() && can_pop(pq, last, max_dist)) {
+    while (!pq.empty() && can_pop(last)) {
       const aln_pos curr_part = pq.top();
       pq.pop();
       // update counts hist
