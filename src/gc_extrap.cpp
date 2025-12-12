@@ -158,16 +158,14 @@ gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     if (verbose)
       std::cerr << "LOADING READS (" << input_format << " format)\n";
 
-    std::vector<double> coverage_hist;
-    const auto n_reads = [&] {
+    const auto [n_reads, coverage_hist] = [&] {
 #ifdef HAVE_HTSLIB
       if (BAM_FORMAT_INPUT)
         return load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
-                                        max_width, coverage_hist);
+                                        max_width);
       else
 #endif
-        return load_coverage_counts(infile, seed, bin_size, max_width,
-                                    coverage_hist);
+        return load_coverage_counts(infile, seed, bin_size, max_width);
     }();
 
     const auto total_bins = get_counts_from_hist(coverage_hist);

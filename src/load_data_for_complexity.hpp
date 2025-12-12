@@ -23,46 +23,48 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
-std::size_t
+[[nodiscard]] auto
 load_coverage_counts(const std::string &input_file_name,
                      const std::uint32_t seed, const std::size_t bin_size,
-                     const std::size_t max_width,
-                     std::vector<double> &coverage_hist);
+                     const std::size_t max_width)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
-load_histogram(const std::string &filename, std::vector<double> &counts_hist);
+[[nodiscard]] auto
+load_histogram(const std::string &filename)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
-load_counts(const std::string &input_file_name,
-            std::vector<double> &counts_hist);
+[[nodiscard]] auto
+load_counts(const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
-load_counts_bed_pe(const std::string &input_file_name,
-                   std::vector<double> &counts_hist);
+[[nodiscard]] auto
+load_counts_bed_pe(const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
-load_counts_bed_se(const std::string &input_file_name,
-                   std::vector<double> &counts_hist);
+[[nodiscard]] auto
+load_counts_bed_se(const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
 #ifdef HAVE_HTSLIB
-std::size_t
+
+[[nodiscard]] auto
 load_counts_BAM_pe(const std::uint32_t n_threads,
-                   const std::string &input_file_name,
-                   std::vector<double> &counts_hist);
+                   const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
+[[nodiscard]] auto
 load_counts_BAM_se(const std::uint32_t n_threads,
-                   const std::string &input_file_name,
-                   std::vector<double> &counts_hist);
+                   const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
-std::size_t
-load_coverage_counts_BAM(const std::uint32_t n_threads,
-                         const std::string &input_file_name,
-                         const std::uint32_t seed, const std::size_t bin_size,
-                         const std::size_t max_width,
-                         std::vector<double> &coverage_hist);
+[[nodiscard]] auto
+load_coverage_counts_BAM(
+  const std::uint32_t n_threads, const std::string &input_file_name,
+  const std::uint32_t seed, const std::size_t bin_size,
+  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>>;
 
 #endif  // HAVE_HTSLIB
 
