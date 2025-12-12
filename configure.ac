@@ -24,11 +24,8 @@ AM_INIT_AUTOMAKE([subdir-objects foreign])
 AC_CONFIG_MACRO_DIR([m4])
 AC_LANG(C++)
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
+AX_CXX_COMPILE_STDCXX(17, [noext], [mandatory])
 AC_PROG_RANLIB
-
-dnl recursively configure smithlab_cpp
-AC_CONFIG_SUBDIRS([src/smithlab_cpp])
 
 dnl check for HTSLib if requested
 hts_fail_msg="
@@ -53,7 +50,7 @@ AC_CONFIG_LINKS([
 tests/md5sum.txt:tests/md5sum.txt
 tests/c_curve_input.hist:tests/data/c_curve_input.hist
 tests/lc_extrap_input.vals:tests/data/lc_extrap_input.vals
-tests/gc_extrap_input.mr:tests/data/gc_extrap_input.mr
+tests/gc_extrap_input.bed:tests/data/gc_extrap_input.bed
 ])
 
 AC_OUTPUT
