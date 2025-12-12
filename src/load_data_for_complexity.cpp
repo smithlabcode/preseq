@@ -36,6 +36,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #ifdef HAVE_HTSLIB
@@ -138,10 +139,10 @@ empty_pq(Interval6 &prev, std::size_t &current_count,
 
 // for BED file input
 
-auto
-load_counts_bed_se(const std::string &input_file_name,
-                   std::vector<double> &counts_hist) -> std::size_t {
-  counts_hist = std::vector<double>(2, 0.0);
+[[nodiscard]] auto
+load_counts_bed_se(const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>> {
+  std::vector<double> counts_hist(2, 0.0);
 
   std::ifstream in(input_file_name);
   if (!in)
@@ -165,15 +166,13 @@ load_counts_bed_se(const std::string &input_file_name,
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
 
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
 auto
-load_counts_bed_pe(const std::string &input_file_name,
-                   std::vector<double> &counts_hist) -> std::size_t {
-  // resize vals_hist
-  counts_hist.clear();
-  counts_hist.resize(2, 0.0);
+load_counts_bed_pe(const std::string &input_file_name)
+  -> std::tuple<std::size_t, std::vector<double>> {
+  std::vector<double> counts_hist(2, 0.0);
 
   std::ifstream in(input_file_name);
   if (!in)
@@ -202,41 +201,40 @@ load_counts_bed_pe(const std::string &input_file_name,
   // to account for the last read compared to the one before it.
   ++counts_hist[current_count];
 
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
-auto
-load_counts(const std::string &infile,
-            std::vector<double> &counts_hist) -> std::size_t {
+[[nodiscard]] auto
+load_counts(const std::string &infile)
+  -> std::tuple<std::size_t, std::vector<double>> {
   std::ifstream in(infile);
   if (!in)
     throw std::runtime_error("failed to open file: " + infile);
 
   std::vector<double> vals((std::istream_iterator<double>(in)),
                            std::istream_iterator<double>());
-  if (vals.empty()) {
-    counts_hist.clear();
-    return 0;
-  }
+  if (vals.empty())
+    return std::make_tuple(0, std::vector<double>{});
 
   const auto max_val = *std::max_element(std::cbegin(vals), std::cend(vals));
-  counts_hist = std::vector<double>(max_val + 1, 0.0);
 
+  std::vector<double> counts_hist(max_val + 1, 0.0);
   for (const auto v : vals)
     ++counts_hist[v];
 
-  return std::accumulate(std::cbegin(vals), std::cend(vals), 0ul);
+  const auto n_reads = std::accumulate(std::cbegin(vals), std::cend(vals), 0ul);
+  return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
 // returns number of reads from file containing counts histogram
-auto
-load_histogram(const std::string &filename,
-               std::vector<double> &counts_hist) -> std::size_t {
-  counts_hist.clear();
-
+[[nodiscard]] auto
+load_histogram(const std::string &filename)
+  -> std::tuple<std::size_t, std::vector<double>> {
   std::ifstream in(filename);
   if (!in)  // if file doesn't open
     throw std::runtime_error("could not open histogram: " + filename);
+
+  std::vector<double> counts_hist;
 
   std::size_t n_reads = 0;
   std::size_t line_count = 0ul, prev_read_count = 0ul;
@@ -265,7 +263,7 @@ load_histogram(const std::string &filename,
     n_reads += static_cast<std::size_t>(read_count * frequency);
   }
 
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
 // Loading coverage counts
@@ -285,21 +283,21 @@ split_genomic_region(Interval6 interval, std::mt19937 &generator,
   interval.start = ((interval.start + start_diff) / bin_size) * bin_size;
   interval.stop = interval.start + w;
 
-  std::vector<Interval6> output;
+  std::vector<Interval6> parts;
   for (auto i = 0u; i < width(interval); i += bin_size) {
     const std::uint32_t curr_start = interval.start + i;
     const double curr_end = std::min(interval.stop, curr_start + bin_size);
     if (dist(generator) <= (curr_end - curr_start) / bin_size)
-      output.emplace_back(interval.chrom, curr_start, curr_start + bin_size,
-                          interval.name, interval.score, interval.strand);
+      parts.emplace_back(interval.chrom, curr_start, curr_start + bin_size,
+                         interval.name, interval.score, interval.strand);
   }
-  return output;
+  return parts;
 }
 
 [[nodiscard]] auto
 load_coverage_counts(const std::string &infile, const std::uint32_t seed,
-                     const std::size_t bin_size, const std::size_t max_width,
-                     std::vector<double> &coverage_hist) -> std::size_t {
+                     const std::size_t bin_size, const std::size_t max_width)
+  -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
   std::ifstream in(infile);
@@ -312,6 +310,8 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
   Interval6 prev;
   std::size_t n_reads{};
   std::size_t current_count{1};
+
+  std::vector<double> coverage_hist;
 
   std::string line;
   while (std::getline(in, line)) {
@@ -334,7 +334,7 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
   while (!pq.empty())
     empty_pq(prev, current_count, coverage_hist, pq, infile);
 
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(coverage_hist));
 }
 
 #ifdef HAVE_HTSLIB
@@ -409,9 +409,9 @@ round_position(const T x, const std::uint32_t bin_size,
 
 // split a mapped read into multiple genomic intervals based on the number of
 // base pairs in each
-static void
+static auto
 split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
-                       const hts_pos_t bin_size, std::vector<aln_pos> &output) {
+                       const hts_pos_t bin_size) -> std::vector<aln_pos> {
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   // could shorten or lengthen; postcond: ends are at bin boundaries
@@ -419,8 +419,10 @@ split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
   const hts_pos_t r_stop = round_position(gi.stop, bin_size, dist(generator));
 
   // gather all the parts at bin offsets
+  std::vector<aln_pos> parts;
   for (auto pos = r_start; pos < r_stop; pos += bin_size)
-    output.emplace_back(gi.tid, pos);
+    parts.emplace_back(gi.tid, pos);
+  return parts;
 }
 
 static inline auto
@@ -448,8 +450,8 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
 
 template <typename aln_pos_t>
 auto
-load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
-                std::vector<double> &counts_hist) -> std::size_t {
+load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile)
+  -> std::tuple<std::size_t, std::vector<double>> {
   bamxx::bam_tpool tp(n_threads);
 
   bamxx::bam_in hts(inputfile);  // assume already checked
@@ -465,10 +467,9 @@ load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
   while (hts.read(hdr, aln) && not_mapped(aln))
     ;
 
-  std::size_t n_reads{};
   // if all reads unmapped, must return
   if (not_mapped(aln))
-    return n_reads;
+    return std::make_tuple(0, std::vector<double>{});
 
   // to check that reads are sorted properly
   std::vector<bool> chroms_seen(get_n_targets(hdr), false);
@@ -477,7 +478,10 @@ load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
   aln_pos_t prev{aln};
 
   // start with count of 1 for first read seen
-  std::size_t current_count = 1;
+  std::size_t n_reads{};
+  std::size_t current_count{1};
+
+  std::vector<double> counts_hist;
 
   while (hts.read(hdr, aln)) {
     if (not_mapped(aln))
@@ -506,19 +510,19 @@ load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
     counts_hist.resize(current_count + 1, 0.0);
   ++counts_hist[current_count];
 
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
-auto
-load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile,
-                   std::vector<double> &counts_hist) -> std::size_t {
-  return load_counts_BAM<aln_pos>(n_threads, inputfile, counts_hist);
+[[nodiscard]] auto
+load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile)
+  -> std::tuple<std::size_t, std::vector<double>> {
+  return load_counts_BAM<aln_pos>(n_threads, inputfile);
 }
 
-auto
-load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile,
-                   std::vector<double> &counts_hist) -> std::size_t {
-  return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
+[[nodiscard]] auto
+load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile)
+  -> std::tuple<std::size_t, std::vector<double>> {
+  return load_counts_BAM<aln_pos_pair>(n_threads, inputfile);
 }
 
 template <class T>
@@ -539,15 +543,14 @@ update_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the first mate
 // for each mapped read
 auto
-load_coverage_counts_BAM(const std::uint32_t n_threads,
-                         const std::string &inputfile, const std::uint32_t seed,
-                         const std::size_t bin_size,
-                         const std::size_t max_width,
-                         std::vector<double> &coverage_hist) -> std::size_t {
+load_coverage_counts_BAM(
+  const std::uint32_t n_threads, const std::string &inputfile,
+  const std::uint32_t seed, const std::size_t bin_size,
+  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);
-  bamxx::bam_in hts(inputfile);  // assume already checked
+  bamxx::bam_in hts(inputfile);
   bamxx::bam_header hdr(hts);
   if (!hdr)
     throw std::runtime_error("failed to read header");
@@ -562,7 +565,7 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
 
   std::size_t n_reads{};
   if (not_mapped(aln))  // no reads unmapped
-    return 0;
+    return {0, {}};
 
   // to check reads are sorted properly
   std::vector<bool> chroms_seen(get_n_targets(hdr), false);
@@ -572,7 +575,6 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
 
   // initialize prioirty queue to reorder the split reads
   std::priority_queue<aln_pos, std::vector<aln_pos>, std::greater<>> pq;
-  std::vector<aln_pos> parts;  // reuse allocated space
   aln_pos prev_part;
   genomic_interval prev;
 
@@ -580,9 +582,7 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
   // sorted and can be processed; not the same as the full reads being sorted
   const hts_pos_t max_dist = bin_size + max_width;
 
-  const auto can_pop = [&](const auto &last) {
-    return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
-  };
+  std::vector<double> coverage_hist;
 
   while (hts.read(hdr, aln)) {
     if (not_mapped(aln))
@@ -602,16 +602,19 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
                                " covers " + std::to_string(width(curr)) +
                                "bp; increase max width or reconsider data");
 
-    parts.clear();  // need new vec, but keep capacity
-    split_genomic_interval(curr, generator, bin_size, parts);
+    const auto parts = split_genomic_interval(curr, generator, bin_size);
 
     // add split intervals to the priority queue
     const auto last = parts.back();  // keep a copy for test below
     for (const auto &i : parts)
       pq.push(i);
 
+    const auto can_pop = [&pq, &last, max_dist]() {
+      return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
+    };
+
     // remove genomic interval parts from the priority queue
-    while (!pq.empty() && can_pop(last)) {
+    while (!pq.empty() && can_pop()) {
       const aln_pos curr_part = pq.top();
       pq.pop();
       // update counts hist
@@ -630,7 +633,7 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
     update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
     prev_part = curr_part;
   }
-  return n_reads;
+  return std::make_tuple(n_reads, std::move(coverage_hist));
 }
 
 #endif  // HAVE_HTSLIB

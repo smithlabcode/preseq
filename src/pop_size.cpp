@@ -135,43 +135,40 @@ pop_size_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
-    vector<double> counts_hist;
-    std::size_t n_reads = 0;
-
-    /************ loading input ***************************************/
-    if (HIST_INPUT) {
-      if (verbose)
-        std::cerr << "HIST_INPUT\n";
-      n_reads = load_histogram(input_file_name, counts_hist);
-    }
-    else if (VALS_INPUT) {
-      if (verbose)
-        std::cerr << "VALS_INPUT\n";
-      n_reads = load_counts(input_file_name, counts_hist);
-    }
+    const auto [n_reads, counts_hist] = [&] {
+      if (HIST_INPUT) {
+        if (verbose)
+          std::cerr << "HIST_INPUT\n";
+        return load_histogram(input_file_name);
+      }
+      else if (VALS_INPUT) {
+        if (verbose)
+          std::cerr << "VALS_INPUT\n";
+        return load_counts(input_file_name);
+      }
 #ifdef HAVE_HTSLIB
-    else if (BAM_FORMAT_INPUT && PAIRED_END) {
-      if (verbose)
-        std::cerr << "PAIRED_END_BAM_INPUT\n";
-      n_reads = load_counts_BAM_pe(n_threads, input_file_name, counts_hist);
-    }
-    else if (BAM_FORMAT_INPUT) {
-      if (verbose)
-        std::cerr << "BAM_INPUT\n";
-      n_reads = load_counts_BAM_se(n_threads, input_file_name, counts_hist);
-    }
+      else if (BAM_FORMAT_INPUT && PAIRED_END) {
+        if (verbose)
+          std::cerr << "PAIRED_END_BAM_INPUT\n";
+        return load_counts_BAM_pe(n_threads, input_file_name);
+      }
+      else if (BAM_FORMAT_INPUT) {
+        if (verbose)
+          std::cerr << "BAM_INPUT\n";
+        return load_counts_BAM_se(n_threads, input_file_name);
+      }
 #endif
-    else if (PAIRED_END) {
-      if (verbose)
-        std::cerr << "PAIRED_END_BED_INPUT\n";
-      n_reads = load_counts_bed_pe(input_file_name, counts_hist);
-    }
-    else {  // default is single end bed file
-      if (verbose)
-        std::cerr << "BED_INPUT\n";
-      n_reads = load_counts_bed_se(input_file_name, counts_hist);
-    }
-    /************ done loading input **********************************/
+      else if (PAIRED_END) {
+        if (verbose)
+          std::cerr << "PAIRED_END_BED_INPUT\n";
+        return load_counts_bed_pe(input_file_name);
+      }
+      else {  // default is single end bed file
+        if (verbose)
+          std::cerr << "BED_INPUT\n";
+        return load_counts_bed_se(input_file_name);
+      }
+    }();
 
     const std::size_t max_observed_count = std::size(counts_hist) - 1;
     const auto distinct_reads =
