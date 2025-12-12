@@ -15,8 +15,8 @@
  * Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef INTERVAL6_HPP_
-#define INTERVAL6_HPP_
+#ifndef SRC_INTERVAL6_HPP_
+#define SRC_INTERVAL6_HPP_
 
 #include <cstdint>
 //  #include <format> // ADS: needs c++20
@@ -37,8 +37,8 @@ struct Interval6 {
   Interval6(const std::string &chrom, const std::uint32_t start,
             const std::uint32_t stop, const std::string &name,
             const double score, const char strand) :
-    chrom{chrom},
-    start{start}, stop{stop}, name{name}, score{score}, strand{strand} {}
+    chrom{chrom}, start{start}, stop{stop}, name{name}, score{score},
+    strand{strand} {}
 
   explicit Interval6(const std::string &line) {
     if (!initialize(line.data(), line.data() + std::size(line)))
@@ -85,4 +85,4 @@ size(const Interval6 &x) {
 [[nodiscard]] auto
 read_intervals6(const std::string &intervals_file) -> std::vector<Interval6>;
 
-#endif  // INTERVAL6_HPP_
+#endif  // SRC_INTERVAL6_HPP_
