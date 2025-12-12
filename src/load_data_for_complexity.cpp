@@ -97,8 +97,8 @@ update_se_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
 
 struct interval_greater {
   auto
-  operator()(const Interval6 &prev, const Interval6 &curr) const -> bool {
-    return curr < prev;  // prev > curr
+  operator()(const Interval6 &a, const Interval6 &b) const -> bool {
+    return b < a;  // i.e. a > b
   }
 };
 
