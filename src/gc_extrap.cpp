@@ -156,7 +156,7 @@ gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
 
     const auto input_format = BAM_FORMAT_INPUT ? "BAM" : "BED";
     if (verbose)
-      std::cerr << "LOADING READS (" << input_format << "format)\n";
+      std::cerr << "LOADING READS (" << input_format << " format)\n";
 
     std::vector<double> coverage_hist;
     const auto n_reads = [&] {
