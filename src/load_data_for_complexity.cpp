@@ -33,6 +33,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>  // IWYU pragma: keep
 #include <utility>
 #include <vector>
 

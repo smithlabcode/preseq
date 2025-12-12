@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <cstdio>  // IWYU pragma: keep
 #include <fstream>
 #include <stdexcept>
 #include <string>
