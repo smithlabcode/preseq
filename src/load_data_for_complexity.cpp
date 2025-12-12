@@ -49,10 +49,10 @@ width(const T &x) -> std::uint32_t {
   return x.stop - x.start;
 }
 
-static bool
+static auto
 update_pe_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
                                 std::vector<double> &counts_hist,
-                                std::size_t &current_count) {
+                                std::size_t &current_count) -> bool {
   // check if reads are sorted
   if (curr.chrom == prev.chrom && curr.start < prev.start &&
       curr.stop < prev.stop)
@@ -95,27 +95,26 @@ update_se_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
     ++current_count;
 }
 
-struct Interval6OrderChecker {
-  bool
-  operator()(const Interval6 &prev, const Interval6 &curr) const {
+struct interval_greater {
+  auto
+  operator()(const Interval6 &prev, const Interval6 &curr) const -> bool {
     return curr < prev;  // prev > curr
   }
 };
 
-typedef std::priority_queue<Interval6, std::vector<Interval6>,
-                            Interval6OrderChecker>
-  ReadPQ;
+using read_pq =
+  std::priority_queue<Interval6, std::vector<Interval6>, interval_greater>;
 
-static bool
-is_ready_to_pop(const ReadPQ &pq, const Interval6 &interval,
-                const std::size_t max_width) {
+static auto
+is_ready_to_pop(const read_pq &pq, const Interval6 &interval,
+                const std::size_t max_width) -> bool {
   return pq.top().chrom != interval.chrom ||
          pq.top().stop + max_width < interval.start;
 }
 
 static void
 empty_pq(Interval6 &prev, std::size_t &current_count,
-         std::vector<double> &counts_hist, ReadPQ &read_pq,
+         std::vector<double> &counts_hist, read_pq &read_pq,
          const std::string &input_file_name) {
   const auto curr = read_pq.top();
   read_pq.pop();
@@ -134,14 +133,12 @@ empty_pq(Interval6 &prev, std::size_t &current_count,
   prev = curr;
 }
 
-/* this code is for BED file input */
+// for BED file input
 
-std::size_t
+auto
 load_counts_bed_se(const std::string &input_file_name,
-                   std::vector<double> &counts_hist) {
-  // resize vals_hist
-  counts_hist.clear();
-  counts_hist.resize(2, 0.0);
+                   std::vector<double> &counts_hist) -> std::size_t {
+  counts_hist = std::vector<double>(2, 0.0);
 
   std::ifstream in(input_file_name);
   if (!in)
@@ -168,9 +165,9 @@ load_counts_bed_se(const std::string &input_file_name,
   return n_reads;
 }
 
-std::size_t
+auto
 load_counts_bed_pe(const std::string &input_file_name,
-                   std::vector<double> &counts_hist) {
+                   std::vector<double> &counts_hist) -> std::size_t {
   // resize vals_hist
   counts_hist.clear();
   counts_hist.resize(2, 0.0);
@@ -205,8 +202,9 @@ load_counts_bed_pe(const std::string &input_file_name,
   return n_reads;
 }
 
-std::size_t
-load_counts(const std::string &infile, std::vector<double> &counts_hist) {
+auto
+load_counts(const std::string &infile,
+            std::vector<double> &counts_hist) -> std::size_t {
   std::ifstream in(infile);
   if (!in)
     throw std::runtime_error("failed to open file: " + infile);
@@ -228,8 +226,9 @@ load_counts(const std::string &infile, std::vector<double> &counts_hist) {
 }
 
 // returns number of reads from file containing counts histogram
-std::size_t
-load_histogram(const std::string &filename, std::vector<double> &counts_hist) {
+auto
+load_histogram(const std::string &filename,
+               std::vector<double> &counts_hist) -> std::size_t {
   counts_hist.clear();
 
   std::ifstream in(filename);
@@ -305,7 +304,7 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
     throw std::runtime_error("problem opening file: " + infile);
 
   // prioirty queue to reorder the split reads
-  ReadPQ PQ;
+  read_pq pq;
 
   Interval6 prev;
   std::size_t n_reads{};
@@ -318,19 +317,19 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
 
     // add split intervals to the priority queue
     for (const auto &i : splits)
-      PQ.push(i);
+      pq.push(i);
 
     if (std::size(splits) > 0) {
       // remove intervals from the priority queue
-      while (!PQ.empty() && is_ready_to_pop(PQ, splits.back(), max_width))
-        empty_pq(prev, current_count, coverage_hist, PQ, infile);
+      while (!pq.empty() && is_ready_to_pop(pq, splits.back(), max_width))
+        empty_pq(prev, current_count, coverage_hist, pq, infile);
     }
     ++n_reads;
   }
 
   // done adding reads, now spit the rest out
-  while (!PQ.empty())
-    empty_pq(prev, current_count, coverage_hist, PQ, infile);
+  while (!pq.empty())
+    empty_pq(prev, current_count, coverage_hist, pq, infile);
 
   return n_reads;
 }
@@ -341,8 +340,8 @@ struct genomic_interval {
   std::int32_t tid{-1};  // indicates uninitialized
   hts_pos_t start{};
   hts_pos_t stop{};
-  bool
-  operator<(const genomic_interval &rhs) const {
+  auto
+  operator<(const genomic_interval &rhs) const -> bool {
     // clang-format off
     return (tid < rhs.tid ||
             (tid == rhs.tid &&
@@ -360,16 +359,16 @@ struct aln_pos {
   aln_pos(const std::int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
   explicit aln_pos(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)} {}
-  bool
-  operator<(const aln_pos &rhs) const {
+  auto
+  operator<(const aln_pos &rhs) const -> bool {
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
   }
-  bool
-  operator>(const aln_pos &rhs) const {
+  auto
+  operator>(const aln_pos &rhs) const -> bool {
     return tid > rhs.tid || (tid == rhs.tid && pos > rhs.pos);
   }
-  bool
-  operator!=(const aln_pos &rhs) const {
+  auto
+  operator!=(const aln_pos &rhs) const -> bool {
     // ADS: ordered to check pos first
     return pos != rhs.pos || tid != rhs.tid;
   }
@@ -382,13 +381,13 @@ struct aln_pos_pair {
   hts_pos_t mpos{};
   explicit aln_pos_pair(const bamxx::bam_rec &a) :
     tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
-  bool
-  operator<(const aln_pos_pair &rhs) const {
+  auto
+  operator<(const aln_pos_pair &rhs) const -> bool {
     // ADS: only compares on tid and pos, NOT mtid or mpos
     return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
   }
-  bool
-  operator!=(const aln_pos_pair &rhs) const {
+  auto
+  operator!=(const aln_pos_pair &rhs) const -> bool {
     // ADS: ordered to check pos first
     return pos != rhs.pos || tid != rhs.tid || mtid != rhs.mtid ||
            mpos != rhs.mpos;
@@ -396,8 +395,9 @@ struct aln_pos_pair {
 };
 
 template <typename T>
-[[nodiscard]] static inline T
-round_position(const T x, const std::uint32_t bin_size, const double frac) {
+[[nodiscard]] static inline auto
+round_position(const T x, const std::uint32_t bin_size,
+               const double frac) -> T {
   // probabilisticly round read ends so they are at bin boundaries
   const double lo = (x / bin_size) * bin_size;
   const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
@@ -420,8 +420,8 @@ split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
     output.emplace_back(gi.tid, pos);
 }
 
-static inline bool
-not_mapped(const bamxx::bam_rec &aln) {
+static inline auto
+not_mapped(const bamxx::bam_rec &aln) -> bool {
   return get_tid(aln) == -1;
 }
 
@@ -444,9 +444,9 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
 }
 
 template <typename aln_pos_t>
-std::size_t
+auto
 load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
-                std::vector<double> &counts_hist) {
+                std::vector<double> &counts_hist) -> std::size_t {
   bamxx::bam_tpool tp(n_threads);
 
   bamxx::bam_in hts(inputfile);  // assume already checked
@@ -506,15 +506,15 @@ load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile,
   return n_reads;
 }
 
-std::size_t
+auto
 load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile,
-                   std::vector<double> &counts_hist) {
+                   std::vector<double> &counts_hist) -> std::size_t {
   return load_counts_BAM<aln_pos>(n_threads, inputfile, counts_hist);
 }
 
-std::size_t
+auto
 load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile,
-                   std::vector<double> &counts_hist) {
+                   std::vector<double> &counts_hist) -> std::size_t {
   return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
 }
 
@@ -535,12 +535,12 @@ update_coverage_hist(const T &curr, const T &prev,
 
 // ADS: don't care if mapped reads are SE or PE, we only need the first mate
 // for each mapped read
-std::size_t
+auto
 load_coverage_counts_BAM(const std::uint32_t n_threads,
                          const std::string &inputfile, const std::uint32_t seed,
                          const std::size_t bin_size,
                          const std::size_t max_width,
-                         std::vector<double> &coverage_hist) {
+                         std::vector<double> &coverage_hist) -> std::size_t {
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);
@@ -568,14 +568,13 @@ load_coverage_counts_BAM(const std::uint32_t n_threads,
   std::size_t current_count = 1;
 
   // initialize prioirty queue to reorder the split reads
-  std::priority_queue<aln_pos, std::vector<aln_pos>, std::greater<aln_pos>> pq;
+  std::priority_queue<aln_pos, std::vector<aln_pos>, std::greater<>> pq;
   std::vector<aln_pos> parts;  // reuse allocated space
   aln_pos prev_part;
   genomic_interval prev;
 
-  // max_dist indicates when we think we can assume the read parts
-  // will be sorted and can be processed; this is not the same as the
-  // full reads being sorted
+  // max_dist indicates when we think we can assume the read parts will be
+  // sorted and can be processed; not the same as the full reads being sorted
   const hts_pos_t max_dist = bin_size + max_width;
 
   const auto can_pop = [&](const auto &last) {
