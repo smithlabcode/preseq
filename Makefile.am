@@ -1,24 +1,22 @@
 # This file is part of preseq
 #
-# Copyright (C) 2018-2024: Andrew D. Smith
+# Copyright (C) 2018-2025: Andrew D. Smith
 #
 # Authors: Andrew D. Smith
 #
-# This is free software: you can redistribute it and/or modify it
-# under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 #
-# This software is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
+# This software is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS := src/smithlab_cpp
-install installdirs: SUBDIRS := $(filter-out src/smithlab_cpp, $(SUBDIRS))
-AM_CPPFLAGS = -I $(top_srcdir)/src/smithlab_cpp
+AM_CPPFLAGS =
 if ENABLE_HTS
 AM_CPPFLAGS += -I $(top_srcdir)/src/bamxx
 endif
@@ -49,8 +47,6 @@ TESTS = \
 
 TEST_EXTENSIONS = .test
 
-LDADD = src/smithlab_cpp/libsmithlab_cpp.a
-
 bin_PROGRAMS = preseq
 
 preseq_SOURCES = \
@@ -71,6 +67,8 @@ preseq_SOURCES = \
         src/continued_fraction.cpp \
         src/load_data_for_complexity.hpp \
         src/load_data_for_complexity.cpp \
+        src/Interval6.hpp \
+        src/Interval6.cpp \
         src/moment_sequence.hpp \
         src/moment_sequence.cpp
 
