@@ -36,52 +36,37 @@
 #include <string>
 #include <vector>
 
-using std::cbegin;
-using std::cend;
-using std::count_if;
-using std::min;
-using std::runtime_error;
-using std::string;
-using std::to_string;
-using std::uint32_t;
-using std::vector;
-
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
-
 auto
 pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
-    static const std::size_t min_required_counts = 4;
-    static const string min_required_counts_error_message =
-      "max count before zero is less than min required count (" +
-      to_string(min_required_counts) + ") duplicates removed";
+    static constexpr auto max_iter_per_bootstrap = 100;
+    static constexpr auto default_max_extrap = 1000000000ul;
+    static constexpr auto min_required_counts = 4ul;
+    static constexpr auto min_required_counts_error_message =
+      "max count before zero is less than min required count (4)";
 
-    string outfile;
-    string input_file_name;
-    string histogram_outfile;
+    std::string outfile;
+    std::string input_file_name;
+    std::string histogram_outfile;
 
+    // NOLINTBEGIN(*-avoid-magic-numbers)
     std::size_t orig_max_terms = 100;
-    double max_extrap = 0.0;
-    double step_size = 0.0;
+    double max_extrap{};
     std::size_t n_desired_steps = 50;
     std::size_t n_bootstraps = 100;
     int diagonal = 0;
     double c_level = 0.95;
-    uint32_t seed = 408;
+    std::uint32_t seed = 408;
+    // NOLINTEND(*-avoid-magic-numbers)
 
-    /* FLAGS */
-    bool verbose = false;
-    bool VALS_INPUT = false;
-    bool PAIRED_END = false;
-    bool HIST_INPUT = false;
-    bool SINGLE_ESTIMATE = false;
-    bool allow_defects = false;
+    // flags
+    bool verbose{false};
+    bool paired_end{false};
+    bool single_estimate{false};
+    bool allow_defects{false};
 
-#ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT = false;
-    std::size_t MAX_SEGMENT_LENGTH = 5000;
-    uint32_t n_threads{1};
-#endif
+    std::uint32_t n_threads{1};
+
     CLI::App app{rlstrip(pop_size::about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq pop_size [OPTIONS]");
@@ -93,26 +78,18 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       ->option_text("FILE")
       ->required()
       ->check(CLI::ExistingFile);
-    app.add_option("-o,--output", outfile, "yield output file default: stdout");
+    app.add_option("-o,--output", outfile, "output file")
+      ->option_text("FILE");
     app.add_option("-e,--extrap", max_extrap, "maximum extrapolation");
     app.add_option("-s,--steps", n_desired_steps, "number of steps");
     app.add_option("-n,--boots", n_bootstraps, "number of bootstraps");
-    app.add_option("-c,--cval", c_level, "level for confidence intervals");
+    app.add_option("-c,--ci-level", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
-#ifdef HAVE_HTSLIB
-    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
-    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
-                   "maximum segment length when merging paired end bam reads");
-#endif
-    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_flag("-V,--vals", VALS_INPUT,
-                   "input is a text file containing only the observed counts");
-    app.add_flag("-H,--hist", HIST_INPUT,
-                   "input is a text file containing the observed histogram");
-    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
+    app.add_option("-r,--seed", seed, "seed for random number generator");
+    app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
+    app.add_flag("-Q,--quick", single_estimate,
                  "quick mode (no bootstraps) for confidence intervals");
     app.add_flag("-D,--defects", allow_defects, "no testing for defects");
-    app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
 
@@ -123,38 +100,32 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
+    const auto input_format = get_input_format_type(input_file_name);
+    if (is_unknown(input_format)) {
+      std::cerr << "unknown input format\n";
+      return EXIT_FAILURE;
+    }
+
+    if (verbose) {
+      std::cerr << "INPUT FORMAT: " << to_string(input_format) << '\n';
+      if (is_bam(input_format) || is_bed(input_format))
+        std::cerr << "PAIRED END: " << std::boolalpha << paired_end << '\n';
+    }
+
     const auto [n_reads, counts_hist] = [&] {
-      if (HIST_INPUT) {
-        if (verbose)
-          std::cerr << "HIST_INPUT\n";
+      switch (input_format) {
+      case input_format_type::hist:
         return load_histogram(input_file_name);
-      }
-      else if (VALS_INPUT) {
-        if (verbose)
-          std::cerr << "VALS_INPUT\n";
+      case input_format_type::counts:
         return load_counts(input_file_name);
-      }
 #ifdef HAVE_HTSLIB
-      else if (BAM_FORMAT_INPUT && PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BAM_INPUT\n";
-        return load_counts_BAM_pe(n_threads, input_file_name);
-      }
-      else if (BAM_FORMAT_INPUT) {
-        if (verbose)
-          std::cerr << "BAM_INPUT\n";
-        return load_counts_BAM_se(n_threads, input_file_name);
-      }
+      case input_format_type::bam:
+        return paired_end ? load_counts_BAM_pe(n_threads, input_file_name)
+                          : load_counts_BAM_se(n_threads, input_file_name);
 #endif
-      else if (PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BED_INPUT\n";
-        return load_counts_bed_pe(input_file_name);
-      }
-      else {  // default is single end bed file
-        if (verbose)
-          std::cerr << "BED_INPUT\n";
-        return load_counts_bed_se(input_file_name);
+      default:  // case input_format_type::vals:
+        return paired_end ? load_counts_bed_pe(input_file_name)
+                          : load_counts_bed_se(input_file_name);
       }
     }();
 
@@ -167,13 +138,14 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     while (first_zero < std::size(counts_hist) && counts_hist[first_zero] > 0)
       ++first_zero;
 
-    orig_max_terms = min(orig_max_terms, first_zero - 1);
+    orig_max_terms = std::min(orig_max_terms, first_zero - 1);
     orig_max_terms = orig_max_terms - (orig_max_terms % 2 == 1);
 
-    if (max_extrap < 1.0)
-      max_extrap = 1000000000 * distinct_reads;
-    if (step_size < 1.0)
-      step_size = (max_extrap - distinct_reads) / n_desired_steps;
+    if (max_extrap == 0.0)
+      max_extrap = default_max_extrap * distinct_reads;
+
+    const auto step_size =
+      (max_extrap - distinct_reads) / static_cast<double>(n_desired_steps);
 
     const std::size_t distinct_counts =
       std::count_if(std::cbegin(counts_hist), std::cend(counts_hist),
@@ -193,51 +165,44 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // check to make sure library is not overly saturated
     const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
     if (two_fold_extrap < 0.0)
-      throw runtime_error("Saturation expected at double initial sample size."
-                          " Unable to extrapolate");
-
-    // const std::size_t total_reads = get_counts_from_hist(counts_hist);
-
-    // assert(total_reads == n_reads); // ADS: why commented out?
+      throw std::runtime_error(
+        "Saturation expected at double initial sample size."
+        " Unable to extrapolate");
 
     // check that min required count is satisfied
     if (orig_max_terms < min_required_counts)
-      throw runtime_error(min_required_counts_error_message);
+      throw std::runtime_error(min_required_counts_error_message);
 
     if (verbose)
       std::cerr << "[ESTIMATING YIELD CURVE]\n";
 
-    vector<double> yield_estimates;
+    std::vector<double> yield_estimates;
 
-    if (SINGLE_ESTIMATE) {
-      const bool single_estimate_success = extrap_single_estimate(
+    if (single_estimate) {
+      const bool success = extrap_single_estimate(
         verbose, allow_defects, counts_hist, orig_max_terms, diagonal,
         step_size, max_extrap, yield_estimates);
-      // IF FAILURE, EXIT
-      if (!single_estimate_success)
-        throw runtime_error("single estimate failed, run "
-                            "full mode for estimates");
+      if (!success)
+        throw std::runtime_error(
+          "single estimate failed, run full mode for estimates");
 
       std::ofstream of;
       if (!outfile.empty())
-        of.open(outfile.c_str());
+        of.open(outfile.data());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
       out << "TOTAL_READS\tEXPECTED_DISTINCT\n";
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
-
       out << 0 << '\t' << 0 << '\n';
-      for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
+      for (auto i = 0u; i < std::size(yield_estimates); ++i)
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
     }
     else {
       if (verbose)
         std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
-      const std::size_t max_iter = 100 * n_bootstraps;
+      const std::size_t max_iter = max_iter_per_bootstrap * n_bootstraps;
 
-      vector<vector<double>> bootstrap_estimates;
+      std::vector<std::vector<double>> bootstrap_estimates;
       extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
                        orig_max_terms, diagonal, step_size, max_extrap,
                        max_iter, bootstrap_estimates);
@@ -245,7 +210,7 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       if (verbose)
         std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
       // yield ci
-      vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
+      std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
 
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
@@ -256,13 +221,13 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       if (!outfile.empty())
         of.open(outfile);
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
+      if (!outfile.empty() && !out)
+        throw std::runtime_error("failed to open outfile file: " + outfile);
 
       const std::size_t n_ests = std::size(yield_estimates) - 1;
       if (n_ests < 2)
-        throw runtime_error("problem with number of estimates in pop_size");
+        throw std::runtime_error(
+          "problem with number of estimates in pop_size");
 
       const bool converged =
         (yield_estimates[n_ests] - yield_estimates[n_ests - 1] < 1.0);
@@ -282,5 +247,3 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   }
   return EXIT_SUCCESS;
 }
-
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
