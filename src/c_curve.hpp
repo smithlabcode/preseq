@@ -21,7 +21,15 @@
 #ifndef SRC_C_CURVE_HPP_
 #define SRC_C_CURVE_HPP_
 
-int
-c_curve_main(int argc, char *argv[]);
+namespace c_curve {
+
+static constexpr auto about_msg = R"(
+Generate the full complexity curve for observed data (no extrapolation).
+)";
+
+auto
+main(int argc, char *argv[]) -> int;
+
+};  // namespace c_curve
 
 #endif  // SRC_C_CURVE_HPP_
