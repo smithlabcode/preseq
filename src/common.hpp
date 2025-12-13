@@ -47,19 +47,19 @@ rlstrip(const std::string &s) noexcept -> std::string {
   return std::string(start_itr, stop_itr);
 }
 
-double
-GoodToulmin2xExtrap(const std::vector<double> &counts_hist);
+[[nodiscard]] auto
+GoodToulmin2xExtrap(const std::vector<double> &counts_hist) -> double;
 
-double
+[[nodiscard]] auto
 interpolate_distinct(const std::vector<double> &hist, const std::size_t N,
-                     const std::size_t S, const std::size_t n);
+                     const std::size_t S, const std::size_t n) -> double;
 
-bool
+[[nodiscard]] auto
 extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
                        const std::vector<double> &hist, std::size_t max_terms,
                        const int diagonal, const double step_size,
                        const double max_extrap,
-                       std::vector<double> &yield_estimate);
+                       std::vector<double> &yield_estimate) -> bool;
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
@@ -84,16 +84,16 @@ write_predicted_complexity_curve(
   const std::vector<double> &yield_upper_ci_lognorm);
 
 template <typename T>
-T
-get_counts_from_hist(const std::vector<T> &h) {
+[[nodiscard]] auto
+get_counts_from_hist(const std::vector<T> &h) -> T {
   T c = 0.0;
   for (auto i = 0u; i < std::size(h); ++i)
     c += i * h[i];
   return c;
 }
 
-double
-factorial(double x);
+[[nodiscard]] auto
+log_factorial(double x) -> double;
 
 void
 resample_hist(std::mt19937 &gen,
@@ -110,7 +110,7 @@ template <typename uint_type>
 void
 multinomial(std::mt19937 &gen, const std::vector<double> &mult_probs,
             uint_type trials, std::vector<uint_type> &result) {
-  typedef std::binomial_distribution<uint32_t> binom_dist;
+  using binom_dist = std::binomial_distribution<uint32_t>;
 
   result.clear();
   result.resize(std::size(mult_probs));
