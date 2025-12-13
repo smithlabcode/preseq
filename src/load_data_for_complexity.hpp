@@ -27,6 +27,9 @@
 #include <vector>
 
 [[nodiscard]] auto
+is_sam_or_bam_format(const std::string &filename) -> bool;
+
+[[nodiscard]] auto
 load_coverage_counts(const std::string &input_file_name,
                      const std::uint32_t seed, const std::size_t bin_size,
                      const std::size_t max_width)
