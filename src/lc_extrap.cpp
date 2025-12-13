@@ -3,19 +3,18 @@
  *
  * Authors: Timothy Daley and Andrew Smith
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "lc_extrap.hpp"
@@ -38,7 +37,7 @@
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTBEGIN(*-narrowing-conversions)
 
 auto
 lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
@@ -52,27 +51,23 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::string input_file_name;
     std::string histogram_outfile;
 
-    std::size_t orig_max_terms = 100;
-    double max_extrap = 1.0e10;
-    double step_size = 1e6;
-    std::size_t n_bootstraps = 100;
-    int diagonal = 0;
-    double c_level = 0.95;
-    std::uint32_t seed = 408;
+    // NOLINTBEGIN(*-avoid-magic-numbers)
+    int diagonal{0};
+    std::size_t orig_max_terms{100};
+    double max_extrap{1.0e10};
+    double step_size{1e6};
+    std::size_t n_bootstraps{100};
+    double c_level{0.95};
+    std::uint32_t seed{408};
+    // NOLINTEND(*-avoid-magic-numbers)
 
     // flags
     bool verbose{false};
-    bool VALS_INPUT{false};
-    bool PAIRED_END{false};
-    bool HIST_INPUT{false};
-    bool SINGLE_ESTIMATE{false};
+    bool paired_end{false};
+    bool single_estimate{false};
     bool allow_defects{false};
 
-#ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT{false};
-    std::size_t MAX_SEGMENT_LENGTH = 5000;
     std::uint32_t n_threads{1};
-#endif
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
     app.formatter(std::make_shared<preseq_formatter>());
@@ -95,18 +90,9 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-#ifdef HAVE_HTSLIB
-    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
-    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
-                   "maximum segment length when merging paired end bam reads");
-#endif
-    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_flag("-V,--vals", VALS_INPUT,
-                 "input is a text file containing only the observed counts");
-    app.add_flag("-H,--hist", HIST_INPUT,
-                   "input is a text file containing the observed histogram");
-    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
-                 "quick mode (no bootstraps) for confidence intervals");
+    app.add_flag("-P,--pe", paired_end, "input is paired end read file");
+    app.add_flag("-Q,--quick", single_estimate,
+                 "do not use bootstraps for confidence intervals");
     app.add_flag("-D,--defects", allow_defects, "no testing for defects");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
@@ -118,40 +104,32 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
+    const auto input_format = get_input_format_type(input_file_name);
+    if (is_unknown(input_format)) {
+      std::cerr << "unknown input format\n";
+      return EXIT_FAILURE;
+    }
+
+    if (verbose) {
+      std::cerr << "INPUT FORMAT: " << to_string(input_format) << '\n';
+      if (is_bam(input_format) || is_bed(input_format))
+        std::cerr << "PAIRED END: " << std::boolalpha << paired_end << '\n';
+    }
+
     const auto [n_reads, counts_hist] = [&] {
-      if (HIST_INPUT) {
-        if (verbose)
-          std::cerr << "HIST_INPUT\n";
+      switch (input_format) {
+      case input_format_type::hist:
         return load_histogram(input_file_name);
-      }
-      else if (VALS_INPUT) {
-        if (verbose)
-          std::cerr << "VALS_INPUT\n";
+      case input_format_type::counts:
         return load_counts(input_file_name);
-      }
 #ifdef HAVE_HTSLIB
-      else if (BAM_FORMAT_INPUT) {
-        if (PAIRED_END) {
-          if (verbose)
-            std::cerr << "PAIRED_END_BAM_INPUT\n";
-          return load_counts_BAM_pe(n_threads, input_file_name);
-        }
-        else {  // single end
-          if (verbose)
-            std::cerr << "BAM_INPUT\n";
-          return load_counts_BAM_se(n_threads, input_file_name);
-        }
-      }
+      case input_format_type::bam:
+        return paired_end ? load_counts_BAM_pe(n_threads, input_file_name)
+                          : load_counts_BAM_se(n_threads, input_file_name);
 #endif
-      else if (PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BED_INPUT\n";
-        return load_counts_bed_pe(input_file_name);
-      }
-      else {  // default is single end bed file
-        if (verbose)
-          std::cerr << "BED_INPUT\n";
-        return load_counts_bed_se(input_file_name);
+      default:  // case input_format_type::vals:
+        return paired_end ? load_counts_bed_pe(input_file_name)
+                          : load_counts_bed_se(input_file_name);
       }
     }();
 
@@ -198,19 +176,18 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       std::cerr << "[ESTIMATING YIELD CURVE]\n";
     std::vector<double> yield_estimates;
 
-    if (SINGLE_ESTIMATE) {
-      const bool single_estimate_success = extrap_single_estimate(
+    if (single_estimate) {
+      const bool success = extrap_single_estimate(
         verbose, allow_defects, counts_hist, orig_max_terms, diagonal,
         step_size, max_extrap, yield_estimates);
       // exit on failure
-      if (!single_estimate_success)
+      if (!success)
         throw std::runtime_error(
           "single estimate failed, run full mode for estimates");
 
-      std::ofstream of;
-      if (!outfile.empty())
-        of.open(outfile);
-      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+      std::ofstream out(outfile);
+      if (!out)
+        throw std::runtime_error("failed to open output file: " + outfile);
 
       out << "TOTAL_READS\tEXPECTED_DISTINCT\n";
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -253,4 +230,4 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   return EXIT_SUCCESS;
 }
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTEND(*-narrowing-conversions)
