@@ -32,30 +32,26 @@
 #include <iostream>
 #include <iterator>
 #include <numeric>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTBEGIN(*-narrowing-conversions)
 
 auto
 c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
-    bool verbose = false;
-    bool PAIRED_END = false;
-    bool HIST_INPUT = false;
-    bool VALS_INPUT = false;
-    std::uint32_t seed = 408;
+    std::uint32_t seed = 408;  // NOLINT(*-avoid-magic-numbers)
+    double step_size = 1e6;    // NOLINT(*-avoid-magic-numbers)
 
     std::string outfile;
-    std::string input_file_name;
+    std::string infile;
     std::string histogram_outfile;
 
-    double step_size = 1e6;
-#ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT = false;
-    std::size_t MAX_SEGMENT_LENGTH = 5000;
+    bool verbose = false;
+    bool paired_end = false;
+
     std::uint32_t n_threads{1};
-#endif
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq c_curve [OPTIONS]");
@@ -63,22 +59,15 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     //   app.footer(description);
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
+    app.add_option("-i,--input", infile, "input file")
       ->option_text("FILE")
       ->required()
       ->check(CLI::ExistingFile);
-    app.add_option("-o,--output", outfile, "yield output file (default: stdout)");
+    app.add_option("-o,--output", outfile, "yield output file")
+      ->required()
+      ->option_text("FILE");
     app.add_option("-s,--step", step_size, "step size in extrapolations");
-    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_flag("-H,--hist", HIST_INPUT,
-                 "input is a text file containing the observed histogram");
-    app.add_flag("-V,--vals", VALS_INPUT,
-                   "input is a text file containing only the observed counts");
-#ifdef HAVE_HTSLIB
-    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
-    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
-                   "maximum segment length when merging paired end bam reads");
-#endif
+    app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
     app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
@@ -90,38 +79,26 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
+    const auto input_format = get_input_format_type(infile);
+    if (is_unknown(input_format)) {
+      std::cerr << "unknown input format\n";
+      return EXIT_FAILURE;
+    }
+
     const auto [n_reads, counts_hist] = [&] {
-      if (HIST_INPUT) {
-        if (verbose)
-          std::cerr << "INPUT_HIST\n";
-        return load_histogram(input_file_name);
-      }
-      else if (VALS_INPUT) {
-        if (verbose)
-          std::cerr << "VALS_INPUT\n";
-        return load_counts(input_file_name);
-      }
+      switch (input_format) {
+      case input_format_type::hist:
+        return load_histogram(infile);
+      case input_format_type::counts:
+        return load_counts(infile);
 #ifdef HAVE_HTSLIB
-      else if (BAM_FORMAT_INPUT && PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BAM_INPUT\n";
-        return load_counts_BAM_pe(n_threads, input_file_name);
-      }
-      else if (BAM_FORMAT_INPUT) {
-        if (verbose)
-          std::cerr << "BAM_INPUT\n";
-        return load_counts_BAM_se(n_threads, input_file_name);
-      }
+      case input_format_type::bam:
+        return paired_end ? load_counts_BAM_pe(n_threads, infile)
+                          : load_counts_BAM_se(n_threads, infile);
 #endif
-      else if (PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BED_INPUT\n";
-        return load_counts_bed_pe(input_file_name);
-      }
-      else {  // default is single end bed file
-        if (verbose)
-          std::cerr << "BED_INPUT\n";
-        return load_counts_bed_se(input_file_name);
+      default:  // case input_format_type::vals:
+        return paired_end ? load_counts_bed_pe(infile)
+                          : load_counts_bed_se(infile);
       }
     }();
 
@@ -148,22 +125,16 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // set upper limit equal to number of molecules
     const std::size_t upper_limit = n_reads;
 
-    // setup for output of the complexity curve
-    std::ofstream of;
-    if (!outfile.empty())
-      of.open(outfile);
-    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+    std::ofstream out(outfile);
+    if (!out)
+      throw std::runtime_error("failed to open output file: " + outfile);
 
-    // prints the complexity curve
-    out << "total_reads" << "\t" << "distinct_reads\n";
-    out << 0 << '\t' << 0 << '\n';
-    for (std::size_t i = step_size; i <= upper_limit; i += step_size) {
-      if (verbose)
-        std::cerr << "sample size: " << i << '\n';
+    out << "total_reads" << '\t' << "distinct_reads\n"
+        << 0 << '\t' << 0 << '\n';
+    for (std::size_t i = step_size; i <= upper_limit; i += step_size)
       out << i << '\t'
           << interpolate_distinct(counts_hist, total_reads, distinct_reads, i)
           << '\n';
-    }
   }
   catch (const std::exception &e) {
     std::cerr << "ERROR:\t" << e.what() << '\n';
@@ -172,4 +143,4 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   return EXIT_SUCCESS;
 }
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTEND(*-narrowing-conversions)
