@@ -1,26 +1,28 @@
-/* Copyright (C) 2013-2025
- *               University of Southern California and
- *               Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2025 Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "moment_sequence.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <iterator>
 #include <utility>  // IWYU pragma: keep
 #include <vector>
@@ -33,8 +35,8 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
   std::size_t k{};
 
   P.clear();
-  for (std::size_t x = 0; x <= N; x++)
-    P.push_back(static_cast<int>(x));
+  for (int x = 0; x <= static_cast<int>(N); ++x)
+    P.push_back(x);
 
   for (i = 0; i < N; i++) {
     double maxA = 0.0;
@@ -63,7 +65,6 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
 
     for (std::size_t j = i + 1; j < N; j++) {
       A[j][i] /= A[i][i];
-
       for (k = i + 1; k < N; k++)
         A[j][k] -= A[j][i] * A[i][k];
     }
@@ -74,32 +75,24 @@ double
 LU_determinant(const std::vector<std::vector<double>> &A,
                const std::vector<int> &P) {
   const std::size_t N = A.size();
-
   double det = A[0][0];
   for (std::size_t i = 1; i < N; ++i)
     det *= A[i][i];
-
   if ((P[N] - N) % 2 == 0)
     return det;
-
   return -det;
 }
 
-/////////////////////////////////////////////////////
-// test Hankel moment matrix
-// ensure moment sequence is positive definite
-// truncate moment sequence to ensure pos def
+// test the Hankel moment matrix to ensure moment sequence is positive
+// definite and truncate moment sequence to ensure pos def
 std::size_t
-ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
-                       const bool VERBOSE) {
+ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance) {
   const std::size_t min_hankel_dim = 1;
   std::size_t hankel_dim = 2;
   if (moments.size() < 2 * hankel_dim) {
-    if (VERBOSE)
-      std::cerr << "too few moments\n";
+    moments.clear();
     return min_hankel_dim;
   }
-
   while (2 * hankel_dim - 1 < moments.size()) {
     std::vector<std::vector<double>> hankel_mat(
       hankel_dim, std::vector<double>(hankel_dim, 0.0));
@@ -122,12 +115,13 @@ ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
     const double shift_hankel_mat_det =
       LU_determinant(shift_hankel_matrix, s_perm);
 
-    if (VERBOSE) {
-      std::cerr << "dim" << '\t' << "hankel_det" << '\t' << "shifted_hankel_det"
-                << '\n';
-      std::cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
-                << shift_hankel_mat_det << '\n';
-    }
+    // if (VERBOSE) {
+    //   std::cerr << "dim" << '\t' << "hankel_det" << '\t' <<
+    //   "shifted_hankel_det"
+    //             << '\n';
+    //   std::cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
+    //             << shift_hankel_mat_det << '\n';
+    // }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
       hankel_dim++;
@@ -138,11 +132,10 @@ ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
       return hankel_dim;
     }
   }
-
   return std::max(hankel_dim - 1, min_hankel_dim);
 }
 
-/// 3 term relations
+// 3 term relations
 
 // check 3 term recurrence to avoid non-positive elements truncate if
 // non-positive element found
@@ -164,8 +157,8 @@ check_three_term_relation(std::vector<double> &a, std::vector<double> &b) {
     }
 }
 
-// check the moment sequence to avoid non-positive elements and
-// truncate at first non-positive element if found
+// check the moment sequence to avoid non-positive elements and truncate at
+// first non-positive element if found
 static void
 check_moment_sequence(std::vector<double> &obs_moms) {
   if (obs_moms[0] <= 0.0 || !std::isfinite(obs_moms[0]))
@@ -339,7 +332,7 @@ check_positivity(const std::vector<double> &v) -> bool {
 }
 
 bool
-MomentSequence::Lower_quadrature_rules(const std::size_t n_points,
+MomentSequence::lower_quadrature_rules(const std::size_t n_points,
                                        const double tol,
                                        const std::size_t max_iter,
                                        std::vector<double> &points,
@@ -352,9 +345,8 @@ MomentSequence::Lower_quadrature_rules(const std::size_t n_points,
 
   check_three_term_relation(a, b);
 
-  // See Gautschi pgs 10-13,
-  // the nu here is the square of the off-diagonal
-  // of the Jacobi matrix
+  // See Gautschi pgs 10-13, the nu here is the square of the off-diagonal of
+  // the Jacobi matrix
   for (std::size_t i = 0; i < b.size(); i++)
     b[i] = sqrt(b[i]);
 
@@ -368,14 +360,11 @@ MomentSequence::Lower_quadrature_rules(const std::size_t n_points,
   for (std::size_t i = 0; i < qr_beta.size(); i++)
     error_sum += fabs(qr_beta[i]);
 
-  std::size_t iter = 0;
-  while (iter < max_iter && error_sum > tol) {
+  for (std::size_t iter = 0; iter < max_iter && error_sum > tol; ++iter) {
     QRiteration(eigenvals, qr_beta, eigenvec);
-
     error_sum = 0.0;
     for (std::size_t i = 0; i < qr_beta.size(); i++)
       error_sum += fabs(qr_beta[i]);
-    iter++;
   }
 
   // eigenvalues are on diagonal of J
