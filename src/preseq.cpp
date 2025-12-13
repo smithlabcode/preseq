@@ -1,83 +1,89 @@
-/* preseq: to predict properties of genomic sequencing libraries
+/* preseq: a tool for analyzing sequencing library complexity
  *
- * Copyright (C) 2013-2024 University of Southern California and
+ * Copyright (C) 2013-2025 University of Southern California and
  *                         Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley, Chao Deng, Victoria Helus, and Andrew Smith
+ * Author: Andrew D Smith
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "bound_pop.hpp"
 #include "c_curve.hpp"
+#include "common.hpp"
 #include "gc_extrap.hpp"
 #include "lc_extrap.hpp"
 #include "pop_size.hpp"
+
+#include "CLI11/CLI11.hpp"
 
 #include <config.h>
 
 #include <cstdlib>
 #include <iostream>
-#include <sstream>
+#include <memory>
 #include <string>
 
-static std::string
-usage_message() {
-  std::ostringstream oss;
-  oss << "preseq: a program for analyzing library complexity\n"
-         "Version: ";
-  oss << VERSION;
-  oss << "\n\n"
-         "Usage: preseq <command> [OPTIONS]\n\n"
-         "<command>: c_curve    generate complexity curve for a library\n"
-         "           lc_extrap  predict the yield for future experiments\n"
-         "           gc_extrap  predict genome coverage low input\n"
-         "                      sequencing experiments\n"
-         "           bound_pop  lower bound on population size\n"
-         "           pop_size   estimate number of unique species\n";
-  return oss.str();
-}
-
 int
-main(int argc, char *argv[]) {
+main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
+  CLI::App app{"preseq: a tool for analyzing sequencing library complexity"};
+  argv = app.ensure_utf8(argv);
+  app.formatter(std::make_shared<preseq_formatter>());
+  app.usage("\nUsage: preseq command [OPTIONS]");
+  // if (argc >= 3)
+  //   app.footer(rlstrip(footer_msg));
+
+  app.require_subcommand(0, 1);
+  app.allow_extras();
+
+  bool print_version{};
+
+  // clang-format off
+  app.add_flag("--version", print_version, "output version information and exit");
+  const auto lc_extrap = app.add_subcommand("lc_extrap", rlstrip(lc_extrap::about_msg));
+  const auto gc_extrap = app.add_subcommand("gc_extrap", rlstrip(gc_extrap::about_msg));
+  const auto pop_size = app.add_subcommand("pop_size", rlstrip(pop_size::about_msg));
+  const auto bound_pop = app.add_subcommand("bound_pop", rlstrip(bound_pop::about_msg));
+  const auto c_curve = app.add_subcommand("c_curve", rlstrip(c_curve::about_msg));
+  // clang-format on
+
   if (argc < 2) {
-    std::cerr << usage_message() << '\n';
+    // std::println("{}", app.help());
+    std::cout << app.help() << '\n';
+    return EXIT_SUCCESS;
+  }
+  CLI11_PARSE(app, argc, argv);
+
+  if (print_version) {
+    std::cout << VERSION << '\n';
     return EXIT_SUCCESS;
   }
 
-  static const std::string cmd = argv[1];  // NOLINT(*-pointer-arithmetic)
+  if (app.got_subcommand(lc_extrap))
+    return lc_extrap::main(argc - 1, argv + 1);
 
-  if (cmd == "lc_extrap")
-    return lc_extrap_main(argc - 1, argv + 1);
+  if (app.got_subcommand(gc_extrap))
+    return gc_extrap::main(argc - 1, argv + 1);
 
-  if (cmd == "c_curve")
-    return c_curve_main(argc - 1, argv + 1);
+  if (app.got_subcommand(c_curve))
+    return c_curve::main(argc - 1, argv + 1);
 
-  if (cmd == "gc_extrap")
-    return gc_extrap_main(argc - 1, argv + 1);
+  if (app.got_subcommand(pop_size))
+    return pop_size::main(argc - 1, argv + 1);
 
-  if (cmd == "bound_pop")
-    return bound_pop_main(argc - 1, argv + 1);
-
-  if (cmd == "pop_size")
-    return pop_size_main(argc - 1, argv + 1);
-
-  std::cerr << "Error: unrecognized command: "
-            << argv[1]  // NOLINT(*-pointer-arithmetic)
-            << '\n'
-            << usage_message() << '\n';
+  if (app.got_subcommand(bound_pop))
+    return bound_pop::main(argc - 1, argv + 1);
 
   return EXIT_FAILURE;
 }
