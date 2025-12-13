@@ -18,18 +18,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-static constexpr auto about_msg = R"(
-preseq pop_size: Estimate the total population size using a small sample from
-the population.
-)";
-
-static constexpr auto footer_msg = R"(
-Estimate the total population size using the approach described in Daley &
-Smith (2013), extrapolating to very long range. Default parameters assume that
-the initial sample represents at least 1e-9 of the population, which is
-sufficient for every example application we have seen.
-)";
-
 #include "pop_size.hpp"
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
@@ -60,8 +48,8 @@ using std::vector;
 
 // NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
-int
-pop_size_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
+auto
+pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     static const std::size_t min_required_counts = 4;
     static const string min_required_counts_error_message =
@@ -94,11 +82,11 @@ pop_size_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     std::size_t MAX_SEGMENT_LENGTH = 5000;
     uint32_t n_threads{1};
 #endif
-    CLI::App app{rlstrip(about_msg)};
+    CLI::App app{rlstrip(pop_size::about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq pop_size [OPTIONS]");
     if (argc >= 2)
-      app.footer(rlstrip(footer_msg));
+      app.footer(rlstrip(pop_size::footer_msg));
 
     // clang-format off
     app.add_option("-i,--input", input_file_name, "input file")

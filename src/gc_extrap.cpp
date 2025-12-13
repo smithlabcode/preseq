@@ -18,18 +18,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-static constexpr auto about_msg = R"(
-preseq gc_extrap: Extrapolate the size of the covered genome by mapped reads.
-)";
-
-static constexpr auto footer_msg = R"(
-This approach is described in Daley & Smith (2014). The method is the same as
-for lc_extrap: using rational function approximation to a power-series
-expansion for the number of "unobserved" bases in the initial sample. The
-gc_extrap method is adapted to deal with individual nucleotides rather than
-distinct reads.
-)";
-
 #include "gc_extrap.hpp"
 
 #include "common.hpp"
@@ -87,8 +75,8 @@ write_predicted_coverage_curve(
   }
 }
 
-int
-gc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
+auto
+gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     static constexpr auto MIN_REQUIRED_COUNTS = 4;
 

@@ -18,18 +18,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-constexpr auto about_msg = R"(
-preseq lc_extrap: Estimate the complexity curve for a sequencing library.
-)";
-
-constexpr auto footer_msg = R"(
-This is the approach described in Daley & Smith (2013). The method applies
-rational function approximation via continued fractions with the original goal
-of estimating the number of distinct reads that a sequencing library would
-yield upon deeper sequencing.  This method has been used for many different
-purposes since then.
-)";
-
 #include "lc_extrap.hpp"
 
 #include "common.hpp"
@@ -52,8 +40,8 @@ purposes since then.
 
 // NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
-int
-lc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
+auto
+lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     static const std::size_t min_required_counts = 4;
     static const std::string min_required_counts_error_message =
@@ -72,16 +60,16 @@ lc_extrap_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
     double c_level = 0.95;
     std::uint32_t seed = 408;
 
-    /* FLAGS */
-    bool verbose = false;
-    bool VALS_INPUT = false;
-    bool PAIRED_END = false;
-    bool HIST_INPUT = false;
-    bool SINGLE_ESTIMATE = false;
-    bool allow_defects = false;
+    // flags
+    bool verbose{false};
+    bool VALS_INPUT{false};
+    bool PAIRED_END{false};
+    bool HIST_INPUT{false};
+    bool SINGLE_ESTIMATE{false};
+    bool allow_defects{false};
 
 #ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT = false;
+    bool BAM_FORMAT_INPUT{false};
     std::size_t MAX_SEGMENT_LENGTH = 5000;
     std::uint32_t n_threads{1};
 #endif
