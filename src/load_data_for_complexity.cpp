@@ -92,9 +92,10 @@ get_input_format_type(const std::string &filename) -> input_format_type {
   std::string line;
   if (!std::getline(in, line))
     return input_format_type::unknown;
-  std::string s;
+
   std::uint32_t val1{}, val2{};
   {
+    std::string s;
     std::istringstream iss(line);
     if (iss >> s >> val1 >> val2)
       return input_format_type::bed;
