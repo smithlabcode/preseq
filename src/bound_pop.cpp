@@ -21,10 +21,12 @@
 #include "bound_pop.hpp"
 
 #include "common.hpp"
+#include "lnfact.hpp"
 #include "load_data_for_complexity.hpp"
 #include "moment_sequence.hpp"
 
 #include "CLI11/CLI11.hpp"
+#include "nlohmann/json.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -32,75 +34,46 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <memory>  // IWYU pragma: keep
 #include <numeric>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
-
-static void
-report_bootstrapped_moments(const std::vector<double> &bootstrap_moments,
-                            const MomentSequence &bootstrap_mom_seq,
-                            const std::vector<double> &points,
-                            const std::vector<double> &weights,
-                            const double estimated_unobs) {
-  std::cerr << "bootstrapped_moments=\n";
-  for (const auto m : bootstrap_moments)
-    std::cerr << m << '\n';
-  for (std::size_t k = 0; k < std::size(bootstrap_mom_seq.alpha); k++)
-    std::cerr << "alpha_" << k << '\t';
-  std::cerr << '\n';
-  for (const auto a : bootstrap_mom_seq.alpha)
-    std::cerr << a << '\t';
-  std::cerr << '\n';
-  for (std::size_t k = 0; k < std::size(bootstrap_mom_seq.beta); k++)
-    std::cerr << "beta_" << k << '\t';
-  std::cerr << '\n';
-  for (const auto b : bootstrap_mom_seq.beta)
-    std::cerr << b << '\t';
-  std::cerr << '\n';
-  std::cerr << "points=\t";
-  for (const auto p : points)
-    std::cerr << p << '\t';
-  std::cerr << '\n';
-  std::cerr << "weights=\t";
-  for (const auto w : weights)
-    std::cerr << w << '\t';
-  std::cerr << '\n';
-  std::cerr << "estimated_unobs=\t" << estimated_unobs << '\n';
-}
+// NOLINTBEGIN(*-narrowing-conversions)
 
 // bounding n_0
 auto
 bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
   try {
+    const auto normalize =
+      [](auto &x) {  // cppcheck-suppress constParameterReference
+        const auto d = std::accumulate(std::cbegin(x), std::cend(x), 0.0);
+        std::transform(std::cbegin(x), std::cend(x), std::begin(x),
+                       [&](const auto y) { return y / d; });
+      };
+
     bool verbose{false};
-    bool PAIRED_END{false};
-    bool HIST_INPUT{false};
-    bool VALS_INPUT{false};
-    bool QUICK_MODE{false};
+    bool paired_end{false};
+    bool quick_mode{false};
 
     std::string input_file_name;
     std::string outfile;
     std::string histogram_outfile;
 
-#ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT{false};
-    std::size_t MAX_SEGMENT_LENGTH{5000};
-    std::uint32_t n_threads{1};
-#endif
-
+    // NOLINTBEGIN(*-avoid-magic-numbers)
     std::size_t max_num_points = 10;
     double tolerance = 1e-20;
     std::size_t n_bootstraps = 500;
     double c_level = 0.95;
     std::size_t max_iter = 100;
     std::uint32_t seed = 408;
+    // NOLINTEND(*-avoid-magic-numbers)
+
+    std::uint32_t n_threads{1};
 
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
@@ -114,28 +87,17 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
       ->option_text("FILE")
       ->required()
       ->check(CLI::ExistingFile);
-    app.add_option("-o,--output", outfile,
-                   "species richness output file (default: print to screen)");
-    app.add_option("-p,--max_num_points", max_num_points,
+    app.add_option("-o,--output", outfile, "output file");
+    app.add_option("-m,--max-points", max_num_points,
                    "maximum number of points in quadrature estimates");
     app.add_option("-t,--tolerance", tolerance, "numerical tolerance");
     app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
-    app.add_option("-c,--clevel", c_level, "level for confidence intervals");
-    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_flag("-H,--hist", HIST_INPUT,
-                 "input is a text file containing the observed histogram");
-    app.add_flag("-V,--vals", VALS_INPUT,
-                 "input is a text file containing only the observed duplicate counts");
-#ifdef HAVE_HTSLIB
-    app.add_flag("-B,--bam", BAM_FORMAT_INPUT,
-                 "input is in BAM format");
-    app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
-                   "maximum segment length when merging paired end bam reads");
-#endif
-    app.add_flag("-Q,--quick", QUICK_MODE,
-                 "quick mode, estimate without bootstrapping");
+    app.add_option("-c,--ci-level", c_level, "level for confidence intervals");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_flag("-v,--verbose", verbose, "print more info");
+    app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
+    app.add_flag("-Q,--quick", quick_mode,
+                 "quick mode, estimate without bootstrapping");
+    app.add_flag("-v,--verbose", verbose, "print moments and boostraps with output");
     // clang-format on
 
     if (argc < 3) {
@@ -145,39 +107,25 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
+    const auto input_format = get_input_format_type(input_file_name);
+    if (is_unknown(input_format)) {
+      std::cerr << "unknown input format\n";
+      return EXIT_FAILURE;
+    }
+
     const auto [n_obs, counts_hist] = [&] {
-      if (HIST_INPUT) {
-        if (verbose)
-          std::cerr << "HIST_INPUT\n";
+      if (is_hist(input_format))
         return load_histogram(input_file_name);
-      }
-      else if (VALS_INPUT) {
-        if (verbose)
-          std::cerr << "VALS_INPUT\n";
+      if (is_counts(input_format))
         return load_counts(input_file_name);
-      }
 #ifdef HAVE_HTSLIB
-      else if (BAM_FORMAT_INPUT && PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BAM_INPUT\n";
-        return load_counts_BAM_pe(n_threads, input_file_name);
-      }
-      else if (BAM_FORMAT_INPUT) {
-        if (verbose)
-          std::cerr << "BAM_INPUT\n";
-        return load_counts_BAM_se(n_threads, input_file_name);
-      }
+      if (is_bam(input_format))
+        return paired_end ? load_counts_BAM_pe(n_threads, input_file_name)
+                          : load_counts_BAM_se(n_threads, input_file_name);
 #endif
-      else if (PAIRED_END) {
-        if (verbose)
-          std::cerr << "PAIRED_END_BED_INPUT\n";
-        return load_counts_bed_pe(input_file_name);
-      }
-      else {  // default is single end bed file
-        if (verbose)
-          std::cerr << "BED_INPUT\n";
-        return load_counts_bed_se(input_file_name);
-      }
+      //  if (is_bed(input_format))
+      return paired_end ? load_counts_bed_pe(input_file_name)
+                        : load_counts_bed_se(input_file_name);
     }();
 
     const double distinct_obs =
@@ -185,177 +133,108 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
 
     std::vector<double> measure_moments;
     // mu_r = (r + 1)! n_{r+1} / n_1
-    std::size_t idx = 1;
-    while (idx < std::size(counts_hist) && counts_hist[idx]) {
-      // idx + 1 because function calculates (x-1)!
-      measure_moments.push_back(std::exp(log_factorial(idx + 1) +
-                                         std::log(counts_hist[idx]) -
-                                         std::log(counts_hist[1])));
-      if (!std::isfinite(measure_moments.back())) {
-        measure_moments.pop_back();
+    for (auto i = 1u; i < std::size(counts_hist) && counts_hist[i]; ++i) {
+      const auto mm = std::exp(lnfact(i + 1) + std::log(counts_hist[i]) -
+                               std::log(counts_hist[1]));
+      if (!std::isfinite(mm))
         break;
-      }
-      ++idx;
-    }
-
-    if (verbose) {
-      std::cerr << "TOTAL OBSERVATIONS     = " << n_obs << '\n'
-                << "DISTINCT OBSERVATIONS  = " << distinct_obs << '\n'
-                << "MAX COUNT              = " << std::size(counts_hist) - 1
-                << '\n';
-
-      std::cerr << "OBSERVED MOMENTS\n";
-      for (std::size_t i = 0; i < std::size(measure_moments); i++)
-        std::cerr << std::setprecision(16) << measure_moments[i] << '\n';
+      measure_moments.push_back(mm);
     }
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
 
-    if (QUICK_MODE) {
+    std::vector<nlohmann::json> bootstraps;
+    nlohmann::json output;
+
+    if (quick_mode) {
       if (std::size(measure_moments) > 2 * max_num_points)
         measure_moments.resize(2 * max_num_points);
 
-      std::size_t n_points =
-        ensure_pos_def_mom_seq(measure_moments, tolerance, verbose);
-      if (verbose)
-        std::cerr << "n_points = " << n_points << '\n';
-
+      auto n_points = ensure_pos_def_mom_seq(measure_moments, tolerance);
       MomentSequence obs_mom_seq(measure_moments);
 
-      if (verbose) {
-        for (std::size_t k = 0; k < std::size(obs_mom_seq.alpha); k++)
-          std::cerr << "alpha_" << k << '\t';
-        std::cerr << '\n';
-        for (std::size_t k = 0; k < std::size(obs_mom_seq.alpha); k++)
-          std::cerr << obs_mom_seq.alpha[k] << '\t';
-        std::cerr << '\n';
-
-        for (std::size_t k = 0; k < std::size(obs_mom_seq.beta); k++)
-          std::cerr << "beta_" << k << '\t';
-        std::cerr << '\n';
-        for (std::size_t k = 0; k < std::size(obs_mom_seq.beta); k++)
-          std::cerr << obs_mom_seq.beta[k] << '\t';
-        std::cerr << '\n';
-      }
-
       std::vector<double> points, weights;
-      obs_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter, points,
+      obs_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter, points,
                                          weights);
+      normalize(weights);
 
-      // renormalize if needed
-      const double weights_sum =
-        std::accumulate(std::cbegin(weights), std::cend(weights), 0.0);
-      if (weights_sum != 1.0)
-        for (std::size_t i = 0; i < std::size(weights); i++)
-          weights[i] = weights[i] / weights_sum;
-
-      if (verbose) {
-        std::cerr << "points = \n";
-        for (const auto p : points)
-          std::cerr << p << '\t';
-        std::cerr << '\n';
-
-        std::cerr << "weights = \n";
-        for (const auto w : weights)
-          std::cerr << w << '\t';
-        std::cerr << '\n';
-      }
-
-      double estimated_unobs = 0.0;
-
-      for (std::size_t i = 0; i < std::size(weights); i++)
-        estimated_unobs += counts_hist[1] * weights[i] / points[i];
-
-      if (estimated_unobs > 0.0)
-        estimated_unobs += distinct_obs;
-      else {
-        estimated_unobs = distinct_obs;
+      const auto n_1 = counts_hist[1];
+      const auto term = [n_1](const auto w, const auto p) {
+        return n_1 * w / p;
+      };
+      auto estimated_unobs =
+        std::inner_product(std::cbegin(weights), std::cend(weights),
+                           std::cbegin(points), 0.0, std::plus<>(), term);
+      estimated_unobs = std::max(estimated_unobs, 0.0) + distinct_obs;
+      if (estimated_unobs == distinct_obs)
         n_points = 0;
-      }
 
-      std::ofstream of;
-      if (!outfile.empty())
-        of.open(outfile);
-      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
-
-      out << "quadrature_estimated_unobs" << '\t' << "n_points\n"
-          << estimated_unobs << '\t' << n_points << '\n';
+      output = {
+        {"quadrature_estimated_unobs", estimated_unobs},
+        {"n_points", n_points},
+      };
     }
-    // NOT QUICK MODE, BOOTSTRAP
     else {
+      // do bootstraps
       std::vector<double> quad_estimates;
 
-      // setup rng
-      std::mt19937 rng(seed);
+      std::mt19937 rng(seed);  // setup rng
 
       // hist may be sparse, to speed up bootstrapping
       // sample only from positive entries
       std::vector<std::size_t> counts_hist_distinct_counts;
       std::vector<double> distinct_counts_hist;
-      for (std::size_t i = 0; i < std::size(counts_hist); i++)
+      for (std::size_t i = 0; i < std::size(counts_hist); ++i)
         if (counts_hist[i] > 0) {
           counts_hist_distinct_counts.push_back(i);
           distinct_counts_hist.push_back(counts_hist[i]);
         }
 
-      for (std::size_t iter = 0;
-           iter < max_iter && std::size(quad_estimates) < n_bootstraps;
-           ++iter) {
-        if (verbose)
-          std::cerr << "iter=" << "\t" << iter << '\n';
-
+      for (auto i = 0u;
+           i < max_iter && std::size(quad_estimates) < n_bootstraps; ++i) {
         std::vector<double> sample_hist;
         resample_hist(rng, counts_hist_distinct_counts, distinct_counts_hist,
                       sample_hist);
-
         const double sampled_distinct = std::accumulate(
           std::cbegin(sample_hist), std::cend(sample_hist), 0.0);
 
-        // initialize moments, 0th moment is 1
+        // initialize moments, 0-th moment is 1
         std::vector<double> bootstrap_moments(1, 1.0);
         // moments[r] = (r + 1)! n_{r+1} / n_1
-        for (std::size_t i = 0; i < 2 * max_num_points; i++)
-          bootstrap_moments.push_back(std::exp(log_factorial(i + 3) +
-                                               std::log(sample_hist[i + 2]) -
+        for (std::size_t j = 0; j < 2 * max_num_points; ++j)
+          bootstrap_moments.push_back(std::exp(lnfact(j + 3) +
+                                               std::log(sample_hist[j + 2]) -
                                                std::log(sample_hist[1])));
-
-        std::size_t n_points =
-          ensure_pos_def_mom_seq(bootstrap_moments, tolerance, verbose);
-        n_points = std::min(n_points, max_num_points);
-        if (verbose)
-          std::cerr << "n_points = " << n_points << '\n';
+        const auto n_points = std::min(
+          ensure_pos_def_mom_seq(bootstrap_moments, tolerance), max_num_points);
 
         MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
         std::vector<double> points;
         std::vector<double> weights;
-        bootstrap_mom_seq.Lower_quadrature_rules(n_points, tolerance, max_iter,
+        bootstrap_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter,
                                                  points, weights);
+        normalize(weights);
 
-        // renormalize if needed
-        const double weights_sum =
-          std::accumulate(std::cbegin(weights), std::cend(weights), 0.0);
-        if (weights_sum != 1.0)
-          for (std::size_t i = 0; i < std::size(weights); i++)
-            weights[i] = weights[i] / weights_sum;
-
-        double estimated_unobs = 0.0;
-
-        for (std::size_t i = 0; i < std::size(weights); i++)
-          estimated_unobs += counts_hist[1] * weights[i] / points[i];
-
-        if (estimated_unobs > 0.0)
-          estimated_unobs += sampled_distinct;
-        else
-          estimated_unobs = sampled_distinct;
+        const auto n_1 = counts_hist[1];
+        const auto term = [n_1](const auto w, const auto p) {
+          return n_1 * w / p;
+        };
+        auto estimated_unobs =
+          std::inner_product(std::cbegin(weights), std::cend(weights),
+                             std::cbegin(points), 0.0, std::plus<>(), term);
+        estimated_unobs = std::max(estimated_unobs, 0.0) + sampled_distinct;
 
         if (verbose)
-          report_bootstrapped_moments(bootstrap_moments, bootstrap_mom_seq,
-                                      points, weights, estimated_unobs);
+          bootstraps.push_back(nlohmann::json({
+            {"bootstrapped_moments", bootstrap_moments},
+            {"alpha", bootstrap_mom_seq.alpha},
+            {"beta", bootstrap_mom_seq.alpha},
+            {"points", points},
+            {"weights", weights},
+            {"estimated_unobs", estimated_unobs},
+          }));
 
         quad_estimates.push_back(estimated_unobs);
       }
@@ -365,19 +244,27 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
       double upper_ci{};
       median_and_ci(quad_estimates, c_level, median_estimate, lower_ci,
                     upper_ci);
-
-      std::ofstream of;
-      if (!outfile.empty())
-        of.open(outfile);
-      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
-
-      out << "median_estimated_unobs" << '\t' << "lower_ci" << '\t'
-          << "upper_ci\n"
-          << median_estimate << '\t' << lower_ci << '\t' << upper_ci << '\n';
+      output = {
+        {"median_estimated_unobs", median_estimate},
+        {"lower_ci", lower_ci},
+        {"upper_ci", upper_ci},
+      };
     }
+
+    std::ofstream of;
+    if (!outfile.empty())
+      of.open(outfile);
+    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+    if (!outfile.empty() && !out)
+      throw std::runtime_error("failed to open output file: " + outfile);
+
+    output["total_observations"] = n_obs;
+    output["distinct_observations"] = distinct_obs;
+    output["max_count"] = std::size(counts_hist) - 1;
+    output["observed_moments"] = measure_moments;
+    if (verbose && !quick_mode)
+      output["bootstraps"] = bootstraps;
+    out << output.dump(4) << '\n';
   }
   catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
@@ -386,4 +273,4 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
   return EXIT_SUCCESS;
 }
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTEND(*-narrowing-conversions)
