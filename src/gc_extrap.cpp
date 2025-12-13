@@ -37,35 +37,46 @@
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTBEGIN(*-narrowing-conversions)
+
+static auto
+write_output(const std::string &outfile, const std::uint32_t bin_size,
+             const std::uint32_t base_step_size,
+             const std::vector<double> &coverage_estimates) {
+  std::ofstream out(outfile);
+  if (!out)
+    throw std::runtime_error("failed to open output file: " + outfile);
+
+  out << "TOTAL_BASES\tEXPECTED_DISTINCT\n";
+
+  out << 0 << '\t' << 0 << '\n';
+  for (auto i = 0u; i < std::size(coverage_estimates); ++i)
+    out << (i + 1) * base_step_size << '\t' << coverage_estimates[i] * bin_size
+        << '\n';
+}
 
 // ADS: functions same, header different (above and this one)
-static void
+static auto
 write_predicted_coverage_curve(
   const std::string &outfile, const double c_level, const double base_step_size,
-  const std::size_t bin_size, const std::vector<double> &cvrg_estimates,
+  const std::uint32_t bin_size, const std::vector<double> &cvrg_estimates,
   const std::vector<double> &cvrg_lower_ci_lognorm,
   const std::vector<double> &cvrg_upper_ci_lognorm) {
   static constexpr double one_hundred = 100.0;
-  std::ofstream of;
-  if (!outfile.empty())
-    of.open(outfile);
-  std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+  std::ofstream out(outfile);
+  if (!out)
+    throw std::runtime_error("failed to open output file: " + outfile);
 
   const double percentile = one_hundred * c_level;
   // clang-format off
   out << "TOTAL_BASES" << '\t'
       << "EXPECTED_COVERED_BASES" << '\t'
-      << "LOWER_" << percentile << "%CI" << '\t'
-      << "UPPER_" << percentile << "%CI"
-      << '\n';
+      << "LOWER_" << percentile << "_CI" << '\t'
+      << "UPPER_" << percentile << "_CI\n";
   // clang-format on
 
-  out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-  out.precision(1);
-
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
-  for (std::size_t i = 0; i < std::size(cvrg_estimates); ++i) {
+  for (auto i = 0u; i < std::size(cvrg_estimates); ++i) {
     // clang-format off
     out << (i + 1) * base_step_size << '\t'
         << cvrg_estimates[i] * bin_size << '\t'
@@ -78,29 +89,30 @@ write_predicted_coverage_curve(
 auto
 gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
-    static constexpr auto MIN_REQUIRED_COUNTS = 4;
+    static constexpr auto min_required_counts = 4;
+    static constexpr auto max_iter_per_bootstrap = 10;
 
     std::string outfile;
     std::string infile;
     std::string histogram_outfile;
 
+    // NOLINTBEGIN(*-avoid-magic-numbers)
     int diagonal = 0;
-    std::size_t orig_max_terms = 100;
-    std::size_t bin_size = 10;
-    bool verbose = false;
+    std::uint32_t orig_max_terms = 100;
+    std::uint32_t bin_size = 10;
     double base_step_size = 1.0e8;
-    std::size_t max_width = 10000;
-    bool SINGLE_ESTIMATE = false;
+    std::uint32_t max_width = 10000;
     double max_extrap = 1.0e12;
-    std::size_t n_bootstraps = 100;
+    std::uint32_t n_bootstraps = 100;
     std::uint32_t seed = 408;
-    bool allow_defects = false;
-
     double c_level = 0.95;
-    bool BAM_FORMAT_INPUT = false;
-#ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
-#endif
+    // NOLINTEND(*-avoid-magic-numbers)
+
+    bool allow_defects{false};
+    bool verbose{false};
+    bool single_estimate{false};
+
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq gc_extrap [OPTIONS]");
@@ -124,11 +136,8 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum number of terms");
-#ifdef HAVE_HTSLIB
-    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
-#endif
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
+    app.add_flag("-Q,--quick", single_estimate,
                  "quick mode: run gc_extrap without bootstrapping for confidence intervals");
     app.add_flag("-D,--defects", allow_defects,
                  "defects mode to extrapolate without testing for defects");
@@ -142,19 +151,19 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     }
     CLI11_PARSE(app, argc, argv);
 
-    const auto input_format = BAM_FORMAT_INPUT ? "BAM" : "BED";
+    const auto bam_format_input = is_sam_or_bam_format(infile);
+
+    const auto input_format = bam_format_input ? "BAM" : "BED";
     if (verbose)
       std::cerr << "LOADING READS (" << input_format << " format)\n";
 
-    const auto [n_reads, coverage_hist] = [&] {
+    const auto [n_reads, coverage_hist] =
 #ifdef HAVE_HTSLIB
-      if (BAM_FORMAT_INPUT)
-        return load_coverage_counts_BAM(n_threads, infile, seed, bin_size,
-                                        max_width);
-      else
+      bam_format_input
+        ? load_coverage_counts_BAM(n_threads, infile, seed, bin_size, max_width)
+        :
 #endif
-        return load_coverage_counts(infile, seed, bin_size, max_width);
-    }();
+        load_coverage_counts(infile, seed, bin_size, max_width);
 
     const auto total_bins = get_counts_from_hist(coverage_hist);
     const auto distinct_bins = std::accumulate(std::cbegin(coverage_hist),
@@ -162,10 +171,10 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     const double avg_bins_per_read = total_bins / n_reads;
     const double bin_step_size = base_step_size / bin_size;
 
-    const std::size_t max_observed_count = std::size(coverage_hist) - 1;
+    const std::uint32_t max_observed_count = std::size(coverage_hist) - 1;
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
-    std::size_t first_zero{1};
+    std::uint32_t first_zero{1};
     while (first_zero < std::size(coverage_hist) &&
            coverage_hist[first_zero] > 0)
       ++first_zero;
@@ -188,7 +197,7 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       report_histogram(histogram_outfile, coverage_hist);
 
     // catch if all reads are distinct
-    if (orig_max_terms < MIN_REQUIRED_COUNTS)
+    if (orig_max_terms < min_required_counts)
       throw std::runtime_error("max count before zero is les than min required "
                                "count (4), sample not sufficiently deep or "
                                "duplicates removed");
@@ -204,35 +213,22 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
 
     std::vector<double> coverage_estimates;
 
-    if (SINGLE_ESTIMATE) {
-      bool SINGLE_ESTIMATE_SUCCESS = extrap_single_estimate(
+    if (single_estimate) {
+      const auto success = extrap_single_estimate(
         verbose, allow_defects, coverage_hist, orig_max_terms, diagonal,
         bin_step_size, max_extrap / bin_size, coverage_estimates);
       // IF FAILURE, EXIT
-      if (!SINGLE_ESTIMATE_SUCCESS)
-        throw std::runtime_error("SINGLE ESTIMATE FAILED, NEED TO RUN IN "
-                                 "FULL MODE FOR ESTIMATES");
+      if (!success)
+        throw std::runtime_error(
+          "Single estimate failed. Run in full mode for estimates");
 
-      std::ofstream of;
-      if (!outfile.empty())
-        of.open(outfile);
-      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
-
-      out << "TOTAL_BASES\tEXPECTED_DISTINCT\n";
-
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
-
-      out << 0 << '\t' << 0 << '\n';
-      for (std::size_t i = 0; i < std::size(coverage_estimates); ++i)
-        out << (i + 1) * base_step_size << '\t'
-            << coverage_estimates[i] * bin_size << '\n';
+      write_output(outfile, bin_size, base_step_size, coverage_estimates);
     }
     else {
       if (verbose)
         std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
 
-      const std::size_t max_iter = 10 * n_bootstraps;
+      const std::uint32_t max_iter = max_iter_per_bootstrap * n_bootstraps;
 
       std::vector<std::vector<double>> bootstrap_estimates;
       extrap_bootstrap(verbose, allow_defects, seed, coverage_hist,
@@ -261,4 +257,4 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   return EXIT_SUCCESS;
 }
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions)
+// NOLINTEND(*-narrowing-conversions)
