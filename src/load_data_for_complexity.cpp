@@ -46,13 +46,28 @@
 // NOLINTBEGIN(*-narrowing-conversions)
 
 [[nodiscard]] auto
-is_sam_or_bam_format(const std::string &filename) -> bool {
-  {
-    // make sure the file can be opened at all
-    std::ifstream in(filename);
-    if (!in)
-      throw std::runtime_error("failed to open file: " + filename);
+to_string(input_format_type t) -> std::string {
+  switch (t) {
+  case input_format_type::bam:
+    return "BAM";
+  case input_format_type::bed:
+    return "BED";
+  case input_format_type::hist:
+    return "HIST";
+  case input_format_type::counts:
+    return "COUNTS";
+  default:  // case input_format_type::counts:
+    return "UNKNOWN";
   }
+  return std::string();
+}
+
+[[nodiscard]] auto
+is_sam_or_bam_format(const std::string &filename) -> bool {
+  // make sure the file can be opened at all
+  std::ifstream in(filename);
+  if (!in)
+    throw std::runtime_error("failed to open file: " + filename);
 #ifdef HAVE_HTSLIB
   // if the file can be opened and has a header, we can get reads from it
   bamxx::bam_in hts(filename);
@@ -63,6 +78,38 @@ is_sam_or_bam_format(const std::string &filename) -> bool {
     return true;
 #endif
   return false;
+}
+
+[[nodiscard]] auto
+get_input_format_type(const std::string &filename) -> input_format_type {
+  if (is_sam_or_bam_format(filename))
+    return input_format_type::bam;
+
+  std::ifstream in(filename);
+  if (!in)
+    throw std::runtime_error("failed to open file: " + filename);
+
+  std::string line;
+  if (!std::getline(in, line))
+    return input_format_type::unknown;
+  std::string s;
+  std::uint32_t val1{}, val2{};
+  {
+    std::istringstream iss(line);
+    if (iss >> s >> val1 >> val2)
+      return input_format_type::bed;
+  }
+  {
+    std::istringstream iss(line);
+    if (iss >> val1 >> val2)
+      return input_format_type::hist;
+  }
+  {
+    std::istringstream iss(line);
+    if (iss >> val1)
+      return input_format_type::bed;
+  }
+  return input_format_type::unknown;
 }
 
 template <typename T>
