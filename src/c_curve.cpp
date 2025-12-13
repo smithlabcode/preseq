@@ -17,11 +17,6 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-static constexpr auto about_msg = R"(
-Generate the full observed complexity curve for data. This does not
-extrapolate, but instead resamples from the given data.
-)";
-
 #include "c_curve.hpp"
 
 #include "common.hpp"
@@ -42,8 +37,8 @@ extrapolate, but instead resamples from the given data.
 
 // NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
-int
-c_curve_main(int argc, char *argv[]) {  // NOLINT(*-avoid-c-arrays)
+auto
+c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     bool verbose = false;
     bool PAIRED_END = false;
