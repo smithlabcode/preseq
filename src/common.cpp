@@ -21,9 +21,9 @@
 #include "common.hpp"
 
 #include "continued_fraction.hpp"
+#include "lnfact.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -33,78 +33,39 @@
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions,*-constant-array-index)
+// NOLINTBEGIN(*-narrowing-conversions)
 
 [[nodiscard]] auto
 GoodToulmin2xExtrap(const std::vector<double> &counts_hist) -> double {
   double two_fold_extrap = 0.0;
-  for (std::size_t i = 0; i < std::size(counts_hist); ++i)
-    two_fold_extrap += pow(-1.0, i + 1) * counts_hist[i];
+  for (std::size_t i = 0; i < std::size(counts_hist); ++i) {
+    const int sign = (i % 2 == 0) ? -1 : 1;  // (-1)^(i+1)
+    two_fold_extrap += sign * counts_hist[i];
+  }
   return two_fold_extrap;
 }
 
-// Lanczos approximation for gamma function for x >= 0.5 - essentially an
-// approximation for (x-1)!
-[[nodiscard]] auto
-log_factorial(double x) -> double {
-  // constants
-  static constexpr double LogRootTwoPi = 0.9189385332046727;
-  static constexpr double Euler = 2.71828182845904523536028747135;
-
-  // clang-format off
-  static const auto Lanczos = std::array<double, 9>{
-    0.99999999999980993227684700473478,
-    676.520368121885098567009190444019,
-    -1259.13921672240287047156078755283,
-    771.3234287776530788486528258894,
-    -176.61502916214059906584551354,
-    12.507343278686904814458936853,
-    -0.13857109526572011689554707,
-    9.984369578019570859563e-6,
-    1.50563273514931155834e-7,
-  };
-  // clang-format on
-
-  // Approximation for factorial is actually x-1
-  x -= 1.0;
-
-  double Ag = Lanczos[0];
-  for (auto k = 1u; k < std::size(Lanczos); ++k)
-    Ag += Lanczos[k] / (x + k);
-
-  const double term1 = (x + 0.5) * std::log((x + 7.5) / Euler);
-  const double term2 = LogRootTwoPi + std::log(Ag);
-
-  return term1 + (term2 - 7.0);
-}
-
-// interpolate by explicit calculating the expectation
-// for sampling without replacement;
-// see K.L Heck 1975
-// N total sample size; S the total number of distincts
-// n sub sample size
+// interpolate by explicit calculating the expectation for sampling without
+// replacement; see K.L Heck 1975
+//
+// -- N total sample size; S the total number of distincts
+// -- n sub sample size
 [[nodiscard]] auto
 interpolate_distinct(const std::vector<double> &hist, const std::size_t N,
                      const std::size_t S, const std::size_t n) -> double {
-  const double log_denom =
-    log_factorial(N + 1) - log_factorial(n + 1) - log_factorial(N - n + 1);
-
+  const double log_denom = lnfact(N + 1) - lnfact(n + 1) - lnfact(N - n + 1);
   std::vector<double> numer(hist.size(), 0);
   for (std::size_t i = 1; i < std::size(hist); ++i) {
-    // N - i -n + 1 should be greater than 0
-    if (N < i + n) {
-      numer[i] = 0;
-    }
-    else {
-      const double x = (log_factorial(N - i + 1) - log_factorial(n + 1) -
-                        log_factorial(N - i - n + 1));
-      numer[i] = std::exp(x - log_denom) * hist[i];
-    }
+    // N - i - n + 1 should be greater than 0
+    if (N < i + n)
+      continue;
+    const auto x = lnfact(N - i + 1) - lnfact(n + 1) - lnfact(N - i - n + 1);
+    numer[i] = std::exp(x - log_denom) * hist[i];
   }
   return S - std::accumulate(std::cbegin(numer), std::cend(numer), 0);
 }
 
-static void
+static auto
 extrapolate_curve(const ContinuedFraction &the_cf,
                   const double initial_distinct, const double vals_sum,
                   const double initial_sample_size, const double step_size,
@@ -139,7 +100,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
     yield_estimate.push_back(
       interpolate_distinct(hist, upper_limit, initial_distinct, sample));
 
-  // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
+  // ensure that the max terms are acceptable
   std::size_t first_zero = 1;
   while (first_zero < std::size(hist) && hist[first_zero] > 0)
     ++first_zero;
@@ -190,17 +151,19 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
 
 void
 extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
-                 const std::uint32_t seed, const std::vector<double> &orig_hist,
+                 const std::uint32_t rng_seed,
+                 const std::vector<double> &orig_hist,
                  const std::size_t n_bootstraps,
                  const std::size_t orig_max_terms, const int diagonal,
                  const double bin_step_size, const double max_extrap,
                  const std::size_t max_iter,
                  std::vector<std::vector<double>> &bootstrap_estimates) {
+  static constexpr auto progress_width = 72;  // bootstrap success progress
   // clear returning vectors
   bootstrap_estimates.clear();
 
   // setup rng
-  std::mt19937 rng(seed);
+  std::mt19937 rng(rng_seed);
 
   const double initial_distinct =
     std::accumulate(std::cbegin(orig_hist), std::cend(orig_hist), 0.0);
@@ -216,8 +179,8 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
   for (std::size_t iter = 0;
        (iter < max_iter && std::size(bootstrap_estimates) < n_bootstraps);
        ++iter) {
-    if (VERBOSE && iter > 0 && iter % 72 == 0)
-      std::cerr << '\n';  // bootstrap success progress only 72 char wide
+    if (VERBOSE && iter > 0 && iter % progress_width == 0)
+      std::cerr << '\n';
 
     std::vector<double> yield_vector;
     std::vector<double> hist;
@@ -379,7 +342,7 @@ resample_hist(std::mt19937 &gen,
 template <typename T>
 [[nodiscard]] auto
 median_from_sorted_vector(const std::vector<T> &sorted_data,
-                          const std::size_t stride, const std::size_t n) -> T {
+                          const std::size_t n) -> T {
   if (n == 0 || sorted_data.empty())
     return 0.0;
 
@@ -387,28 +350,26 @@ median_from_sorted_vector(const std::vector<T> &sorted_data,
   const std::size_t rhs = n / 2;
 
   if (lhs == rhs)
-    return sorted_data[lhs * stride];
+    return sorted_data[lhs];
 
-  return (sorted_data[lhs * stride] + sorted_data[rhs * stride]) / 2.0;
+  return (sorted_data[lhs] + sorted_data[rhs]) / static_cast<T>(2);
 }
 
 template <typename T>
 [[nodiscard]] auto
 quantile_from_sorted_vector(const std::vector<T> &sorted_data,
-                            const std::size_t stride, const std::size_t n,
-                            const double f) -> T {
+                            const std::size_t n, const double f) -> T {
   const double index = f * (n - 1);
-  const std::size_t lhs = static_cast<int>(index);
+  const std::size_t lhs = static_cast<std::size_t>(index);
   const double delta = index - lhs;
 
   if (n == 0 || sorted_data.empty())
     return 0.0;
 
-  if (lhs == n - 1)
-    return sorted_data[lhs * stride];
+  if (lhs + 1 == n)
+    return sorted_data[lhs];
 
-  return (1 - delta) * sorted_data[lhs * stride] +
-         delta * sorted_data[(lhs + 1) * stride];
+  return (1 - delta) * sorted_data[lhs] + delta * sorted_data[lhs + 1];
 }
 
 // Confidence interval stuff
@@ -422,10 +383,10 @@ median_and_ci(std::vector<double> estimates,  // by val so we can sort them
   const double alpha = 1.0 - ci_level;
   const std::size_t N = std::size(estimates);
 
-  median_estimate = median_from_sorted_vector(estimates, 1, N);
-  lower_ci_estimate = quantile_from_sorted_vector(estimates, 1, N, alpha / 2);
+  median_estimate = median_from_sorted_vector(estimates, N);
+  lower_ci_estimate = quantile_from_sorted_vector(estimates, N, alpha / 2);
   upper_ci_estimate =
-    quantile_from_sorted_vector(estimates, 1, N, 1.0 - alpha / 2);
+    quantile_from_sorted_vector(estimates, N, 1.0 - alpha / 2);
 }
 
-// NOLINTEND(*-avoid-magic-numbers,*-narrowing-conversions,*-constant-array-index)
+// NOLINTEND(*-narrowing-conversions)
