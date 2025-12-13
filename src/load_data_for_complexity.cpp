@@ -45,6 +45,26 @@
 
 // NOLINTBEGIN(*-narrowing-conversions)
 
+[[nodiscard]] auto
+is_sam_or_bam_format(const std::string &filename) -> bool {
+  {
+    // make sure the file can be opened at all
+    std::ifstream in(filename);
+    if (!in)
+      throw std::runtime_error("failed to open file: " + filename);
+  }
+#ifdef HAVE_HTSLIB
+  // if the file can be opened and has a header, we can get reads from it
+  bamxx::bam_in hts(filename);
+  if (!hts)
+    return false;
+  bamxx::bam_header hdr(hts);
+  if (hdr)
+    return true;
+#endif
+  return false;
+}
+
 template <typename T>
 [[nodiscard]] static inline auto
 width(const T &x) -> std::uint32_t {
