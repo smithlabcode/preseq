@@ -18,11 +18,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-const auto about_msg = R"(
-preseq bound_pop: Estimate the size of the underlying population based on
-counts of observed species in an initial sample.
-)";
-
 #include "bound_pop.hpp"
 
 #include "common.hpp"
@@ -81,22 +76,22 @@ report_bootstrapped_moments(const std::vector<double> &bootstrap_moments,
 }
 
 // bounding n_0
-int
-bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
+auto
+bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
   try {
-    bool verbose = false;
-    bool PAIRED_END = false;
-    bool HIST_INPUT = false;
-    bool VALS_INPUT = false;
-    bool QUICK_MODE = false;
+    bool verbose{false};
+    bool PAIRED_END{false};
+    bool HIST_INPUT{false};
+    bool VALS_INPUT{false};
+    bool QUICK_MODE{false};
 
     std::string input_file_name;
     std::string outfile;
     std::string histogram_outfile;
 
 #ifdef HAVE_HTSLIB
-    bool BAM_FORMAT_INPUT = false;
-    std::size_t MAX_SEGMENT_LENGTH = 5000;
+    bool BAM_FORMAT_INPUT{false};
+    std::size_t MAX_SEGMENT_LENGTH{5000};
     std::uint32_t n_threads{1};
 #endif
 
@@ -128,17 +123,17 @@ bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
     app.add_option("-c,--clevel", c_level, "level for confidence intervals");
     app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
     app.add_flag("-H,--hist", HIST_INPUT,
-                   "input is a text file containing the observed histogram");
+                 "input is a text file containing the observed histogram");
     app.add_flag("-V,--vals", VALS_INPUT,
-                   "input is a text file containing only the observed duplicate counts");
+                 "input is a text file containing only the observed duplicate counts");
 #ifdef HAVE_HTSLIB
     app.add_flag("-B,--bam", BAM_FORMAT_INPUT,
-                   "input is in BAM format");
+                 "input is in BAM format");
     app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
                    "maximum segment length when merging paired end bam reads");
 #endif
     app.add_flag("-Q,--quick", QUICK_MODE,
-                   "quick mode, estimate without bootstrapping");
+                 "quick mode, estimate without bootstrapping");
     app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
@@ -193,7 +188,7 @@ bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
     std::size_t idx = 1;
     while (idx < std::size(counts_hist) && counts_hist[idx]) {
       // idx + 1 because function calculates (x-1)!
-      measure_moments.push_back(std::exp(factorial(idx + 1) +
+      measure_moments.push_back(std::exp(log_factorial(idx + 1) +
                                          std::log(counts_hist[idx]) -
                                          std::log(counts_hist[1])));
       if (!std::isfinite(measure_moments.back())) {
@@ -324,7 +319,7 @@ bound_pop_main(int argc, char *argv[]) {  // NOLINT (*-avoid-c-arrays)
         std::vector<double> bootstrap_moments(1, 1.0);
         // moments[r] = (r + 1)! n_{r+1} / n_1
         for (std::size_t i = 0; i < 2 * max_num_points; i++)
-          bootstrap_moments.push_back(std::exp(factorial(i + 3) +
+          bootstrap_moments.push_back(std::exp(log_factorial(i + 3) +
                                                std::log(sample_hist[i + 2]) -
                                                std::log(sample_hist[1])));
 
