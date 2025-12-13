@@ -92,9 +92,6 @@ get_counts_from_hist(const std::vector<T> &h) -> T {
   return c;
 }
 
-[[nodiscard]] auto
-log_factorial(double x) -> double;
-
 void
 resample_hist(std::mt19937 &gen,
               const std::vector<std::size_t> &vals_hist_distinct_counts,
