@@ -35,6 +35,10 @@
 #include <memory>
 #include <string>
 
+#ifdef INCLUDE_FULL_LICENSE_INFO
+#include <license.h>
+#endif
+
 int
 main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   CLI::App app{"preseq: a tool for analyzing sequencing library complexity"};
@@ -51,6 +55,9 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
 
   // clang-format off
   app.add_flag("--version", print_version, "output version information and exit");
+#ifdef INCLUDE_FULL_LICENSE_INFO
+  app.add_flag("--licenses", print_licenses, "view licenses");
+#endif
   const auto lc_extrap = app.add_subcommand("lc_extrap", rlstrip(lc_extrap::about_msg));
   const auto gc_extrap = app.add_subcommand("gc_extrap", rlstrip(gc_extrap::about_msg));
   const auto pop_size = app.add_subcommand("pop_size", rlstrip(pop_size::about_msg));
@@ -69,6 +76,13 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
     std::cout << VERSION << '\n';
     return EXIT_SUCCESS;
   }
+
+#ifdef INCLUDE_FULL_LICENSE_INFO
+  if (view_licenses) {
+    std::cout << license_text;
+    return EXIT_SUCCESS;
+  }
+#endif
 
   if (app.got_subcommand(lc_extrap))
     return lc_extrap::main(argc - 1, argv + 1);
