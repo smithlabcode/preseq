@@ -17,12 +17,12 @@
 ACLOCAL_AMFLAGS = -I m4
 
 AM_CPPFLAGS =
-if ENABLE_HTS
+if ENABLE_HTSLIB
 AM_CPPFLAGS += -I $(top_srcdir)/src/bamxx
 endif
 
 AM_CPPFLAGS += -Wall -Wextra -Wpedantic -Wno-unknown-attributes
-if ENABLE_HTS
+if ENABLE_HTSLIB
 AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
@@ -72,7 +72,7 @@ preseq_SOURCES = \
         src/moment_sequence.hpp \
         src/moment_sequence.cpp
 
-if ENABLE_HTS
+if ENABLE_HTSLIB
 preseq_SOURCES += \
 	src/bamxx/bamxx.hpp \
 	src/bam_record_utils.hpp \
