@@ -42,7 +42,7 @@ If you want to disable HTSLib when building preseq, use the --disable-htslib
 argument to the configure script.
 "
 AC_ARG_ENABLE([hts],
-  [AS_HELP_STRING([--disable-hts], [Enable HTSLib @<:@yes@:>@])],
+  [AS_HELP_STRING([--disable-htslib], [Enable HTSLib @<:@yes@:>@])],
   [enable_hts=no], [enable_hts=yes])
 AS_IF([test "x$enable_hts" = "xyes"],
   [AC_CHECK_LIB([hts], [hts_version], [],
