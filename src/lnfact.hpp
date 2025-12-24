@@ -15,6 +15,9 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SRC_LNFACT_HPP_
+#define SRC_LNFACT_HPP_
+
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -202,3 +205,5 @@ lnfact(const std::uint64_t n) -> double {
     return lnfact_table[n];
   return std::lgamma(n + 1.0);
 }
+
+#endif  // SRC_LNFACT_HPP_
