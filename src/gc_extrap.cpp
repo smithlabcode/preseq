@@ -49,6 +49,7 @@ write_output(const std::string &outfile, const std::uint32_t bin_size,
 
   out << "TOTAL_BASES\tEXPECTED_DISTINCT\n";
 
+  out.setf(std::ios_base::fixed, std::ios_base::floatfield);
   out << 0 << '\t' << 0 << '\n';
   for (auto i = 0u; i < std::size(coverage_estimates); ++i)
     out << (i + 1) * base_step_size << '\t' << coverage_estimates[i] * bin_size
@@ -102,7 +103,7 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t bin_size = 10;
     double base_step_size = 1.0e8;
     std::uint32_t max_width = 10000;
-    double max_extrap = 1.0e12;
+    std::uint64_t max_extrap_int{1'000'000'000'000};
     std::uint32_t n_bootstraps = 100;
     std::uint32_t seed = 408;
     double c_level = 0.95;
@@ -124,14 +125,17 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-i,--input", infile, "input file")
       ->option_text("FILE")
       ->required()
+      // ->check(CLI::ReadPermission)
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "coverage yield output file")
       ->option_text("FILE")
+      // ->check(CLI::WritePermission)
       ->required();
     app.add_option("-w,--max_width", max_width,
                    "max fragment length, set equal to read length for single end reads");
     app.add_option("-b,--bin_size", bin_size, "bin size");
-    app.add_option("-e,--extrap", max_extrap, "maximum extrapolation in base pairs");
+    app.add_option("-e,--extrap", max_extrap_int, "maximum extrapolation (must be integer)")
+      ->check(CLI::PositiveNumber);
     app.add_option("-s,--step", base_step_size, "step size in bases between extrapolations");
     app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
@@ -150,6 +154,8 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
+
+    const double max_extrap = max_extrap_int;
 
     const auto bam_format_input = is_sam_or_bam_format(infile);
 
