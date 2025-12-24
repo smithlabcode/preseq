@@ -1,5 +1,4 @@
-/* Copyright (C) 2013-2025 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2025 Andrew D. Smith and Timothy Daley
  *
  * Authors: Timothy Daley and Andrew Smith
  *
@@ -54,7 +53,7 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // NOLINTBEGIN(*-avoid-magic-numbers)
     int diagonal{0};
     std::size_t orig_max_terms{100};
-    double max_extrap{1.0e10};
+    std::uint64_t max_extrap_int{10'000'000'000};
     double step_size{1e6};
     std::size_t n_bootstraps{100};
     double c_level{0.95};
@@ -80,17 +79,20 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-i,--input", input_file_name, "input file")
       ->option_text("FILE")
       ->required()
+      // ->check(CLI::ReadPermission)
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "output filename (directory must exist)")
       ->option_text("FILE")
+      // ->check(CLI::WritePermission)
       ->required();
-    app.add_option("-e,--extrap", max_extrap, "maximum extrapolation");
+    app.add_option("-e,--extrap", max_extrap_int, "maximum extrapolation (must be integer)")
+      ->check(CLI::PositiveNumber);
     app.add_option("-s,--step", step_size, "extrapolation step size");
     app.add_option("-n,--boots", n_bootstraps, "number of bootstraps");
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_flag("-P,--pe", paired_end, "input is paired end read file");
+    app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
     app.add_flag("-Q,--quick", single_estimate,
                  "do not use bootstraps for confidence intervals");
     app.add_flag("-D,--defects", allow_defects, "no testing for defects");
@@ -103,6 +105,8 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
+
+    const double max_extrap = max_extrap_int;
 
     const auto input_format = get_input_format_type(input_file_name);
     if (is_unknown(input_format)) {
@@ -191,8 +195,6 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
 
       out << "TOTAL_READS\tEXPECTED_DISTINCT\n";
       out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out.precision(1);
-
       out << 0 << '\t' << 0 << '\n';
       for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
         out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
