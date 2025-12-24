@@ -3,19 +3,18 @@
  *
  * Authors: Timothy Daley and Andrew Smith
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "bound_pop.hpp"
@@ -34,6 +33,7 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <memory>  // IWYU pragma: keep
@@ -73,7 +73,9 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     std::uint32_t seed = 408;
     // NOLINTEND(*-avoid-magic-numbers)
 
+#ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
+#endif
 
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
@@ -95,8 +97,7 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     app.add_option("-c,--ci-level", c_level, "level for confidence intervals");
     app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
-    app.add_flag("-Q,--quick", quick_mode,
-                 "quick mode, estimate without bootstrapping");
+    app.add_flag("-q,--quick", quick_mode, "no bootstraps when making estimates");
     app.add_flag("-v,--verbose", verbose, "print moments and boostraps with output");
     // clang-format on
 

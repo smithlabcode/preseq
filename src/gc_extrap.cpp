@@ -107,8 +107,11 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t n_bootstraps = 100;
     std::uint32_t seed = 408;
     double c_level = 0.95;
-    std::uint32_t n_threads{1};
     // NOLINTEND(*-avoid-magic-numbers)
+
+#ifdef HAVE_HTSLIB
+    std::uint32_t n_threads{1};
+#endif
 
     bool allow_defects{false};
     bool verbose{false};
@@ -141,8 +144,7 @@ gc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum number of terms");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_flag("-Q,--quick", single_estimate,
-                 "quick mode: run gc_extrap without bootstrapping for confidence intervals");
+    app.add_flag("-q,--quick", single_estimate, "no bootstraps for confidence intervals");
     app.add_flag("-D,--defects", allow_defects,
                  "defects mode to extrapolate without testing for defects");
     app.add_flag("-v,--verbose", verbose, "print more info");
