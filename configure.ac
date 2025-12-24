@@ -31,7 +31,6 @@ AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX(17, [noext], [mandatory])
 AC_PROG_RANLIB
 
-dnl check for HTSLib if requested
 hts_fail_msg="
 
 Failed to locate HTSLib on your system. Please use the LDFLAGS and
@@ -40,25 +39,53 @@ and headers can be found.
 
 If you want to disable HTSLib when building preseq, use the --disable-htslib
 argument to the configure script.
-"
-AC_ARG_ENABLE([hts],
-  [AS_HELP_STRING([--disable-htslib], [Enable HTSLib @<:@yes@:>@])],
-  [enable_hts=no], [enable_hts=yes])
-AS_IF([test "x$enable_hts" = "xyes"],
-  [AC_CHECK_LIB([hts], [hts_version], [],
-  [AC_MSG_FAILURE([$hts_fail_msg])])]
-)
-AM_CONDITIONAL([ENABLE_HTS], [test "x$enable_hts" = "xyes"])
 
-dnl arg for using libdeflate, which might happen by default anyway
-AC_ARG_WITH([libdeflate],
-  [AS_HELP_STRING([--with-libdeflate], [use libdeflate for reading BAM files])],
-  [with_libdeflate=yes], [with_libdeflate=no])
-AS_IF([test "x$with_libdeflate" = "xyes"],
-  [
+"
+
+libdeflate_fail_msg="
+
+Failed to locate libdeflate on your system. This is a common dependency of
+HTSLib. If your HTSLib might have been built without requiring libdeflate,
+please use the --without-libdeflate argument to configure. If you do not need
+to directly process SAM/BAM files with preseq, then you might consider using
+the argument --without-htslib to build preseq without support for reading
+SAM/BAM.
+
+If you need libdeflate, please use the LDFLAGS and CPPFLAGS variables to
+specify the directories where the library and headers can be found on your
+system.
+
+"
+
+AC_ARG_ENABLE([hts],
+  [AS_HELP_STRING([--disable-htslib],
+    [Disable HTSLib (needed for BAM/SAM input) @<:@no@:>@])],
+  [enable_htslib=no], [enable_htslib=yes]
+)
+
+AC_ARG_ENABLE([deflate],
+  [AS_HELP_STRING([--disable-libdeflate],
+    [Disable libdeflate (might be needed by HTSLib) @<:@no@:>@])],
+  [enable_libdeflate=no], [enable_libdeflate=yes]
+)
+
+AS_IF([test "x$enable_htslib" = xyes], [
+  AX_PTHREAD([],
+    [AC_MSG_ERROR([Threads required for HTSLib but threads library not found])]
+  )
+  AC_SEARCH_LIBS(
+    [gzopen], [z], [],
+    [AC_MSG_FAILURE(["ZLib required for HTSLib but not found"])]
+  )
+  AS_IF([test "x$enable_libdeflate" = xyes], [
     AC_SEARCH_LIBS([libdeflate_deflate_compress], [deflate], [],
-                   [AC_MSG_ERROR([--with-libdeflate specified but libdeflate not found])])
-  ])
+      [AC_MSG_ERROR([$libdeflate_fail_msg])], [])]
+  )
+  AC_CHECK_LIB([hts], [hts_version], [],
+    [AC_MSG_FAILURE([$hts_fail_msg])], [-pthread -lz -ldeflate])
+  ]
+)
+AM_CONDITIONAL([ENABLE_HTSLIB], [test "x$enable_htslib" = "xyes"])
 
 AC_CONFIG_FILES([Makefile])
 
