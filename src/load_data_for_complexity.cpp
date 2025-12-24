@@ -82,7 +82,8 @@ is_sam_or_bam_format(const std::string &filename) -> bool {
 
 [[nodiscard]] auto
 get_input_format_type(const std::string &filename) -> input_format_type {
-  if (is_sam_or_bam_format(filename))
+  if (is_sam_or_bam_format(  // cppcheck-suppress[knownConditionTrueFalse]
+        filename))
     return input_format_type::bam;
 
   std::ifstream in(filename);

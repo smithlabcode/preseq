@@ -65,7 +65,9 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     bool single_estimate{false};
     bool allow_defects{false};
 
+#ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
+#endif
 
     CLI::App app{rlstrip(pop_size::about_msg)};
     argv = app.ensure_utf8(argv);
@@ -87,8 +89,7 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
     app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
-    app.add_flag("-Q,--quick", single_estimate,
-                 "quick mode (no bootstraps) for confidence intervals");
+    app.add_flag("-q,--quick", single_estimate, "no bootstraps for confidence intervals");
     app.add_flag("-D,--defects", allow_defects, "no testing for defects");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on

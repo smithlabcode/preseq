@@ -51,7 +51,10 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     bool verbose = false;
     bool paired_end = false;
 
+#ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
+#endif
+
     CLI::App app{rlstrip(about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq c_curve [OPTIONS]");
