@@ -293,10 +293,9 @@ write_predicted_complexity_curve(
   const std::vector<double> &yield_estimates,
   const std::vector<double> &yield_lower_ci_lognorm,
   const std::vector<double> &yield_upper_ci_lognorm) {
-  std::ofstream of;
-  if (!outfile.empty())
-    of.open(outfile);
-  std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+  std::ofstream out(outfile);
+  if (!out)
+    throw std::runtime_error("failed to open output file: " + outfile);
 
   // clang-format off
   out << "TOTAL_READS" << '\t'
@@ -306,13 +305,11 @@ write_predicted_complexity_curve(
   // clang-format on
 
   out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-  out.precision(1);
-
   out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
-  for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
-    out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\t'
-        << yield_lower_ci_lognorm[i] << '\t' << yield_upper_ci_lognorm[i]
-        << '\n';
+  for (auto i = 0ul; i < std::size(yield_estimates); ++i)
+    out << static_cast<std::uint64_t>((i + 1) * step_size) << '\t'
+        << yield_estimates[i] << '\t' << yield_lower_ci_lognorm[i] << '\t'
+        << yield_upper_ci_lognorm[i] << '\n';
 }
 
 // vals_hist[j] = n_{j} = # (counts = j)
