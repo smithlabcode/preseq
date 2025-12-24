@@ -1,11 +1,11 @@
 # preseq documentation
 
 This is the (new) documentation for preseq that uses
-[mkdocs](https://mkdocs.readthedocs.io) to generate readthedocs pages.
-The public web verison of this documentation is available at
-[preseq.readthedocs.io](https://preseq.readthedocs.io), but for users
-who wish to see the documentation on a web browser offline, you can
-build the documentation locally as described below.
+[mkdocs](https://mkdocs.readthedocs.io) to generate readthedocs pages. The
+public web verison of this documentation is available at
+[preseq.readthedocs.io](https://preseq.readthedocs.io), but for users who wish
+to see the documentation on a web browser offline, you can build the
+documentation locally as described below.
 
 ### Dependencies
 
