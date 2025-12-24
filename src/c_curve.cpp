@@ -66,9 +66,11 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     app.add_option("-o,--output", outfile, "yield output file")
       ->required()
       ->option_text("FILE");
-    app.add_option("-s,--step", step_size, "step size in extrapolations");
+    app.add_option("-s,--step", step_size, "step size in extrapolations")
+      ->default_val(step_size);
+    app.add_option("-r,--seed", seed, "seed for random number generator")
+      ->default_val(seed);
     app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
-    app.add_option("-r,--seed", seed, "seed for random number generator");
     app.add_flag("-v,--verbose", verbose, "print more info");
     // clang-format on
 
