@@ -26,7 +26,7 @@ AM_INIT_AUTOMAKE([subdir-objects foreign])
 AC_CONFIG_MACRO_DIR([m4])
 AC_LANG(C++)
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX(17, [noext], [mandatory])
+AX_CXX_COMPILE_STDCXX(23, [noext], [mandatory])
 AC_PROG_RANLIB
 
 hts_fail_msg="
