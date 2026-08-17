@@ -1,95 +1,119 @@
-/*    Copyright (C) 2013 University of Southern California and
- *                       Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 University of Southern California and
+ *                         Andrew D. Smith and Timothy Daley
  *
- *    Authors: Andrew D. Smith and Timothy Daley
+ * Authors: Andrew D. Smith and Timothy Daley
  *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef CONTINUED_FRACTION_HPP
 #define CONTINUED_FRACTION_HPP
 
-#include <numeric>
-#include <vector>
-#include <fstream>
-#include <iomanip>
 #include <cstddef>
+#include <fstream>
+#include <vector>
 
 struct ContinuedFraction {
   // Constructors
-  ContinuedFraction() : diagonal_idx(0), degree(0ul) {}
-  ContinuedFraction(const std::vector<double> &ps_cf,
-                    const int di, const size_t dg);
+  ContinuedFraction() = default;
+  ContinuedFraction(const std::vector<double> &ps_cf, const int di,
+                    const std::size_t dg);
+  // Assumes diagonal is 0
+  ContinuedFraction(const std::vector<double> &hist,
+                    const std::size_t max_terms);
 
   // Evaluate the continued fraction
-  double operator()(const double val) const;
+  [[nodiscard]] auto
+  evaluate(const double val) const -> double;
 
-  //////////////////////////////////////////
+  // Evaluate the continued fraction
+  [[nodiscard]] auto
+  operator()(const double val) const -> double {
+    return evaluate(val);
+  }
+
   // Extrapolation functions
 
-  // Evaluate the continued fraction estimating distinct
-  // along a curve from 0 to max_value
+  // Evaluate the continued fraction estimating distinct along a curve from 0
+  // to max_value
   void
   extrapolate_distinct(const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
 
-  bool is_valid() const {return !cf_coeffs.empty();}
-  size_t return_degree() const {return degree;}
+  [[nodiscard]] auto
+  is_valid() const -> bool {
+    return !cf_coeffs.empty();
+  }
+
+  [[nodiscard]] auto
+  return_degree() const -> std::size_t {
+    return degree;
+  }
+
+  void
+  extrapolate_curve(const double initial_distinct, const double vals_sum,
+                    const double initial_sample_size, const double step_size,
+                    const double max_sample_size,
+                    std::vector<double> &estimates) const;
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;
-  int diagonal_idx;
-  size_t degree;
+  int diagonal_idx{};
+  std::size_t degree{};
 };
 
-  // get continued fraction with lower degree
-void decrease_degree(const size_t decrement, ContinuedFraction &cf);
-void truncate_degree(const size_t truncated_degree, ContinuedFraction &cf);
+// get continued fraction with lower degree
+void
+decrease_degree(const std::size_t decrement, ContinuedFraction &cf);
 
-std::ostream &
-operator<<(std::ostream &out, const ContinuedFraction &cf);
+void
+truncate_degree(const std::size_t truncated_degree, ContinuedFraction &cf);
 
+auto
+operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream &;
 
 class ContinuedFractionApproximation {
 public:
-  ContinuedFractionApproximation(const int di, const size_t mt) :
-    diagonal_idx(di), max_terms(mt) {}
+  ContinuedFractionApproximation(const int di, const std::size_t mt) :
+    diagonal_idx{di}, max_terms{mt} {}
 
   // find best cont frac approx for estimating distinct
-  ContinuedFraction
-  optimal_cont_frac_distinct(const std::vector<double> &counts_hist) const;
+  [[nodiscard]] auto
+  optimal_cf_distinct(const std::vector<double> &counts_hist) const
+    -> ContinuedFraction;
 
-  int get_diagonal() const {return diagonal_idx;}
+  [[nodiscard]] auto
+  get_diagonal() const -> int {
+    return diagonal_idx;
+  }
 
 private:
-
-  int diagonal_idx; // the diagonal to work with for estimates
-  size_t max_terms; // the maximum number of terms to try for a CF
+  int diagonal_idx{};       // the diagonal to work with for estimates
+  std::size_t max_terms{};  // the maximum number of terms to try for a CF
 
   /* note: these never change */
-  static const size_t min_allowed_degree;
+  static const std::size_t min_allowed_degree;
 
   // largest value to search for lowerbound and stability
   static const double search_max_val;
 
-  //step size for search of lowerbound and stability
+  // step size for search of lowerbound and stability
   static const double search_step_size;
-
 };
 
-bool
-check_yield_estimates_stability(const std::vector<double> &estimates);
+[[nodiscard]] auto
+check_yield_estimates_stability(const std::vector<double> &estimates) -> bool;
 
 #endif
