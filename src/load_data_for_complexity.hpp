@@ -1,17 +1,17 @@
-/* Copyright (C) 2025 Andrew D. Smith
+/* Copyright (C) 2013-2026 Andrew D. Smith
  *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
@@ -100,10 +100,11 @@ load_counts_BAM_se(const std::uint32_t n_threads,
   -> std::tuple<std::size_t, std::vector<double>>;
 
 [[nodiscard]] auto
-load_coverage_counts_BAM(
-  const std::uint32_t n_threads, const std::string &input_file_name,
-  const std::uint32_t seed, const std::size_t bin_size,
-  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>>;
+load_coverage_counts_BAM(const std::uint32_t n_threads,
+                         const std::string &input_file_name,
+                         const std::uint32_t seed, const std::size_t bin_size,
+                         const std::size_t max_width)
+  -> std::tuple<std::size_t, std::vector<double>>;
 
 #endif  // HAVE_HTSLIB
 

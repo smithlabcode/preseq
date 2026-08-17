@@ -1,23 +1,17 @@
-/* Copyright (C) 2014-2025 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
- *
  * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "load_data_for_complexity.hpp"
@@ -318,7 +312,6 @@ load_histogram(const std::string &filename)
     if (!(is >> read_count >> frequency))
       throw std::runtime_error("bad histogram line format:\n" + buffer + "\n" +
                                "(line " + std::to_string(line_count) + ")");
-
     // histogram is out of order?
     if (read_count < prev_read_count)
       throw std::runtime_error("bad line order in file " + filename + "\n" +
@@ -469,8 +462,8 @@ struct aln_pos_pair {
 
 template <typename T>
 [[nodiscard]] static inline auto
-round_position(const T x, const std::uint32_t bin_size,
-               const double frac) -> T {
+round_position(const T x, const std::uint32_t bin_size, const double frac)
+  -> T {
   // probabilisticly round read ends so they are at bin boundaries
   const double lo = (x / bin_size) * bin_size;
   const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
@@ -613,10 +606,11 @@ update_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the first mate
 // for each mapped read
 auto
-load_coverage_counts_BAM(
-  const std::uint32_t n_threads, const std::string &inputfile,
-  const std::uint32_t seed, const std::size_t bin_size,
-  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>> {
+load_coverage_counts_BAM(const std::uint32_t n_threads,
+                         const std::string &inputfile, const std::uint32_t seed,
+                         const std::size_t bin_size,
+                         const std::size_t max_width)
+  -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);
