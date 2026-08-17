@@ -1,4 +1,7 @@
-/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 University of Southern California and
+ *                         Andrew D. Smith and Timothy Daley
+ *
+ * Authors: Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -32,28 +35,38 @@ struct ContinuedFraction {
                     const std::size_t max_terms);
 
   // Evaluate the continued fraction
-  [[nodiscard]] double
-  operator()(const double val) const;
+  [[nodiscard]] auto
+  evaluate(const double val) const -> double;
 
   // Evaluate the continued fraction
-  [[nodiscard]] double
-  evaluate(const double val) const {
-    return (*this)(val);
-  };
+  [[nodiscard]] auto
+  operator()(const double val) const -> double {
+    return evaluate(val);
+  }
 
-  //////////////////////////////////////////
   // Extrapolation functions
 
-  // Evaluate the continued fraction estimating distinct
-  // along a curve from 0 to max_value
+  // Evaluate the continued fraction estimating distinct along a curve from 0
+  // to max_value
   void
   extrapolate_distinct(const double max_value, const double step_size,
                        std::vector<double> &estimates) const;
 
-  bool
-  is_valid() const {
+  [[nodiscard]] auto
+  is_valid() const -> bool {
     return !cf_coeffs.empty();
   }
+
+  [[nodiscard]] auto
+  return_degree() const -> std::size_t {
+    return degree;
+  }
+
+  void
+  extrapolate_curve(const double initial_distinct, const double vals_sum,
+                    const double initial_sample_size, const double step_size,
+                    const double max_sample_size,
+                    std::vector<double> &estimates) const;
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -69,36 +82,36 @@ decrease_degree(const std::size_t decrement, ContinuedFraction &cf);
 void
 truncate_degree(const std::size_t truncated_degree, ContinuedFraction &cf);
 
-inline auto
-operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream & {
-  return out << cf.tostring();
-}
+auto
+operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream &;
 
-template <>
-struct std::formatter<ContinuedFraction> : std::formatter<std::string> {
-  auto format(const ContinuedFraction &cf, auto &ctx) const {
-    return std::formatter<std::string>::format(cf.tostring(), ctx);
-  }
-};
+class ContinuedFractionApproximation {
+public:
+  ContinuedFractionApproximation(const int di, const std::size_t mt) :
+    diagonal_idx{di}, max_terms{mt} {}
 
-struct ContinuedFractionApproximation {
   // find best cont frac approx for estimating distinct
-  [[nodiscard]] auto optimal_cf_distinct(
-    const std::vector<double> &counts_hist) const -> ContinuedFraction;
+  [[nodiscard]] auto
+  optimal_cf_distinct(const std::vector<double> &counts_hist) const
+    -> ContinuedFraction;
 
-  [[nodiscard]] auto get_diagonal() const -> int { return diagonal_idx; }
+  [[nodiscard]] auto
+  get_diagonal() const -> int {
+    return diagonal_idx;
+  }
 
+private:
   int diagonal_idx{};       // the diagonal to work with for estimates
   std::size_t max_terms{};  // the maximum number of terms to try for a CF
 
   /* note: these never change */
-  static constexpr std::size_t min_allowed_degree{4};
+  static const std::size_t min_allowed_degree;
 
   // largest value to search for lowerbound and stability
-  static constexpr double search_max_val{100.0};
+  static const double search_max_val;
 
   // step size for search of lowerbound and stability
-  static constexpr double search_step_size{0.05};
+  static const double search_step_size;
 };
 
 [[nodiscard]] auto

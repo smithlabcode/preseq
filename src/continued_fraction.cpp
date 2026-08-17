@@ -1,4 +1,7 @@
-/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 University of Southern California and
+ *                         Andrew D. Smith and Timothy Daley
+ *
+ * Authors: Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -17,18 +20,11 @@
 #include "continued_fraction.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iomanip>
 #include <iterator>
 #include <vector>
-
-using std::fabs;
-using std::isfinite;
-using std::min;
-using std::pow;
-using std::vector;
-
-// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
 // ADS: the std::pow function is used frequently to get (-1)^x for
 // integer x. This doesn't make sense, and should be replaced at some
@@ -42,22 +38,23 @@ using std::vector;
  * evaluate a0/(1 + a1x/(1 + a2x/... while the algorithm is designed
  * for the a0/(1 - a1x/(1 - a2x/... see https://dlmf.nist.gov/3.10
  */
-[[nodiscard]] static auto
-quotdiff_algorithm(const std::vector<double> &ps_coeffs)
-  -> std::vector<double> {
+static void
+quotdiff_algorithm(const std::vector<double> &ps_coeffs,
+                   std::vector<double> &cf_coeffs) {
   const std::size_t depth = std::size(ps_coeffs);  // degree of power series
-  assert(depth > 0LU);
 
   // q_table[0] never used, and undefined
-  auto q_table = std::vector(depth, std::vector<double>(depth + 1, 0.0));
-  // q_table[1][j]: ratio of ps coefficients
-  for (std::size_t j = 0; j + 1 < depth; ++j)
+  std::vector<std::vector<double>> q_table(depth,
+                                           std::vector<double>(depth + 1, 0.0));
+  // q_table[1][j] = ratio of ps coefficients
+  for (std::size_t j = 0; j < depth - 1; ++j)
     q_table[1][j] = ps_coeffs[j + 1] / ps_coeffs[j];
 
   // e_table[0] is always 0
-  auto e_table = std::vector(depth, std::vector<double>(depth + 1, 0.0));
+  std::vector<std::vector<double>> e_table(depth,
+                                           std::vector<double>(depth + 1, 0.0));
   // e_table[1] follows the general recurrence (same as in loop below)
-  for (std::size_t j = 0; j + 1 < depth; ++j)
+  for (std::size_t j = 0; j < depth - 1; ++j)
     e_table[1][j] = q_table[1][j + 1] - q_table[1][j] + e_table[0][j + 1];
 
   // using intial values of E(i)(j)'s and Q(i)(j)'s, fill rest of the
@@ -85,12 +82,14 @@ quotdiff_algorithm(const std::vector<double> &ps_coeffs)
  * greater than degree of polynomial in the denominator
  */
 static void
-quotdiff_above_diagonal(const vector<double> &ps_coeffs, const size_t offset,
-                        vector<double> &cf_coeffs,
-                        vector<double> &offset_coeffs) {
+quotdiff_above_diagonal(const std::vector<double> &ps_coeffs,
+                        const std::size_t offset,
+                        std::vector<double> &cf_coeffs,
+                        std::vector<double> &offset_coeffs) {
   // get the high order PS coeffs for approximation by CF
   std::vector<double> high_ps_coeffs(std::cbegin(ps_coeffs) + offset,
                                      std::cend(ps_coeffs));
+
   // use QD algorithm to determine CF coefficients
   auto cf_coeffs = quotdiff_algorithm(high_ps_coeffs);
   // first "offset" coeffs are equal to PS coeffs
@@ -100,10 +99,11 @@ quotdiff_above_diagonal(const vector<double> &ps_coeffs, const size_t offset,
 }
 
 // calculate CF coeffs when lower_offset > 0
-[[nodiscard]] static auto
+static void
 quotdiff_below_diagonal(const std::vector<double> &ps_coeffs,
-                        const std::size_t offset)
-  -> std::tuple<std::vector<double>, std::vector<double>> {
+                        const std::size_t offset,
+                        std::vector<double> &cf_coeffs,
+                        std::vector<double> &offset_coeffs) {
   // need to work with reciprocal series g = 1/f, then invert
   std::vector<double> recip_ps_coeffs(std::size(ps_coeffs));
   recip_ps_coeffs[0] = 1.0 / ps_coeffs[0];
@@ -118,12 +118,21 @@ quotdiff_below_diagonal(const std::vector<double> &ps_coeffs,
   // qd to compute cf_coeffs using remaining coeffs
   std::vector<double> high_recip_ps_coeffs(
     std::cbegin(recip_ps_coeffs) + offset, std::cend(recip_ps_coeffs));
-  auto cf_coeffs = quotdiff_algorithm(high_recip_ps_coeffs);
+  quotdiff_algorithm(high_recip_ps_coeffs, cf_coeffs);
 
   // set offset coeffs to 1st "offset" PS coeffs of 1/f (reciprocal)
   auto offset_coeffs = recip_ps_coeffs;
   offset_coeffs.resize(offset);
   return std::tuple{std::move(cf_coeffs), std::move(offset_coeffs)};
+}
+
+/* decrease degree of CF keeping coeffs equal to original */
+void
+decrease_degree(const std::size_t decrement, ContinuedFraction &cf) {
+  assert(decrement < cf.degree);
+  cf.ps_coeffs.resize(std::size(cf.ps_coeffs) - decrement);
+  cf.cf_coeffs.resize(std::size(cf.cf_coeffs) - decrement);
+  cf.degree -= decrement;
 }
 
 /* decrease degree of CF keeping coeffs equal to original */
@@ -149,7 +158,8 @@ truncate_degree(const std::size_t n_terms, ContinuedFraction &cf) {
 
 ContinuedFraction::ContinuedFraction(const std::vector<double> &ps_cf,
                                      const int di, const std::size_t dg) :
-  ps_coeffs(ps_cf), diagonal_idx(di), degree(dg) {
+  ps_coeffs(ps_cf),
+  diagonal_idx(di), degree(dg) {
   if (diagonal_idx == 0)
     cf_coeffs = quotdiff_algorithm(ps_coeffs);
   else if (diagonal_idx > 0)
@@ -166,7 +176,7 @@ ContinuedFraction::ContinuedFraction(const std::vector<double> &hist,
   degree{max_terms} {
   for (std::size_t j = 1; j <= max_terms; ++j)
     ps_coeffs.push_back(hist[j] * std::pow(-1.0, j + 1));
-  cf_coeffs = quotdiff_algorithm(ps_coeffs);
+  quotdiff_algorithm(ps_coeffs, cf_coeffs);
 }
 
 /// Functions to evaluate continued fractions at a point
@@ -189,9 +199,9 @@ get_rescale_value(const double numerator, const double denominator) -> double {
 evaluate_on_diagonal(const std::vector<double> &cf_coeffs, const double val,
                      const std::size_t depth) -> double {
   // initialize
-  double current_numer{};
+  double current_numer = 0.0;
   double prev_numer1 = cf_coeffs[0];
-  double prev_numer2{};
+  double prev_numer2 = 0.0;
 
   double current_denom{};
   double prev_denom1{1.0};
@@ -226,9 +236,9 @@ evaluate_on_diagonal(const std::vector<double> &cf_coeffs, const double val,
 }
 
 [[nodiscard]] static auto
-evaluate_power_series(const std::vector<double> &ps_coeffs,
-                      const double val) -> double {
-  double x{};
+evaluate_power_series(const std::vector<double> &ps_coeffs, const double val)
+  -> double {
+  double x = 0.0;
   for (std::size_t i = 0; i < std::size(ps_coeffs); ++i)
     x += ps_coeffs[i] * std::pow(val, i);
   return x;
@@ -288,39 +298,42 @@ ContinuedFraction::extrapolate_curve(const double initial_distinct,
   }
 }
 
-[[nodiscard]] auto
-ContinuedFraction::tostring() const -> std::string {
-  std::ostringstream the_stream;
+auto
+operator<<(std::ostream &the_stream, const ContinuedFraction &cf)
+  -> std::ostream & {
   std::ios_base::fmtflags orig_flags = the_stream.flags();
   the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
   the_stream.precision(2);
   the_stream << "OFFSET_COEFFS" << '\t' << "PS_COEFFS" << '\n';
-  const std::size_t offset = std::size(offset_coeffs);
+  const std::size_t offset = std::size(cf.offset_coeffs);
   for (std::size_t i = 0; i < offset; ++i)
-    the_stream << std::setw(12) << offset_coeffs[i] << '\t' << std::setw(12)
-               << ps_coeffs[i] << '\n';
+    the_stream << std::setw(12) << cf.offset_coeffs[i] << '\t' << std::setw(12)
+               << cf.ps_coeffs[i] << '\n';
   the_stream << "CF_COEFFS" << '\n';
-  for (std::size_t i = 0; i < std::size(cf_coeffs); ++i)
-    the_stream << std::setw(12) << cf_coeffs[i] << '\t' << std::setw(12)
-               << ps_coeffs[i + offset] << '\n';
+  for (std::size_t i = 0; i < std::size(cf.cf_coeffs); ++i)
+    the_stream << std::setw(12) << cf.cf_coeffs[i] << '\t' << std::setw(12)
+               << cf.ps_coeffs[i + offset] << '\n';
   the_stream.flags(orig_flags);
   return the_stream.str();
 }
 
 // estimate yields by evaluating the CF at given points
-[[nodiscard]] auto
-ContinuedFraction::extrapolate_distinct(
-  const double max_value, const double step_size) const -> std::vector<double> {
-  std::vector<double> estimates;
+void
+ContinuedFraction::extrapolate_distinct(const double max_value,
+                                        const double step_size,
+                                        std::vector<double> &estimates) const {
+  estimates.clear();
   estimates.push_back(0);
-  double t{step_size};
-  while (t <= max_value) {
-    estimates.push_back(t * evaluate(t));
-    t += step_size;
-  }
+  for (double t = step_size; t <= max_value; t += step_size)
+    estimates.push_back(t * operator()(t));
 }
 
 /// Continued fraction _approximation_
+
+using CFA = ContinuedFractionApproximation;
+const std::size_t CFA::min_allowed_degree = 4;
+const double CFA::search_max_val = 100;
+const double CFA::search_step_size = 0.05;
 
 /* check if a sequence of estimates are "stable": in [0, infty), increasing,
  * negative 2nd deriv
@@ -370,8 +383,8 @@ ContinuedFractionApproximation::optimal_cf_distinct(
 
   // if max terms in {3,4,5,6}, check only that degree
   if (max_terms >= 3 && max_terms <= 6) {
-    const auto estimates =
-      full_cf.extrapolate_distinct(search_max_val, search_step_size);
+    std::vector<double> estimates;
+    full_cf.extrapolate_distinct(search_max_val, search_step_size, estimates);
     if (check_yield_estimates_stability(estimates))
       return full_cf;
   }
@@ -380,8 +393,9 @@ ContinuedFractionApproximation::optimal_cf_distinct(
     for (std::size_t i = 7 + (max_terms % 2 == 0); i <= max_terms; i += 2) {
       ContinuedFraction truncated_cf(full_cf);
       truncate_degree(i, truncated_cf);
-      const auto estimates =
-        truncated_cf.extrapolate_distinct(search_max_val, search_step_size);
+      std::vector<double> estimates;
+      truncated_cf.extrapolate_distinct(search_max_val, search_step_size,
+                                        estimates);
       if (check_yield_estimates_stability(estimates))
         return truncated_cf;
     }
