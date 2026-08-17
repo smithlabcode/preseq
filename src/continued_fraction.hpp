@@ -1,7 +1,4 @@
-/* Copyright (C) 2013-2026 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
- *
- * Authors: Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
