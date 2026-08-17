@@ -26,9 +26,8 @@
 #include <iterator>
 #include <vector>
 
-// ADS: the std::pow function is used frequently to get (-1)^x for
-// integer x. This doesn't make sense, and should be replaced at some
-// point.
+// ADS: the std::pow function is used frequently to get (-1)^x for integer
+// x. This doesn't make sense, and should be replaced at some point.
 
 /* QUOTIENT DIFFERENCE ALGORITHM: compute continued fraction
  * coefficients vector for power series coefficients & vector for
@@ -298,21 +297,21 @@ ContinuedFraction::extrapolate_curve(const double initial_distinct,
   }
 }
 
-auto
-operator<<(std::ostream &the_stream, const ContinuedFraction &cf)
-  -> std::ostream & {
+[[nodiscard]] auto
+ContinuedFraction::tostring() const -> std::string {
+  std::ostringstream the_stream;
   std::ios_base::fmtflags orig_flags = the_stream.flags();
   the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
   the_stream.precision(2);
   the_stream << "OFFSET_COEFFS" << '\t' << "PS_COEFFS" << '\n';
-  const std::size_t offset = std::size(cf.offset_coeffs);
+  const std::size_t offset = std::size(offset_coeffs);
   for (std::size_t i = 0; i < offset; ++i)
-    the_stream << std::setw(12) << cf.offset_coeffs[i] << '\t' << std::setw(12)
-               << cf.ps_coeffs[i] << '\n';
+    the_stream << std::setw(12) << offset_coeffs[i] << '\t' << std::setw(12)
+               << ps_coeffs[i] << '\n';
   the_stream << "CF_COEFFS" << '\n';
-  for (std::size_t i = 0; i < std::size(cf.cf_coeffs); ++i)
-    the_stream << std::setw(12) << cf.cf_coeffs[i] << '\t' << std::setw(12)
-               << cf.ps_coeffs[i + offset] << '\n';
+  for (std::size_t i = 0; i < std::size(cf_coeffs); ++i)
+    the_stream << std::setw(12) << cf_coeffs[i] << '\t' << std::setw(12)
+               << ps_coeffs[i + offset] << '\n';
   the_stream.flags(orig_flags);
   return the_stream.str();
 }

@@ -68,6 +68,9 @@ struct ContinuedFraction {
                     const double max_sample_size,
                     std::vector<double> &estimates) const;
 
+  [[nodiscard]] auto
+  tostring() const -> std::string;
+
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
   std::vector<double> offset_coeffs;
@@ -82,8 +85,18 @@ decrease_degree(const std::size_t decrement, ContinuedFraction &cf);
 void
 truncate_degree(const std::size_t truncated_degree, ContinuedFraction &cf);
 
-auto
-operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream &;
+inline auto
+operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream & {
+  return out << cf.tostring();
+}
+
+template <>
+struct std::formatter<ContinuedFraction> : std::formatter<std::string> {
+  auto
+  format(const ContinuedFraction &cf, auto &ctx) const {
+    return std::formatter<std::string>::format(cf.tostring(), ctx);
+  }
+};
 
 class ContinuedFractionApproximation {
 public:
