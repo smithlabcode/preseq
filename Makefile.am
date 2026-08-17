@@ -27,7 +27,6 @@ LDADD = src/smithlab_cpp/libsmithlab_cpp.a
 
 bin_PROGRAMS = preseq
 if ENABLE_HTS
-bin_PROGRAMS += to-mr
 AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
@@ -39,6 +38,3 @@ preseq_SOURCES = \
         src/load_data_for_complexity.cpp \
         src/moment_sequence.hpp \
         src/moment_sequence.cpp
-
-to_mr_SOURCES = \
-        src/to-mr.cpp
