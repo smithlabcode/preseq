@@ -39,8 +39,8 @@
 
 #ifdef INCLUDE_FULL_LICENSE_INFO
 #include <license.h>
-
 #endif
+
 const auto description = R"(
 Extrapolate the complexity of a library. This is the approach described in
 Daley & Smith (2013). The method applies rational function approximation via
@@ -48,11 +48,6 @@ continued fractions with the original goal of estimating the number of
 distinct reads that a sequencing library would yield upon deeper sequencing.
 This method has been used for many different purposes since then.
 )";
-CLI::App app{about_msg};
-argv = app.ensure_utf8(argv);
-// app.usage(usage);
-if (argc >= 2)
-  app.footer(rlstrip(description));
 
 int
 main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
@@ -60,6 +55,8 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   argv = app.ensure_utf8(argv);
   app.formatter(std::make_shared<preseq_formatter>());
   app.usage("\nUsage: preseq command [OPTIONS]");
+  // if (argc >= 2)
+  // app.footer(rlstrip(description));
   // if (argc >= 3)
   //   app.footer(rlstrip(footer_msg));
 
@@ -111,8 +108,7 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   if (app.got_subcommand(pop_size))
     return pop_size::main(argc - 1, argv + 1);
 
-  if (app.got_subcommand(bound_pop))
-    return bound_pop::main(argc - 1, argv + 1);
-
-  return EXIT_FAILURE;
+  std::println(std::cerr, "unrecognized command: {}", std::string(argv[1]));
+  std::println(std::cerr, "{}", usage_message);
+  return EXIT_SUCCESS;
 }
