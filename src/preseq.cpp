@@ -39,7 +39,20 @@
 
 #ifdef INCLUDE_FULL_LICENSE_INFO
 #include <license.h>
+
 #endif
+const auto description = R"(
+Extrapolate the complexity of a library. This is the approach described in
+Daley & Smith (2013). The method applies rational function approximation via
+continued fractions with the original goal of estimating the number of
+distinct reads that a sequencing library would yield upon deeper sequencing.
+This method has been used for many different purposes since then.
+)";
+CLI::App app{about_msg};
+argv = app.ensure_utf8(argv);
+// app.usage(usage);
+if (argc >= 2)
+  app.footer(rlstrip(description));
 
 int
 main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
