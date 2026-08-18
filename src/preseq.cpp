@@ -78,8 +78,7 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   // clang-format on
 
   if (argc < 2) {
-    // std::println("{}", app.help());
-    std::cout << app.help() << '\n';
+    std::println("{}", app.help());
     return EXIT_SUCCESS;
   }
   CLI11_PARSE(app, argc, argv);
