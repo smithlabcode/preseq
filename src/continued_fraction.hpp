@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <format>
 #include <fstream>
+#include <string>
 #include <vector>
 
 struct ContinuedFraction {
