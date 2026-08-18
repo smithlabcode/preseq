@@ -340,7 +340,7 @@ extrap_bootstrap(
     }
     else {
       // refit curve for lower bound
-      const ContinuedFractionApproximation lower_cfa(diagonal, max_terms);
+      const ContinuedFractionApproximation lower_cfa{diagonal, max_terms};
       const auto lower_cf = lower_cfa.optimal_cf_distinct(hist);
       // extrapolate the curve start
       if (lower_cf.is_valid()) {
@@ -537,9 +537,10 @@ This method has been used for many different purposes since then.
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "output filename (directory must exist)")
       ->option_text("FILE")
@@ -773,9 +774,10 @@ adapted to deal with individual nucleotides rather than distinct reads.
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "coverage yield output file")
       ->option_text("FILE")
@@ -965,9 +967,10 @@ resamples from the given data.
       app.footer(description);
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "yield output file (default: stdout)");
     app.add_option("-s,--step", step_size, "step size in extrapolations");
@@ -1135,9 +1138,10 @@ of observed species in an initial sample.
       app.footer(description);
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "species richness output file (default: stdout)");
     app.add_option("-p,--max_num_points", max_num_points, "maximum number of points in quadrature estimates");
@@ -1499,9 +1503,10 @@ application we have seen.
       app.footer(description);
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
       ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outfile, "yield output file default: stdout");
     app.add_option("-e,--extrap", max_extrap, "maximum extrapolation");
@@ -1728,7 +1733,7 @@ Usage: preseq <command> [OPTIONS]
 Version: )" + std::string(VERSION);
 
   if (argc < 2) {
-    std::cerr << rlstrip(usage_message) << std::endl;
+    std::println(std::cerr, "{}", rlstrip(usage_message));
     return EXIT_SUCCESS;
   }
 
