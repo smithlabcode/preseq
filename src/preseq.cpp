@@ -1579,7 +1579,7 @@ application we have seen.
 
     const std::size_t max_observed_count = std::size(counts_hist) - 1;
     const double distinct_reads =
-      std::accumulate(std::cbegin(counts_hist), std::cend(counts_hist), 0.0);
+      std::reduce(std::cbegin(counts_hist), std::cend(counts_hist));
 
     // ENSURE THAT THE MAX TERMS ARE ACCEPTABLE
     std::size_t first_zero = 1;
@@ -1590,7 +1590,7 @@ application we have seen.
     orig_max_terms = orig_max_terms - (orig_max_terms % 2 == 1);
 
     if (max_extrap < 1.0)
-      max_extrap = 1000000000 * distinct_reads;
+      max_extrap = 1'000'000'000 * distinct_reads;
     if (step_size < 1.0)
       step_size = (max_extrap - distinct_reads) / n_desired_steps;
 
@@ -1747,7 +1747,7 @@ Version: )" + std::string(VERSION);
   if (std::strcmp(argv[1], "pop_size") == 0)
     return pop_size(argc - 1, argv + 1);
 
-  std::cerr << "unrecognized command: " << argv[1] << std::endl
-            << usage_message << std::endl;
+  std::println(std::cerr, "unrecognized command: {}", std::string(argv[1]));
+  std::println(std::cerr, "{}", usage_message);
   return EXIT_SUCCESS;
 }
