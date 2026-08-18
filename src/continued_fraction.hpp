@@ -49,9 +49,9 @@ struct ContinuedFraction {
 
   // Evaluate the continued fraction estimating distinct along a curve from 0
   // to max_value
-  void
-  extrapolate_distinct(const double max_value, const double step_size,
-                       std::vector<double> &estimates) const;
+  [[nodiscard]] auto
+  extrapolate_distinct(const double max_value, const double step_size) const
+    -> std::vector<double>;
 
   [[nodiscard]] auto
   is_valid() const -> bool {
@@ -99,11 +99,7 @@ struct std::formatter<ContinuedFraction> : std::formatter<std::string> {
   }
 };
 
-class ContinuedFractionApproximation {
-public:
-  ContinuedFractionApproximation(const int di, const std::size_t mt) :
-    diagonal_idx{di}, max_terms{mt} {}
-
+struct ContinuedFractionApproximation {
   // find best cont frac approx for estimating distinct
   [[nodiscard]] auto
   optimal_cf_distinct(const std::vector<double> &counts_hist) const
@@ -114,18 +110,17 @@ public:
     return diagonal_idx;
   }
 
-private:
   int diagonal_idx{};       // the diagonal to work with for estimates
   std::size_t max_terms{};  // the maximum number of terms to try for a CF
 
   /* note: these never change */
-  static const std::size_t min_allowed_degree;
+  static constexpr std::size_t min_allowed_degree{4};
 
   // largest value to search for lowerbound and stability
-  static const double search_max_val;
+  static constexpr double search_max_val{100.0};
 
   // step size for search of lowerbound and stability
-  static const double search_step_size;
+  static constexpr double search_step_size{0.05};
 };
 
 [[nodiscard]] auto
