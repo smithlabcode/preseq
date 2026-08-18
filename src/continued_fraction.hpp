@@ -18,7 +18,9 @@
 #define CONTINUED_FRACTION_HPP
 
 #include <cstddef>
+#include <format>
 #include <fstream>
+#include <string>
 #include <vector>
 
 struct ContinuedFraction {
