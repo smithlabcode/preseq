@@ -552,7 +552,7 @@ This method has been used for many different purposes since then.
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
     app.add_option("-r,--seed", seed, "seed for random number generator");
 #ifdef HAVE_HTSLIB
-    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
     app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH,
                    "maximum segment length when merging paired end bam reads");
 #endif
@@ -1144,16 +1144,16 @@ of observed species in an initial sample.
     app.add_option("-t,--tolerance", tolerance, "numerical tolerance");
     app.add_option("-n,--bootstraps", n_bootstraps, "number of bootstraps");
     app.add_option("-c,--clevel", c_level, "level for confidence intervals");
-    app.add_option("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_option("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
-    app.add_option("-V,--vals", VALS_INPUT, "input is a text file containing only the observed duplicate counts");
+    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
+    app.add_flag("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
+    app.add_flag("-V,--vals", VALS_INPUT, "input is a text file containing only the observed duplicate counts");
 #ifdef HAVE_HTSLIB
-    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
     app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH, "maximum segment length when merging paired end bam reads");
 #endif
-    app.add_option("-Q,--quick", QUICK_MODE, "quick mode, estimate without bootstrapping");
+    app.add_flag("-Q,--quick", QUICK_MODE, "quick mode, estimate without bootstrapping");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_option("-v,--verbose", VERBOSE, "print more info");
+    app.add_flag("-v,--verbose", VERBOSE, "print more info");
     // clang-format on
 
     if (argc < 2) {
@@ -1511,17 +1511,17 @@ application we have seen.
     app.add_option("-c,--cval", c_level, "level for confidence intervals");
     app.add_option("-x,--terms", orig_max_terms, "maximum terms in estimator");
 #ifdef HAVE_HTSLIB
-    app.add_option("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
+    app.add_flag("-B,--bam", BAM_FORMAT_INPUT, "input is in BAM format");
     app.add_option("-l,--seg_len", MAX_SEGMENT_LENGTH, "maximum segment length when merging paired end bam reads");
 #endif
-    app.add_option("-P,--pe", PAIRED_END, "input is paired end read file");
-    app.add_option("-V,--vals", VALS_INPUT, "input is a text file containing only the observed counts");
-    app.add_option("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
-    app.add_option("-Q,--quick", SINGLE_ESTIMATE,
-                   "quick mode (no bootstraps) for confidence intervals");
-    app.add_option("-D,--defects", allow_defects, "no testing for defects");
+    app.add_flag("-P,--pe", PAIRED_END, "input is paired end read file");
+    app.add_flag("-V,--vals", VALS_INPUT, "input is a text file containing only the observed counts");
+    app.add_flag("-H,--hist", HIST_INPUT, "input is a text file containing the observed histogram");
+    app.add_flag("-Q,--quick", SINGLE_ESTIMATE,
+                 "quick mode (no bootstraps) for confidence intervals");
+    app.add_flag("-D,--defects", allow_defects, "no testing for defects");
     app.add_option("-r,--seed", seed, "seed for random number generator");
-    app.add_option("-v,--verbose", VERBOSE, "print more info");
+    app.add_flag("-v,--verbose", VERBOSE, "print more info");
     // clang-format on
 
     if (argc < 2) {
