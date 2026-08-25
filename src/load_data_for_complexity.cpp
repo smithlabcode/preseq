@@ -207,7 +207,6 @@ empty_pq(Interval6 &prev, std::size_t &current_count,
 load_counts_bed_se(const std::string &input_file_name)
   -> std::tuple<std::size_t, std::vector<double>> {
   std::vector<double> counts_hist(2, 0.0);
-
   std::ifstream in(input_file_name);
   if (!in)
     throw std::runtime_error("problem opening file: " + input_file_name);
@@ -254,6 +253,7 @@ load_counts_bed_pe(const std::string &input_file_name)
     const bool update_success =
       update_pe_duplicate_counts_hist(curr, prev, counts_hist, current_count);
     if (!update_success)
+
       throw std::runtime_error("reads unsorted in " + input_file_name);
     ++n_reads;
     prev = curr;
