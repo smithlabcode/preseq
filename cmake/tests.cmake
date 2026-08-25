@@ -22,3 +22,4 @@ find_program(BASH_PROGRAM bash)
 
 ## Add each test
 add_test(NAME "lc_extrap histogram input" COMMAND bash test/lc_extrap_hist.sh)
+add_test(NAME "lc_extrap values input" COMMAND bash test/lc_extrap_vals.sh)
