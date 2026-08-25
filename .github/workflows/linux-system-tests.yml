@@ -1,0 +1,31 @@
+name: System tests (Linux)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  ubuntu-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # - name: Dependencies
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y zlib1g-dev libdeflate-dev libhts-dev samtools
+      - name: Configure
+        run: |
+          cmake -B build \
+          -DCMAKE_CXX_COMPILER=g++ \
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: |
+          cmake --build build -j4
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure
