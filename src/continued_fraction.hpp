@@ -14,8 +14,8 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CONTINUED_FRACTION_HPP
-#define CONTINUED_FRACTION_HPP
+#ifndef SRC_CONTINUED_FRACTION_HPP_
+#define SRC_CONTINUED_FRACTION_HPP_
 
 #include <cstddef>
 #include <format>
@@ -33,12 +33,10 @@ struct ContinuedFraction {
                     const std::size_t max_terms);
 
   // Evaluate the continued fraction
-  [[nodiscard]] auto
-  evaluate(const double val) const -> double;
+  [[nodiscard]] auto evaluate(const double val) const -> double;
 
   // Evaluate the continued fraction
-  [[nodiscard]] auto
-  operator()(const double val) const -> double {
+  [[nodiscard]] auto operator()(const double val) const -> double {
     return evaluate(val);
   }
 
@@ -50,24 +48,16 @@ struct ContinuedFraction {
   extrapolate_distinct(const double max_value,
                        const double step_size) const -> std::vector<double>;
 
-  [[nodiscard]] auto
-  is_valid() const -> bool {
-    return !cf_coeffs.empty();
-  }
+  [[nodiscard]] auto is_valid() const -> bool { return !cf_coeffs.empty(); }
 
-  [[nodiscard]] auto
-  return_degree() const -> std::size_t {
-    return degree;
-  }
+  [[nodiscard]] auto return_degree() const -> std::size_t { return degree; }
 
-  void
-  extrapolate_curve(const double initial_distinct, const double vals_sum,
-                    const double initial_sample_size, const double step_size,
-                    const double max_sample_size,
-                    std::vector<double> &estimates) const;
+  void extrapolate_curve(const double initial_distinct, const double vals_sum,
+                         const double initial_sample_size,
+                         const double step_size, const double max_sample_size,
+                         std::vector<double> &estimates) const;
 
-  [[nodiscard]] auto
-  tostring() const -> std::string;
+  [[nodiscard]] auto tostring() const -> std::string;
 
   std::vector<double> ps_coeffs;
   std::vector<double> cf_coeffs;
@@ -90,22 +80,17 @@ operator<<(std::ostream &out, const ContinuedFraction &cf) -> std::ostream & {
 
 template <>
 struct std::formatter<ContinuedFraction> : std::formatter<std::string> {
-  auto
-  format(const ContinuedFraction &cf, auto &ctx) const {
+  auto format(const ContinuedFraction &cf, auto &ctx) const {
     return std::formatter<std::string>::format(cf.tostring(), ctx);
   }
 };
 
 struct ContinuedFractionApproximation {
   // find best cont frac approx for estimating distinct
-  [[nodiscard]] auto
-  optimal_cf_distinct(const std::vector<double> &counts_hist) const
-    -> ContinuedFraction;
+  [[nodiscard]] auto optimal_cf_distinct(
+    const std::vector<double> &counts_hist) const -> ContinuedFraction;
 
-  [[nodiscard]] auto
-  get_diagonal() const -> int {
-    return diagonal_idx;
-  }
+  [[nodiscard]] auto get_diagonal() const -> int { return diagonal_idx; }
 
   int diagonal_idx{};       // the diagonal to work with for estimates
   std::size_t max_terms{};  // the maximum number of terms to try for a CF
@@ -123,4 +108,4 @@ struct ContinuedFractionApproximation {
 [[nodiscard]] auto
 check_yield_estimates_stability(const std::vector<double> &estimates) -> bool;
 
-#endif
+#endif  // SRC_CONTINUED_FRACTION_HPP_

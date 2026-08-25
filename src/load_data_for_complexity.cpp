@@ -104,12 +104,12 @@ end_greater(const auto &a, const auto &b) -> bool {
 /******************************************************************************/
 
 struct GenomicRegionOrderChecker {
-  [[nodiscard]] auto
-  operator()(const GenomicRegion &prev, const GenomicRegion &gr) const -> bool {
+  [[nodiscard]] auto operator()(const GenomicRegion &prev,
+                                const GenomicRegion &gr) const -> bool {
     return start_check(prev, gr);
   }
-  [[nodiscard]] static auto
-  start_check(const GenomicRegion &prev, const GenomicRegion &gr) -> bool {
+  [[nodiscard]] static auto start_check(const GenomicRegion &prev,
+                                        const GenomicRegion &gr) -> bool {
     return chrom_greater(prev, gr) ||                           //
            (prev.same_chrom(gr) && start_greater(prev, gr)) ||  //
            (prev.same_chrom(gr) && same_start(prev, gr) &&
@@ -679,9 +679,8 @@ load_histogram(const std::string &filename,
 // probabilistically split genomic regions into mutiple
 // genomic regions of width equal to bin_size
 static void
-SplitGenomicRegion(const GenomicRegion &inputGR, std::mt19937 &generator,
-                   const std::size_t bin_size,
-                   std::vector<GenomicRegion> &outputGRs) {
+SplitGenomicRegion(const GenomicRegion &inputGR, mt19937 &generator,
+                   const size_t bin_size, vector<GenomicRegion> &outputGRs) {
   outputGRs.clear();
   GenomicRegion gr(inputGR);
 
@@ -747,7 +746,6 @@ SplitMappedRead(const MappedRead &inputMR, std::mt19937 &generator,
           inputMR.r.get_score(), inputMR.r.get_strand());
         outputGRs.push_back(binned_gr);
       }
-      total_covered_bases += covered_bases;
       covered_bases = 0;
     }
     ++seq_iterator;
@@ -871,3 +869,306 @@ load_coverage_counts_GR(const std::string &input_file_name,
 
   return n_reads;
 }
+
+#ifdef HAVE_HTSLIB
+// Deal with SAM/BAM format only if we have htslib
+
+static inline bool
+not_mapped(const bamxx::bam_rec &aln) {
+  return get_tid(aln) == -1;
+}
+
+static inline void
+swap(bamxx::bam_rec &a, bamxx::bam_rec &b) {
+  std::swap(a.b, b.b);
+}
+
+struct aln_pos {
+  int32_t tid{};
+  hts_pos_t pos{};
+  aln_pos() = default;
+  aln_pos(const int32_t tid, const hts_pos_t pos) : tid{tid}, pos{pos} {}
+  explicit aln_pos(const bamxx::bam_rec &a) :
+    tid{get_tid(a)}, pos{get_pos(a)} {}
+  bool operator<(const aln_pos &rhs) const {
+    return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
+  }
+  bool operator>(const aln_pos &rhs) const {
+    return tid > rhs.tid || (tid == rhs.tid && pos > rhs.pos);
+  }
+  bool operator!=(const aln_pos &rhs) const {
+    // ADS: ordered to check pos first
+    return pos != rhs.pos || tid != rhs.tid;
+  }
+};
+
+struct aln_pos_pair {
+  int32_t tid{};
+  hts_pos_t pos{};
+  int32_t mtid{};
+  hts_pos_t mpos{};
+  explicit aln_pos_pair(const bamxx::bam_rec &a) :
+    tid{get_tid(a)}, pos{get_pos(a)}, mtid{get_mtid(a)}, mpos{get_mpos(a)} {}
+  bool operator<(const aln_pos_pair &rhs) const {
+    // ADS: only compares on tid and pos, NOT mtid or mpos
+    return tid < rhs.tid || (tid == rhs.tid && pos < rhs.pos);
+  }
+  bool operator!=(const aln_pos_pair &rhs) const {
+    // ADS: ordered to check pos first
+    return pos != rhs.pos || tid != rhs.tid || mtid != rhs.mtid ||
+           mpos != rhs.mpos;
+  }
+};
+
+template <typename T>
+static inline void
+update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
+                                 vector<double> &counts_hist,
+                                 size_t &current_count) {
+  if (prev != curr) {
+    // next read is new, update counts_hist to include current_count
+    if (size(counts_hist) < current_count + 1) {
+      // histogram is too small, resize
+      counts_hist.resize(current_count + 1, 0.0);
+    }
+    ++counts_hist[current_count];
+    current_count = 1;
+  }
+  else  // next read is same, update current_count
+    ++current_count;
+}
+
+template <typename aln_pos_t>
+size_t
+load_counts_BAM(const uint32_t n_threads, const string &inputfile,
+                vector<double> &counts_hist) {
+  bamxx::bam_tpool tp(n_threads);
+
+  bamxx::bam_in hts(inputfile);  // assume already checked
+  bamxx::bam_header hdr(hts);
+  if (!hdr)
+    throw runtime_error("failed to read header");
+
+  if (n_threads > 1)
+    tp.set_io(hts);
+
+  // find first mapped read to start
+  bamxx::bam_rec aln;
+  while (hts.read(hdr, aln) && not_mapped(aln))
+    ;
+
+  size_t n_reads{};
+  // if all reads unmapped, must return
+  if (not_mapped(aln))
+    return n_reads;
+
+  // to check that reads are sorted properly
+  vector<bool> chroms_seen(get_n_targets(hdr), false);
+
+  // start with prev_aln being first read
+  aln_pos_t prev{aln};
+
+  // start with count of 1 for first read seen
+  size_t current_count = 1;
+
+  while (hts.read(hdr, aln)) {
+    if (not_mapped(aln))
+      continue;  // skip unmapped reads
+
+    const aln_pos_t curr{aln};
+
+    // check that reads are sorted
+    if (curr < prev)
+      throw runtime_error("locations unsorted in: " + inputfile);
+
+    if (curr.tid != prev.tid) {  // check that reads are sorted
+      if (chroms_seen[curr.tid])
+        throw runtime_error("input not sorted");
+      chroms_seen[curr.tid] = true;
+    }
+
+    // check that mapped read is not secondary
+    update_duplicate_counts_hist_BAM(curr, prev, counts_hist, current_count);
+    ++n_reads;
+    prev = curr;
+  }
+
+  // account for the last read
+  if (size(counts_hist) < current_count + 1)
+    counts_hist.resize(current_count + 1, 0.0);
+  ++counts_hist[current_count];
+
+  return n_reads;
+}
+
+size_t
+load_counts_BAM_se(const uint32_t n_threads, const string &inputfile,
+                   vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos>(n_threads, inputfile, counts_hist);
+}
+
+size_t
+load_counts_BAM_pe(const uint32_t n_threads, const string &inputfile,
+                   vector<double> &counts_hist) {
+  return load_counts_BAM<aln_pos_pair>(n_threads, inputfile, counts_hist);
+}
+
+struct genomic_interval {
+  int32_t tid{};  // indicates uninitialized
+  hts_pos_t start{};
+  hts_pos_t stop{};
+  bool operator<(const genomic_interval &rhs) const {
+    // clang-format off
+    return (tid < rhs.tid ||
+            (tid == rhs.tid &&
+             (start < rhs.start ||
+              (start == rhs.start &&
+               (stop < rhs.stop)))));
+    // clang-format on
+  }
+};
+
+static inline uint32_t
+size(const genomic_interval &gi) {
+  return gi.stop - gi.start;
+}
+
+template <typename T>
+static inline T
+round_prob(const T x, const uint32_t bin_size, const double frac) {
+  // probabilisticly round read ends so they are at bin boundaries
+  const double lo = (x / bin_size) * bin_size;
+  const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
+  return frac < (x - lo) ? lo : hi;
+}
+
+// split a mapped read into multiple genomic intervals based on the
+// number of base pairs in each
+static void
+split_genomic_interval(const genomic_interval &gi, mt19937 &generator,
+                       const hts_pos_t bin_size, vector<aln_pos> &output) {
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+  // could shorten or lengthen; postcond: ends are at bin boundaries
+  const hts_pos_t r_start = round_prob(gi.start, bin_size, dist(generator));
+  const hts_pos_t r_stop = round_prob(gi.stop, bin_size, dist(generator));
+
+  // gather all the parts at bin offsets
+  for (auto pos = r_start; pos < r_stop; pos += bin_size)
+    output.emplace_back(gi.tid, pos);
+}
+
+template <class T, class U>
+static inline bool
+can_pop(const T &pq, const U &last, const hts_pos_t max_dist) {
+  return pq.top().tid != last.tid || pq.top().pos + max_dist < last.pos;
+}
+
+template <class T>
+static void
+update_coverage_hist(const T &curr, const T &prev, vector<double> &counts_hist,
+                     size_t &current_count) {
+  if (curr != prev) {
+    if (counts_hist.size() < current_count + 1)  // histogram too small
+      counts_hist.resize(current_count + 1, 0.0);
+    ++counts_hist[current_count];
+    current_count = 1;
+  }
+  else  // next read is same, update current_count
+    ++current_count;
+}
+
+// ADS: don't care if mapped reads are SE or PE, we only need the
+// first mate for each mapped read
+size_t
+load_coverage_counts_BAM(const uint32_t n_threads, const string &inputfile,
+                         const uint32_t seed, const size_t bin_size,
+                         const size_t max_width,
+                         vector<double> &coverage_hist) {
+  std::mt19937 generator(seed);
+
+  bamxx::bam_tpool tp(n_threads);
+  bamxx::bam_in hts(inputfile);  // assume already checked
+  bamxx::bam_header hdr(hts);
+  if (!hdr)
+    throw runtime_error("failed to read header");
+
+  if (n_threads > 1)
+    tp.set_io(hts);
+
+  // find first mapped read to start
+  bamxx::bam_rec aln;
+  while (hts.read(hdr, aln) && not_mapped(aln))
+    ;
+
+  size_t n_reads{};
+  if (not_mapped(aln))  // no reads unmapped
+    return 0;
+
+  // to check reads are sorted properly
+  vector<bool> chroms_seen(get_n_targets(hdr), false);
+
+  // start with count of 1 for first read seen
+  size_t current_count = 1;
+
+  // initialize prioirty queue to reorder the split reads
+  priority_queue<aln_pos, vector<aln_pos>, std::greater<aln_pos>> pq;
+  vector<aln_pos> parts;  // reuse allocated space
+  aln_pos prev_part;
+  genomic_interval prev;
+
+  // max_dist indicates when we think we can assume the read parts
+  // will be sorted and can be processed; this is not the same as the
+  // full reads being sorted
+  const hts_pos_t max_dist = bin_size + max_width;
+
+  while (hts.read(hdr, aln)) {
+    if (not_mapped(aln))
+      continue;  // check that read is mapped
+
+    const hts_pos_t len = rlen_from_cigar(aln);
+    const genomic_interval curr{get_tid(aln), get_pos(aln), get_pos(aln) + len};
+
+    if (curr.tid != prev.tid) {
+      if (chroms_seen[curr.tid])
+        throw runtime_error("input not sorted");
+      chroms_seen[curr.tid] = true;
+    }
+
+    if (size(curr) > max_width)
+      throw runtime_error("read " + string(bam_get_qname(aln)) + " covers " +
+                          std::to_string(size(curr)) +
+                          "bp; increase max width or reconsider data");
+
+    parts.clear();  // need new vec, but keep capacity
+    split_genomic_interval(curr, generator, bin_size, parts);
+
+    // add split intervals to the priority queue
+    const auto last = parts.back();  // keep a copy for test below
+    for (const auto &i : parts)
+      pq.push(i);
+
+    // remove genomic interval parts from the priority queue
+    while (!pq.empty() && can_pop(pq, last, max_dist)) {
+      const aln_pos curr_part = pq.top();
+      pq.pop();
+      // update counts hist
+      update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
+      prev_part = curr_part;
+    }
+    prev = curr;
+    ++n_reads;
+  }
+
+  // take care of remaining parts in priority queue
+  while (!pq.empty()) {
+    const aln_pos curr_part = pq.top();
+    pq.pop();
+    // update counts hist
+    update_coverage_hist(curr_part, prev_part, coverage_hist, current_count);
+    prev_part = curr_part;
+  }
+  return n_reads;
+}
+
+#endif  // HAVE_HTSLIB

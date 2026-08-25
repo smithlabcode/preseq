@@ -132,11 +132,9 @@ ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
     }
 
     if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
-      ACCEPT_HANKEL = true;
       hankel_dim++;
     }
     else {
-      ACCEPT_HANKEL = false;
       hankel_dim--;
       moments.resize(2 * hankel_dim);
       return hankel_dim;

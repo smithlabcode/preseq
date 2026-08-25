@@ -19,12 +19,17 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <iomanip>
-#include <iterator>
 #include <vector>
 
-// ADS: the std::pow function is used frequently to get (-1)^x for integer
-// x. This doesn't make sense, and should be replaced at some point.
+using std::fabs;
+using std::isfinite;
+using std::min;
+using std::pow;
+using std::vector;
+
+// ADS: the std::pow function is used frequently to get (-1)^x for
+// integer x. This doesn't make sense, and should be replaced at some
+// point.
 
 /* QUOTIENT DIFFERENCE ALGORITHM: compute continued fraction
  * coefficients vector for power series coefficients & vector for
@@ -76,10 +81,10 @@ quotdiff_algorithm(const std::vector<double> &ps_coeffs)
  * means degree of polynomial in numerator of Pade approximant is
  * greater than degree of polynomial in the denominator
  */
-[[nodiscard]] static auto
-quotdiff_above_diagonal(const std::vector<double> &ps_coeffs,
-                        const std::size_t offset)
-  -> std::tuple<std::vector<double>, std::vector<double>> {
+static void
+quotdiff_above_diagonal(const vector<double> &ps_coeffs, const size_t offset,
+                        vector<double> &cf_coeffs,
+                        vector<double> &offset_coeffs) {
   // get the high order PS coeffs for approximation by CF
   std::vector<double> high_ps_coeffs(std::cbegin(ps_coeffs) + offset,
                                      std::cend(ps_coeffs));

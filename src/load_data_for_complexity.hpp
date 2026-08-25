@@ -14,8 +14,8 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LOAD_DATA_FOR_COMPLEXITY_HPP
-#define LOAD_DATA_FOR_COMPLEXITY_HPP
+#ifndef SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
+#define SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_
 
 #include <cstddef>
 #include <cstdint>
@@ -63,4 +63,6 @@ load_counts_BAM_se(const std::string &input_file_name,
                    std::vector<double> &counts_hist) -> std::size_t;
 #endif  // HAVE_HTSLIB
 
-#endif
+#endif  // HAVE_HTSLIB
+
+#endif  // SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_

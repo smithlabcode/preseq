@@ -1,6 +1,6 @@
 # This file is part of preseq
 #
-# Copyright (C) 2018-2022: Andrew D. Smith
+# Copyright (C) 2018-2024: Andrew D. Smith
 #
 # Authors: Andrew D. Smith
 #
@@ -14,27 +14,69 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 
-EXTRA_DIST = README.md LICENSE preseqR data docs
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS := src/smithlab_cpp
 install installdirs: SUBDIRS := $(filter-out src/smithlab_cpp, $(SUBDIRS))
 AM_CPPFLAGS = -I $(top_srcdir)/src/smithlab_cpp
+if ENABLE_HTS
+AM_CPPFLAGS += -I $(top_srcdir)/src/bamxx
+endif
 
-CXXFLAGS = -O2 # default has optimization on
-
-LDADD = src/smithlab_cpp/libsmithlab_cpp.a
-
-bin_PROGRAMS = preseq
+AM_CPPFLAGS += -Wall -Wextra -Wpedantic -Wno-unknown-attributes
 if ENABLE_HTS
 AM_CPPFLAGS += -DHAVE_HTSLIB
 endif
 
+EXTRA_DIST = \
+	README.md \
+	LICENSE \
+	preseqR \
+	data \
+	docs \
+	tests/md5sum.txt \
+	tests/data/lc_extrap_input.vals \
+	tests/data/gc_extrap_input.mr \
+	tests/data/c_curve_input.hist \
+	tests/scripts/test_c_curve.test \
+	tests/scripts/test_gc_extrap.test \
+	tests/scripts/test_lc_extrap.test
+
+TESTS = \
+	tests/scripts/test_c_curve.test \
+	tests/scripts/test_lc_extrap.test \
+	tests/scripts/test_gc_extrap.test
+
+TEST_EXTENSIONS = .test
+
+LDADD = src/smithlab_cpp/libsmithlab_cpp.a
+
+bin_PROGRAMS = preseq
+
 preseq_SOURCES = \
         src/preseq.cpp \
+        src/common.hpp \
+        src/common.cpp \
+        src/c_curve.hpp \
+        src/c_curve.cpp \
+        src/gc_extrap.hpp \
+        src/gc_extrap.cpp \
+        src/lc_extrap.hpp \
+        src/lc_extrap.cpp \
+        src/bound_pop.hpp \
+        src/bound_pop.cpp \
+        src/pop_size.hpp \
+        src/pop_size.cpp \
         src/continued_fraction.hpp \
         src/continued_fraction.cpp \
         src/load_data_for_complexity.hpp \
         src/load_data_for_complexity.cpp \
         src/moment_sequence.hpp \
         src/moment_sequence.cpp
+
+if ENABLE_HTS
+preseq_SOURCES += \
+	src/bamxx/bamxx.hpp \
+	src/bam_record_utils.hpp \
+        src/bam_record_utils.cpp
+endif
