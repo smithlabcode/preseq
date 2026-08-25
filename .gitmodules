@@ -1,9 +1,9 @@
 [submodule "preseqR"]
-	path = preseqR
-	url = ../preseqR.git
+        path = preseqR
+        url = ../preseqR.git
 [submodule "src/smithlab_cpp"]
-	path = src/smithlab_cpp
-	url = ../smithlab_cpp.git
+        path = src/smithlab_cpp
+        url = ../smithlab_cpp.git
 [submodule "src/bamxx"]
-	path = src/bamxx
-	url = ../bamxx.git
+        path = src/bamxx
+        url = https://github.com/smithlabcode/bamxx
