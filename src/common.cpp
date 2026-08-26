@@ -128,8 +128,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
   }
   else {
     const ContinuedFractionApproximation lower_cfa(diagonal, max_terms);
-    const ContinuedFraction lower_cf(
-      lower_cfa.optimal_cont_frac_distinct(hist));
+    const ContinuedFraction lower_cf(lower_cfa.optimal_cf_distinct(hist));
 
     // extrapolate curve
     if (lower_cf.is_valid()) {
@@ -231,8 +230,7 @@ extrap_bootstrap(const bool VERBOSE, const bool allow_defects,
     else {
       // refit curve for lower bound
       const ContinuedFractionApproximation lower_cfa(diagonal, max_terms);
-      const ContinuedFraction lower_cf(
-        lower_cfa.optimal_cont_frac_distinct(hist));
+      const ContinuedFraction lower_cf(lower_cfa.optimal_cf_distinct(hist));
 
       // extrapolate the curve start
       if (lower_cf.is_valid()) {
