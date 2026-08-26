@@ -24,7 +24,12 @@
 #include <cmath>
 #include <iomanip>
 #include <iterator>
+#include <sstream>
+#include <tuple>
+#include <utility>
 #include <vector>
+
+// NOLINTBEGIN(*-avoid-magic-numbers,*-narrowing-conversions)
 
 // ADS: the std::pow function is used frequently to get (-1)^x for integer
 // x. This doesn't make sense, and should be replaced at some point.
@@ -310,8 +315,11 @@ ContinuedFraction::extrapolate_distinct(const double max_value,
   -> std::vector<double> {
   std::vector<double> estimates;
   estimates.push_back(0);
-  for (double t = step_size; t <= max_value; t += step_size)
+  auto t = step_size;
+  while (t <= max_value) {
     estimates.push_back(t * evaluate(t));
+    t += step_size;
+  }
   return estimates;
 }
 
@@ -350,7 +358,6 @@ check_yield_estimates_stability(const std::vector<double> &estimates) -> bool {
 [[nodiscard]] auto
 ContinuedFractionApproximation::optimal_cf_distinct(
   const std::vector<double> &counts_hist) const -> ContinuedFraction {
-
   // we expect to use an underestimate, but this is dealt with outside
   // by ensuring we have an even number of max terms
 
