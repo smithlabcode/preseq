@@ -16,8 +16,6 @@
 
 #include "load_data_for_complexity.hpp"
 
-#include "Interval6.hpp"
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -33,11 +31,15 @@
 #include <tuple>  // IWYU pragma: keep
 #include <utility>
 #include <vector>
+#include <format>
+
+#include "Interval6.hpp"
 
 #ifdef HAVE_HTSLIB
-#include "bam_record_utils.hpp"
 #include <bamxx.hpp>
 #include <htslib/sam.h>
+
+#include "bam_record_utils.hpp"
 #endif
 
 // NOLINTBEGIN(*-narrowing-conversions)
