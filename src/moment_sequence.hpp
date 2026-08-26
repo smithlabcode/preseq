@@ -22,8 +22,8 @@
 
 // test Hankel moment matrix to ensure the moment sequence is positive definite
 auto
-ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
-                       const bool VERBOSE) -> size_t;
+ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance)
+  -> std::size_t;
 
 struct MomentSequence {
   // Constructors
@@ -46,7 +46,7 @@ struct MomentSequence {
 
   // quadrature rules using QR on Jacobi matrix
   auto
-  Lower_quadrature_rules(const size_t n_points, const double tolerance,
+  lower_quadrature_rules(const size_t n_points, const double tolerance,
                          const size_t max_iter, std::vector<double> &points,
                          std::vector<double> &weights) -> bool;
 

@@ -18,38 +18,39 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include <format>
 #include <iterator>
+#include <numeric>
 #include <ranges>
+#include <utility>  // IWYU pragma: keep
 #include <vector>
 
 void
 LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
   const std::size_t N = std::size(A);
-  double absA{};
-  std::size_t i{};
-  std::size_t j{};
-  std::size_t k{};
 
-  P.clear();
-  for (std::size_t x = 0; x <= N; x++)
-    P.push_back(x);
+  P.resize(N + 1);
+  std::ranges::generate_n(std::begin(P), std::ssize(P),
+                          [n{0}] mutable { return n++; });
 
-  for (i = 0; i < N; ++i) {
+  for (auto i = 0LU; i < N; ++i) {
     double maxA{};
     std::size_t imax = i;
 
-    for (k = i; k < N; k++)
-      if ((absA = std::fabs(A[k][i])) > maxA) {
+    for (auto k = i; k < N; ++k) {
+      auto absA = std::fabs(A[k][i]);
+      if (absA > maxA) {
         maxA = absA;
         imax = k;
       }
+    }
 
     if (imax != i) {
       // pivoting P
-      std::size_t j = P[i];
-      P[i] = P[imax];
-      P[imax] = j;
+      std::swap(P[i], P[imax]);
+      // std::size_t j = P[i];
+      // P[i] = P[imax];
+      // P[imax] = j;
 
       // pivoting rows of A
       std::swap(A[i], A[imax]);
@@ -61,18 +62,18 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
       ++P[N];
     }
 
-    for (j = i + 1; j < N; ++j) {
+    for (auto j = i + 1; j < N; ++j) {
       A[j][i] /= A[i][i];
 
-      for (k = i + 1; k < N; k++)
+      for (auto k = i + 1; k < N; ++k)
         A[j][k] -= A[j][i] * A[i][k];
     }
   }
 }
 
-auto
-LU_determinant(std::vector<std::vector<double>> &A, std::vector<int> &P)
-  -> double {
+[[nodiscard]] static auto
+LU_determinant(const std::vector<std::vector<double>> &A,
+               const std::vector<int> &P) -> double {
   const std::size_t N = std::size(A);
 
   double det = A[0][0];
@@ -91,307 +92,300 @@ LU_determinant(std::vector<std::vector<double>> &A, std::vector<int> &P)
 // ensure moment sequence is positive definite
 // truncate moment sequence to ensure pos def
 auto
-ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance,
-                       const bool VERBOSE) -> std::size_t {
+ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance)
+  -> std::size_t {
   const std::size_t min_hankel_dim = 1;
   std::size_t hankel_dim = 2;
   if (std::size(moments) < 2 * hankel_dim) {
-    if (VERBOSE)
-      std::cerr << "too few moments" << std::endl;
     return min_hankel_dim;
   }
-  while (2 * hankel_dim - 1 < moments.size()) {
+
+  while (2 * hankel_dim - 1 < std::size(moments)) {
     std::vector<std::vector<double>> hankel_mat(
       hankel_dim, std::vector<double>(hankel_dim, 0.0));
-    for (std::size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
-      for (std::size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
+    for (std::size_t c_idx = 0; c_idx < hankel_dim; ++c_idx)
+      for (std::size_t r_idx = 0; r_idx < hankel_dim; ++r_idx)
         hankel_mat[c_idx][r_idx] = moments[c_idx + r_idx];
 
-    bool ACCEPT_HANKEL = true;
-    while (ACCEPT_HANKEL && (2 * hankel_dim - 1 < std::size(moments))) {
-      std::vector<std::vector<double>> hankel_mat(
-        hankel_dim, std::vector<double>(hankel_dim, 0.0));
-      for (std::size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
-        for (std::size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-          hankel_mat[c_idx][r_idx] = moments[c_idx + r_idx];
+    std::vector<int> perm;
+    LU_decomp(hankel_mat, perm);
+    const double hankel_mat_det = LU_determinant(hankel_mat, perm);
 
-      std::vector<int> perm;
-      LU_decomp(hankel_mat, perm);
-      const double hankel_mat_det = LU_determinant(hankel_mat, perm);
+    std::vector<std::vector<double>> shift_hankel_matrix(
+      hankel_dim, std::vector<double>(hankel_dim, 0.0));
+    for (std::size_t c_idx = 0; c_idx < hankel_dim; ++c_idx)
+      for (std::size_t r_idx = 0; r_idx < hankel_dim; ++r_idx)
+        shift_hankel_matrix[c_idx][r_idx] = moments[c_idx + r_idx + 1];
 
-      std::vector<std::vector<double>> shift_hankel_matrix(
-        hankel_dim, std::vector<double>(hankel_dim, 0.0));
-      for (std::size_t c_idx = 0; c_idx < hankel_dim; c_idx++)
-        for (std::size_t r_idx = 0; r_idx < hankel_dim; r_idx++)
-          shift_hankel_matrix[c_idx][r_idx] = moments[c_idx + r_idx + 1];
+    std::vector<int> s_perm;
+    LU_decomp(shift_hankel_matrix, s_perm);
+    const double shift_hankel_mat_det =
+      LU_determinant(shift_hankel_matrix, s_perm);
 
-      std::vector<int> s_perm;
-      LU_decomp(shift_hankel_matrix, s_perm);
-      const double shift_hankel_mat_det =
-        LU_determinant(shift_hankel_matrix, s_perm);
+    if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
+      ++hankel_dim;
+    }
+    else {
+      --hankel_dim;
+      moments.resize(2 * hankel_dim);
+      return hankel_dim;
+    }
+  }
 
-      if (VERBOSE) {
-        std::cerr << "dim" << '\t' << "hankel_det" << '\t'
-                  << "shifted_hankel_det" << std::endl;
-        std::cerr << hankel_dim << '\t' << hankel_mat_det << '\t'
-                  << shift_hankel_mat_det << std::endl;
-      }
+  return std::max(hankel_dim - 1, min_hankel_dim);
+}
 
-      if (hankel_mat_det > tolerance && shift_hankel_mat_det > tolerance) {
-        hankel_dim++;
-      }
-      else {
-        hankel_dim--;
-        moments.resize(2 * hankel_dim);
-        return hankel_dim;
-      }
+/// 3 term relations
+
+// check 3 term recurrence to avoid non-positive elements truncate if
+// non-positive element found
+static void
+check_three_term_relation(std::vector<double> &a, std::vector<double> &b) {
+  // abort if first entry is zero or smaller
+  if (a[0] <= 0.0) {
+    a.clear();
+    b.clear();
+  }
+  for (std::size_t i = 0; i < std::size(b); ++i)
+    // ADS: some strange logic here
+    if (b[i] <= 0.0 || !std::isfinite(b[i]) || a[i + 1] <= 0.0 ||
+        !std::isfinite(a[i + 1])) {
+      b.resize(i);
+      a.resize(i + 1);
+      break;
+    }
+}
+
+// check the moment sequence to avoid non-positive elements and truncate at
+// first non-positive element if found
+static void
+check_moment_sequence(std::vector<double> &obs_moms) {
+  if (obs_moms[0] <= 0.0 || !std::isfinite(obs_moms[0]))
+    obs_moms.clear();
+
+  for (std::size_t i = 1; i < std::size(obs_moms); ++i)
+    if (obs_moms[i] <= 0.0 || !std::isfinite(obs_moms[i])) {
+      obs_moms.resize(i + 1);
+      break;
+    }
+}
+
+void
+MomentSequence::unmodified_Chebyshev() {
+  const auto n_points = static_cast<std::size_t>(
+    std::floor(static_cast<double>(std::size(moments)) / 2.0));
+  std::vector<double> a(n_points, 0.0);
+  std::vector<double> b(n_points - 1, 0.0);
+
+  std::vector<std::vector<double>> sigma(
+    2 * n_points, std::vector<double>(2 * n_points, 0.0));
+  // initialization
+  a[0] = moments[1] / moments[0];
+  // sigma[-1][l] = 0
+  for (std::size_t l = 0; l < 2 * n_points; ++l)
+    sigma[0][l] = moments[l];
+
+  for (std::size_t k = 1; k <= n_points; ++k) {
+    for (std::size_t l = k; l < 2 * n_points - k; ++l) {
+      sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
+      if (k > 1)
+        sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
+    }
+    if (k != n_points) {
+      a[k] =
+        sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
+      b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
+    }
+  }
+
+  alpha = a;
+  beta = b;
+}
+
+// un-normalized 3 term recurrence
+void
+MomentSequence::full_3term_recurrence(std::vector<double> &full_alpha,
+                                      std::vector<double> &full_beta) {
+  const auto n_points = static_cast<std::size_t>(
+    std::floor(static_cast<double>(std::size(moments)) / 2.0));
+
+  std::vector<double> a(n_points, 0.0);
+  std::vector<double> b(n_points - 1, 0.0);
+
+  std::vector<std::vector<double>> sigma(
+    2 * n_points, std::vector<double>(2 * n_points, 0.0));
+  // initialization
+  a[0] = moments[1] / moments[0];
+  // sigma[-1][l] = 0
+  for (std::size_t l = 0; l < 2 * n_points; ++l)
+    sigma[0][l] = moments[l];
+
+  for (std::size_t k = 1; k <= n_points; ++k) {
+    for (std::size_t l = k; l < 2 * n_points - k; ++l) {
+      sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
+      if (k > 1)
+        sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
+    }
+    if (k != n_points) {
+      a[k] =
+        sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
+      b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
+    }
+  }
+
+  full_alpha.swap(a);
+  full_beta.swap(b);
+}
+
+////////////////////////////////////////////////////
+// Constructor
+
+MomentSequence::MomentSequence(const std::vector<double> &obs_moms) :
+  moments(obs_moms) {
+  std::vector<double> holding_moms(moments);
+  // make sure the moments are all positive
+  check_moment_sequence(holding_moms);
+  moments = holding_moms;
+
+  // calculate 3-term recurrence
+  unmodified_Chebyshev();
+}
+
+/////////////////////////////////////////////////////
+// Quadrature Methods
+
+// one iteration of QR:
+// following eq's 3.3 of Golub & Welsh
+// one iteration is Z_N-1*Z_N-2*...*Z_1*X*Z_1*...*Z_N-1
+// Z_j is givens matrix to zero out the j+1,j'th element of X
+static void
+QR_iteration(std::vector<double> &alpha, std::vector<double> &beta,
+             std::vector<double> &weights) {
+  // initialize variables
+  std::vector<double> sin_theta(std::size(alpha), 0.0);
+  std::vector<double> cos_theta(std::size(alpha), 0.0);
+
+  std::vector<double> a(std::size(alpha), 0.0);
+  std::vector<double> a_bar(std::size(alpha), 0.0);
+  a_bar[0] = alpha[0];
+
+  std::vector<double> b(beta);
+  std::vector<double> b_bar(std::size(alpha), 0.0);
+  b_bar[0] = alpha[0];
+  std::vector<double> b_tilde(std::size(alpha), 0.0);
+  b_tilde[0] = beta[0];
+
+  std::vector<double> d(std::size(alpha), 0.0);
+  d[0] = beta[0];
+
+  std::vector<double> z(weights);
+  std::vector<double> z_bar(std::size(weights), 0.0);
+  z_bar[0] = z[0];
+
+  for (std::size_t j = 0; j + 1 < std::size(alpha); ++j) {
+    // for d and b_bar, j here is j-1 in G&W
+    if (d[j] == 0.0 && b_bar[j] == 0.0) {
+      sin_theta[j] = 0.0;
+      cos_theta[j] = 1.0;
+    }
+    else {
+      sin_theta[j] = d[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
+      cos_theta[j] = b_bar[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
     }
 
-    return std::max(hankel_dim - 1, min_hankel_dim);
+    a[j] = (a_bar[j] * cos_theta[j] * cos_theta[j] +
+            2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
+            alpha[j + 1] * sin_theta[j] * sin_theta[j]);
+
+    a_bar[j + 1] = (a_bar[j] * sin_theta[j] * sin_theta[j] -
+                    2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
+                    alpha[j + 1] * cos_theta[j] * cos_theta[j]);
+
+    if (j != 0)
+      b[j - 1] = sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
+
+    b_bar[j + 1] = ((a_bar[j] - alpha[j + 1]) * sin_theta[j] * cos_theta[j] +
+                    b_tilde[j] * (sin_theta[j] * sin_theta[j] -
+                                  cos_theta[j] * cos_theta[j]));
+
+    b_tilde[j + 1] = -beta[j + 1] * cos_theta[j];
+
+    d[j + 1] = beta[j + 1] * sin_theta[j];
+
+    z[j] = z_bar[j] * cos_theta[j] + weights[j + 1] * sin_theta[j];
+
+    z_bar[j + 1] = z_bar[j] * sin_theta[j] - weights[j + 1] * cos_theta[j];
   }
 
-  /// 3 term relations
+  // last entries set equal to final "holding" values
+  a.back() = a_bar.back();
+  b.back() = b_bar.back();
+  z.back() = z_bar.back();
 
-  // check 3 term recurrence to avoid non-positive elements truncate if
-  // non-positive element found
-  static void check_three_term_relation(std::vector<double> & a,
-                                        std::vector<double> & b) {
-    // abort if first entry is zero or smaller
-    if (a[0] <= 0.0) {
-      a.clear();
-      b.clear();
-    }
-    for (std::size_t i = 0; i < std::size(b); ++i)
-      // ADS: some strange logic here
-      if (b[i] <= 0.0 || !std::isfinite(b[i]) || a[i + 1] <= 0.0 ||
-          !std::isfinite(a[i + 1])) {
-        b.resize(i);
-        a.resize(i + 1);
-        break;
-      }
+  std::swap(alpha, a);
+  std::swap(beta, b);
+  std::swap(weights, z);
+}
+
+static auto
+check_positivity(const std::vector<double> &v) -> bool {
+  const auto not_positive = [](const auto x) {
+    return x <= 0.0 || std::isinf(x);
+  };
+  return std::ranges::find_if(v, not_positive) == std::cend(v);
+}
+
+auto
+MomentSequence::lower_quadrature_rules(const std::size_t n_points,
+                                       const double tol,
+                                       const std::size_t max_iter,
+                                       std::vector<double> &points,
+                                       std::vector<double> &weights) -> bool {
+  const auto abs_sum = [](const auto a, const auto b) {
+    return a + std::fabs(b);
+  };
+  // make sure that std::size(points) will be less than n_points
+  std::vector<double> a(alpha);
+  a.resize((n_points < std::size(alpha)) ? n_points : std::size(alpha));
+  std::vector<double> b(beta);
+  b.resize((n_points - 1 < std::size(beta)) ? n_points - 1 : std::size(beta));
+
+  check_three_term_relation(a, b);
+
+  // See Gautschi pgs 10-13,
+  // the nu here is the square of the off-diagonal
+  // of the Jacobi matrix
+  std::ranges::for_each(b, [](auto &b_val) { b_val = std::sqrt(b_val); });
+  // for (double &b_val : b)
+  //   b_val = std::sqrt(b_val);
+
+  std::vector<double> eigenvec(std::size(a), 0.0);
+  eigenvec[0] = 1.0;
+  std::vector<double> eigenvals(a);
+  std::vector<double> qr_beta(b);
+
+  // in QR, off-diagonals go to zero use off diags for convergence
+  auto error_sum =
+    std::reduce(std::cbegin(qr_beta), std::cend(qr_beta), 0.0, abs_sum);
+
+  std::size_t iter{};
+  while (iter < max_iter && error_sum > tol) {
+    QR_iteration(eigenvals, qr_beta, eigenvec);
+    error_sum =
+      std::reduce(std::cbegin(qr_beta), std::cend(qr_beta), 0.0, abs_sum);
+    ++iter;
   }
 
-  // check the moment sequence to avoid non-positive elements and truncate at
-  // first non-positive element if found
-  static void check_moment_sequence(std::vector<double> & obs_moms) {
-    if (obs_moms[0] <= 0.0 || !std::isfinite(obs_moms[0]))
-      obs_moms.clear();
-
-    for (std::size_t i = 1; i < std::size(obs_moms); ++i)
-      if (obs_moms[i] <= 0.0 || !std::isfinite(obs_moms[i])) {
-        obs_moms.resize(i + 1);
-        break;
-      }
+  // eigenvalues are on diagonal of J
+  const bool points_are_positive = check_positivity(eigenvals);
+  if (points_are_positive) {
+    std::swap(points, eigenvals);
+    std::swap(weights, eigenvec);
   }
 
-  void MomentSequence::unmodified_Chebyshev() {
-    const auto n_points =
-      static_cast<std::size_t>(floor(std::size(moments) / 2));
-    std::vector<double> a(n_points, 0.0);
-    std::vector<double> b(n_points - 1, 0.0);
+  // square entries in the weights vector
+  const auto sqr = [](const auto x) { return x * x; };
+  std::ranges::transform(weights, std::begin(weights), sqr);
 
-    std::vector<std::vector<double>> sigma(
-      2 * n_points, std::vector<double>(2 * n_points, 0.0));
-    // initialization
-    a[0] = moments[1] / moments[0];
-    // sigma[-1][l] = 0
-    for (std::size_t l = 0; l < 2 * n_points; l++)
-      sigma[0][l] = moments[l];
-
-    for (std::size_t k = 1; k <= n_points; k++) {
-      for (std::size_t l = k; l < 2 * n_points - k; l++) {
-        sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
-        if (k > 1)
-          sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
-      }
-      if (k != n_points) {
-        a[k] =
-          sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
-        b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
-      }
-    }
-
-    alpha = a;
-    beta = b;
-  }
-
-  // un-normalized 3 term recurrence
-  void MomentSequence::full_3term_recurrence(std::vector<double> & full_alpha,
-                                             std::vector<double> & full_beta) {
-    const auto n_points =
-      static_cast<std::size_t>(floor(std::size(moments) / 2));
-    std::vector<double> a(n_points, 0.0);
-    std::vector<double> b(n_points - 1, 0.0);
-
-    std::vector<std::vector<double>> sigma(
-      2 * n_points, std::vector<double>(2 * n_points, 0.0));
-    // initialization
-    a[0] = moments[1] / moments[0];
-    // sigma[-1][l] = 0
-    for (std::size_t l = 0; l < 2 * n_points; l++)
-      sigma[0][l] = moments[l];
-
-    for (std::size_t k = 1; k <= n_points; k++) {
-      for (std::size_t l = k; l < 2 * n_points - k; l++) {
-        sigma[k][l] = sigma[k - 1][l + 1] - a[k - 1] * sigma[k - 1][l];
-        if (k > 1)
-          sigma[k][l] -= b[k - 2] * sigma[k - 2][l];
-      }
-      if (k != n_points) {
-        a[k] =
-          sigma[k][k + 1] / sigma[k][k] - sigma[k - 1][k] / sigma[k - 1][k - 1];
-        b[k - 1] = sigma[k][k] / sigma[k - 1][k - 1];
-      }
-    }
-
-    full_alpha.swap(a);
-    full_beta.swap(b);
-  }
-
-  ////////////////////////////////////////////////////
-  // Constructor
-
-  MomentSequence::MomentSequence(const std::vector<double> &obs_moms) :
-    moments(obs_moms) {
-    std::vector<double> holding_moms(moments);
-    // make sure the moments are all positive
-    check_moment_sequence(holding_moms);
-    moments = holding_moms;
-
-    // calculate 3-term recurrence
-    unmodified_Chebyshev();
-  }
-
-  /////////////////////////////////////////////////////
-  // Quadrature Methods
-
-  // one iteration of QR:
-  // following eq's 3.3 of Golub & Welsh
-  // one iteration is Z_N-1*Z_N-2*...*Z_1*X*Z_1*...*Z_N-1
-  // Z_j is givens matrix to zero out the j+1,j'th element of X
-  static void QRiteration(std::vector<double> & alpha,
-                          std::vector<double> & beta,
-                          std::vector<double> & weights) {
-    // initialize variables
-    std::vector<double> sin_theta(std::size(alpha), 0.0);
-    std::vector<double> cos_theta(std::size(alpha), 0.0);
-
-    std::vector<double> a(std::size(alpha), 0.0);
-    std::vector<double> a_bar(std::size(alpha), 0.0);
-    a_bar[0] = alpha[0];
-
-    std::vector<double> b(beta);
-    std::vector<double> b_bar(std::size(alpha), 0.0);
-    b_bar[0] = alpha[0];
-    std::vector<double> b_tilde(std::size(alpha), 0.0);
-    b_tilde[0] = beta[0];
-
-    std::vector<double> d(std::size(alpha), 0.0);
-    d[0] = beta[0];
-
-    std::vector<double> z(weights);
-    std::vector<double> z_bar(std::size(weights), 0.0);
-    z_bar[0] = z[0];
-
-    for (std::size_t j = 0; j + 1 < std::size(alpha); ++j) {
-      // for d and b_bar, j here is j-1 in G&W
-      if (d[j] == 0.0 && b_bar[j] == 0.0) {
-        sin_theta[j] = 0.0;
-        cos_theta[j] = 1.0;
-      }
-      else {
-        sin_theta[j] = d[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
-        cos_theta[j] = b_bar[j] / sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
-      }
-
-      a[j] = (a_bar[j] * cos_theta[j] * cos_theta[j] +
-              2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
-              alpha[j + 1] * sin_theta[j] * sin_theta[j]);
-
-      a_bar[j + 1] = (a_bar[j] * sin_theta[j] * sin_theta[j] -
-                      2 * b_tilde[j] * cos_theta[j] * sin_theta[j] +
-                      alpha[j + 1] * cos_theta[j] * cos_theta[j]);
-
-      if (j != 0)
-        b[j - 1] = sqrt(d[j] * d[j] + b_bar[j] * b_bar[j]);
-
-      b_bar[j + 1] = ((a_bar[j] - alpha[j + 1]) * sin_theta[j] * cos_theta[j] +
-                      b_tilde[j] * (sin_theta[j] * sin_theta[j] -
-                                    cos_theta[j] * cos_theta[j]));
-
-      b_tilde[j + 1] = -beta[j + 1] * cos_theta[j];
-
-      d[j + 1] = beta[j + 1] * sin_theta[j];
-
-      z[j] = z_bar[j] * cos_theta[j] + weights[j + 1] * sin_theta[j];
-
-      z_bar[j + 1] = z_bar[j] * sin_theta[j] - weights[j + 1] * cos_theta[j];
-    }
-
-    // last entries set equal to final "holding" values
-    a.back() = a_bar.back();
-    b.back() = b_bar.back();
-    z.back() = z_bar.back();
-
-    std::swap(alpha, a);
-    std::swap(beta, b);
-    std::swap(weights, z);
-  }
-
-  static auto check_positivity(const std::vector<double> &v)->bool {
-    const auto not_positive = [](const auto x) {
-      return x <= 0.0 || std::isinf(x);
-    };
-    return std::ranges::find_if(v, not_positive) == std::cend(v);
-  }
-
-  auto MomentSequence::Lower_quadrature_rules(
-    const std::size_t n_points, const double tol, const std::size_t max_iter,
-    std::vector<double> &points, std::vector<double> &weights)
-    ->bool {
-    // make sure that std::size(points) will be less than n_points
-    std::vector<double> a(alpha);
-    a.resize((n_points < std::size(alpha)) ? n_points : std::size(alpha));
-    std::vector<double> b(beta);
-    b.resize((n_points - 1 < std::size(beta)) ? n_points - 1 : std::size(beta));
-
-    check_three_term_relation(a, b);
-
-    // See Gautschi pgs 10-13,
-    // the nu here is the square of the off-diagonal
-    // of the Jacobi matrix
-    for (double &b_val : b)
-      b_val = std::sqrt(b_val);
-
-    std::vector<double> eigenvec(std::size(a), 0.0);
-    eigenvec[0] = 1.0;
-    std::vector<double> eigenvals(a);
-    std::vector<double> qr_beta(b);
-
-    // in QR, off-diagonals go to zero use off diags for convergence
-    double error_sum{};
-    for (const double val : qr_beta)
-      error_sum += std::fabs(val);
-
-    std::size_t iter{};
-    while (iter < max_iter && error_sum > tol) {
-      QRiteration(eigenvals, qr_beta, eigenvec);
-      error_sum = 0.0;
-      for (const double val : qr_beta)
-        error_sum += std::fabs(val);
-      iter++;
-    }
-
-    // eigenvalues are on diagonal of J
-    const bool points_are_positive = check_positivity(eigenvals);
-    if (points_are_positive) {
-      std::swap(points, eigenvals);
-      std::swap(weights, eigenvec);
-    }
-
-    // square entries in the weights vector
-    const auto sqr = [](const auto x) { return x * x; };
-    std::ranges::transform(weights, std::begin(weights), sqr);
-
-    return points_are_positive;
-  }
+  return points_are_positive;
+}
