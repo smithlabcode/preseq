@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <print>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -56,7 +57,7 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   app.formatter(std::make_shared<preseq_formatter>());
   app.usage("\nUsage: preseq command [OPTIONS]");
   // if (argc >= 2)
-  // app.footer(rlstrip(description));
+  app.footer(description);
   // if (argc >= 3)
   //   app.footer(rlstrip(footer_msg));
 
@@ -70,11 +71,11 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
 #ifdef INCLUDE_FULL_LICENSE_INFO
   app.add_flag("--licenses", print_licenses, "view licenses");
 #endif
-  const auto lc_extrap = app.add_subcommand("lc_extrap", rlstrip(lc_extrap::about_msg));
-  const auto gc_extrap = app.add_subcommand("gc_extrap", rlstrip(gc_extrap::about_msg));
-  const auto pop_size = app.add_subcommand("pop_size", rlstrip(pop_size::about_msg));
-  const auto bound_pop = app.add_subcommand("bound_pop", rlstrip(bound_pop::about_msg));
-  const auto c_curve = app.add_subcommand("c_curve", rlstrip(c_curve::about_msg));
+  const auto lc_extrap_cmd = app.add_subcommand("lc_extrap", rlstrip(lc_extrap::about_msg));
+  const auto gc_extrap_cmd = app.add_subcommand("gc_extrap", rlstrip(gc_extrap::about_msg));
+  const auto pop_size_cmd = app.add_subcommand("pop_size", rlstrip(pop_size::about_msg));
+  const auto bound_pop_cmd = app.add_subcommand("bound_pop", rlstrip(bound_pop::about_msg));
+  const auto c_curve_cmd = app.add_subcommand("c_curve", rlstrip(c_curve::about_msg));
   // clang-format on
 
   if (argc < 2) {
@@ -95,19 +96,22 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   }
 #endif
 
-  if (app.got_subcommand(lc_extrap))
+  if (app.got_subcommand(lc_extrap_cmd))
     return lc_extrap::main(argc - 1, argv + 1);
 
-  if (app.got_subcommand(gc_extrap))
+  if (app.got_subcommand(gc_extrap_cmd))
     return gc_extrap::main(argc - 1, argv + 1);
 
-  if (app.got_subcommand(c_curve))
+  if (app.got_subcommand(c_curve_cmd))
     return c_curve::main(argc - 1, argv + 1);
 
-  if (app.got_subcommand(pop_size))
+  if (app.got_subcommand(pop_size_cmd))
     return pop_size::main(argc - 1, argv + 1);
 
-  std::println(std::cerr, "unrecognized command: {}", std::string(argv[1]));
-  std::println(std::cerr, "{}", usage_message);
+  if (app.got_subcommand(bound_pop_cmd))
+    return bound_pop::main(argc - 1, argv + 1);
+
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  std::println(std::cerr, "unrecognized command: {}", argv[1]);
   return EXIT_SUCCESS;
 }
