@@ -1,20 +1,17 @@
-/* Copyright (C) 2013-2025 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley and Andrew Smith
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "c_curve.hpp"
@@ -29,9 +26,9 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <numeric>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -39,7 +36,7 @@
 // NOLINTBEGIN(*-narrowing-conversions)
 
 auto
-c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
+c_curve_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     std::uint32_t seed = 408;  // NOLINT(*-avoid-magic-numbers)
     double step_size = 1e6;    // NOLINT(*-avoid-magic-numbers)
@@ -48,24 +45,26 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::string infile;
     std::string histogram_outfile;
 
-    bool verbose = false;
-    bool paired_end = false;
+    bool verbose{};
+    bool paired_end{};
 
 #ifdef HAVE_HTSLIB
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(about_msg)};
+    CLI::App app{rlstrip(c_curve_about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq c_curve [OPTIONS]");
     // if (argc >= 3)
     //   app.footer(description);
 
     // clang-format off
-    app.add_option("-i,--input", infile, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", infile, "input file name")
       ->required()
-      ->check(CLI::ExistingFile);
+      ->option_text(" ")
+      ->check(CLI::ExistingFile)
+      // ->check(CLI::ReadPermission)
+      ;
     app.add_option("-o,--output", outfile, "yield output file")
       ->required()
       ->option_text("FILE");
@@ -78,15 +77,14 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // clang-format on
 
     if (argc < 3) {
-      // std::println("{}", app.help());
-      std::cout << app.help() << '\n';
+      std::println("{}", app.help());
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
 
     const auto input_format = get_input_format_type(infile);
     if (is_unknown(input_format)) {
-      std::cerr << "unknown input format\n";
+      std::println("unknown input format");
       return EXIT_FAILURE;
     }
 
@@ -109,20 +107,26 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
 
     const auto max_observed_count = std::size(counts_hist) - 1;
     const auto distinct_reads =
-      std::accumulate(std::cbegin(counts_hist), std::cend(counts_hist), 0.0);
+      std::reduce(std::cbegin(counts_hist), std::cend(counts_hist));
 
     const auto total_reads = get_counts_from_hist(counts_hist);
     const auto distinct_counts =
-      std::count_if(std::cbegin(counts_hist), std::cend(counts_hist),
-                    [](const double x) { return x > 0.0; });
+      std::ranges::count_if(counts_hist, [](const auto x) { return x > 0.0; });
 
     if (verbose)
-      std::cerr << "TOTAL READS     = " << n_reads << '\n'
-                << "COUNTS_SUM      = " << total_reads << '\n'
-                << "DISTINCT READS  = " << distinct_reads << '\n'
-                << "DISTINCT COUNTS = " << distinct_counts << '\n'
-                << "MAX COUNT       = " << max_observed_count << '\n'
-                << "COUNTS OF 1     = " << counts_hist[1] << '\n';
+      std::println("TOTAL READS     = {}"
+                   "COUNTS_SUM      = {}"
+                   "DISTINCT READS  = {}"
+                   "DISTINCT COUNTS = {}"
+                   "MAX COUNT       = {}"
+                   "COUNTS OF 1     = {}",
+                   n_reads,             //
+                   total_reads,         //
+                   distinct_reads,      //
+                   distinct_counts,     //
+                   max_observed_count,  //
+                   counts_hist[1]       //
+      );
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
@@ -134,15 +138,16 @@ c_curve::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     if (!out)
       throw std::runtime_error("failed to open output file: " + outfile);
 
-    out << "total_reads" << '\t' << "distinct_reads\n"
-        << 0 << '\t' << 0 << '\n';
-    for (std::size_t i = step_size; i <= upper_limit; i += step_size)
-      out << i << '\t'
-          << interpolate_distinct(counts_hist, total_reads, distinct_reads, i)
-          << '\n';
+    std::println(out, "total_reads\tdistinct_reads");
+    std::println(out, "0\t0");
+    for (std::size_t i = step_size; i <= upper_limit; i += step_size) {
+      const auto n_expected =
+        interpolate_distinct(counts_hist, total_reads, distinct_reads, i);
+      std::println(out, "{}\t{}", i, std::round(n_expected));
+    }
   }
   catch (const std::exception &e) {
-    std::cerr << "ERROR:\t" << e.what() << '\n';
+    std::println("{}", e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
