@@ -1,21 +1,17 @@
-/* Copyright (C) 2013-2024 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley and Andrew Smith
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef SRC_COMMON_HPP_
@@ -107,7 +103,7 @@ template <typename uint_type>
 void
 multinomial(std::mt19937 &gen, const std::vector<double> &mult_probs,
             uint_type trials, std::vector<uint_type> &result) {
-  using binom_dist = std::binomial_distribution<uint32_t>;
+  using binom_dist = std::binomial_distribution<uint_type>;
 
   result.clear();
   result.resize(std::size(mult_probs));
@@ -137,7 +133,7 @@ report_histogram(const std::string &outfile, const H &h) {
     throw std::runtime_error("failed to open output file: " + outfile);
   for (auto i = 0u; i < std::size(h); ++i)
     if (h[i] > 0)
-      out << i << '\t' << static_cast<std::uint32_t>(h[i]) << '\n';
+      std::println(out, "{}\t{}", i, static_cast<std::uint32_t>(h[i]));
 }
 
 class preseq_formatter : public CLI::Formatter {

@@ -1,21 +1,17 @@
-/* Copyright (C) 2013-2025 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley and Andrew Smith
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common.hpp"
@@ -54,15 +50,15 @@ GoodToulmin2xExtrap(const std::vector<double> &counts_hist) -> double {
 interpolate_distinct(const std::vector<double> &hist, const std::size_t N,
                      const std::size_t S, const std::size_t n) -> double {
   const double log_denom = lnfact(N + 1) - lnfact(n + 1) - lnfact(N - n + 1);
-  std::vector<double> numer(hist.size(), 0);
+  std::vector<double> numerator(std::size(hist), 0);
   for (std::size_t i = 1; i < std::size(hist); ++i) {
     // N - i - n + 1 should be greater than 0
     if (N < i + n)
       continue;
     const auto x = lnfact(N - i + 1) - lnfact(n + 1) - lnfact(N - i - n + 1);
-    numer[i] = std::exp(x - log_denom) * hist[i];
+    numerator[i] = std::exp(x - log_denom) * hist[i];
   }
-  return S - std::accumulate(std::cbegin(numer), std::cend(numer), 0);
+  return S - std::reduce(std::cbegin(numerator), std::cend(numerator));
 }
 
 static auto
@@ -123,7 +119,7 @@ extrap_single_estimate(const bool VERBOSE, const bool allow_defects,
                       max_extrap, yield_estimate);
 
     if (VERBOSE)
-      std::cerr << defect_cf << '\n';
+      std::println(std::cerr, "{}", defect_cf);
     // NO FAIL! defect mode doesn't care about failure
   }
   else {
@@ -296,18 +292,21 @@ write_predicted_complexity_curve(
     throw std::runtime_error("failed to open output file: " + outfile);
 
   // clang-format off
-  out << "TOTAL_READS" << '\t'
-      << "EXPECTED_DISTINCT" << '\t'
-      << "LOWER_" << c_level << "CI" << '\t'
-      << "UPPER_" << c_level << "CI" << '\n';
+  std::println(out, "TOTAL_READS\t"
+               "EXPECTED_DISTINCT\t"
+               "LOWER_{0}CI\t"
+               "UPPER_{0}CI",
+               c_level);
   // clang-format on
 
-  out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-  out << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\n';
+  std::println(out, "0\t0\t0\t0");
   for (auto i = 0ul; i < std::size(yield_estimates); ++i)
-    out << static_cast<std::uint64_t>((i + 1) * step_size) << '\t'
-        << yield_estimates[i] << '\t' << yield_lower_ci_lognorm[i] << '\t'
-        << yield_upper_ci_lognorm[i] << '\n';
+    std::println(out, "{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}",  //
+                 (i + 1) * step_size,                    //
+                 yield_estimates[i],                     //
+                 yield_lower_ci_lognorm[i],              //
+                 yield_upper_ci_lognorm[i]               //
+    );
 }
 
 // vals_hist[j] = n_{j} = # (counts = j)
@@ -320,15 +319,12 @@ resample_hist(std::mt19937 &gen,
               const std::vector<std::size_t> &vals_hist_distinct_counts,
               const std::vector<double> &distinct_counts_hist,
               std::vector<double> &out_hist) {
+  assert(std::ranges::is_sorted(vals_hist_distinct_counts));
   const std::size_t hist_size = std::size(distinct_counts_hist);
-  std::vector<std::uint32_t> sample_distinct_counts_hist(hist_size, 0);
-
-  const std::uint32_t distinct = std::accumulate(
-    std::cbegin(distinct_counts_hist), std::cend(distinct_counts_hist), 0.0);
-
+  std::vector<std::uint64_t> sample_distinct_counts_hist(hist_size, 0);
+  const std::uint64_t distinct = std::reduce(std::cbegin(distinct_counts_hist),
+                                             std::cend(distinct_counts_hist));
   multinomial(gen, distinct_counts_hist, distinct, sample_distinct_counts_hist);
-
-  out_hist.clear();
   out_hist.resize(vals_hist_distinct_counts.back() + 1, 0.0);
   for (std::size_t i = 0; i < hist_size; ++i)
     out_hist[vals_hist_distinct_counts[i]] = sample_distinct_counts_hist[i];
@@ -373,7 +369,7 @@ median_and_ci(std::vector<double> estimates,  // by val so we can sort them
               const double ci_level, double &median_estimate,
               double &lower_ci_estimate, double &upper_ci_estimate) {
   assert(!estimates.empty());
-  std::sort(std::begin(estimates), std::end(estimates));
+  std::ranges::sort(estimates);
 
   const double alpha = 1.0 - ci_level;
   const std::size_t N = std::size(estimates);
