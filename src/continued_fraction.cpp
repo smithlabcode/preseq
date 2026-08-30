@@ -22,9 +22,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <iomanip>
 #include <iterator>
-#include <sstream>
+#include <ranges>  // IWYU pragma: keep
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -149,8 +148,7 @@ truncate_degree(const std::size_t n_terms, ContinuedFraction &cf) {
 
 ContinuedFraction::ContinuedFraction(const std::vector<double> &ps_cf,
                                      const int di, const std::size_t dg) :
-  ps_coeffs(ps_cf),
-  diagonal_idx(di), degree(dg) {
+  ps_coeffs(ps_cf), diagonal_idx(di), degree(dg) {
   if (diagonal_idx == 0)
     cf_coeffs = quotdiff_algorithm(ps_coeffs);
   else if (diagonal_idx > 0)
@@ -227,8 +225,8 @@ evaluate_on_diagonal(const std::vector<double> &cf_coeffs, const double val,
 }
 
 [[nodiscard]] static auto
-evaluate_power_series(const std::vector<double> &ps_coeffs, const double val)
-  -> double {
+evaluate_power_series(const std::vector<double> &ps_coeffs,
+                      const double val) -> double {
   double x{};
   for (std::size_t i = 0; i < std::size(ps_coeffs); ++i)
     x += ps_coeffs[i] * std::pow(val, i);
@@ -291,28 +289,23 @@ ContinuedFraction::extrapolate_curve(const double initial_distinct,
 
 [[nodiscard]] auto
 ContinuedFraction::tostring() const -> std::string {
-  std::ostringstream the_stream;
-  std::ios_base::fmtflags orig_flags = the_stream.flags();
-  the_stream.setf(std::ios_base::fixed, std::ios_base::floatfield);
-  the_stream.precision(2);
-  the_stream << "OFFSET_COEFFS" << '\t' << "PS_COEFFS" << '\n';
+  static constexpr auto out_fmt = "{:12}\t{:12}";
+  std::string r;
+  r += "OFFSET_COEFFS\t"
+       "PS_COEFFS\n";
   const std::size_t offset = std::size(offset_coeffs);
   for (std::size_t i = 0; i < offset; ++i)
-    the_stream << std::setw(12) << offset_coeffs[i] << '\t' << std::setw(12)
-               << ps_coeffs[i] << '\n';
-  the_stream << "CF_COEFFS" << '\n';
-  for (std::size_t i = 0; i < std::size(cf_coeffs); ++i)
-    the_stream << std::setw(12) << cf_coeffs[i] << '\t' << std::setw(12)
-               << ps_coeffs[i + offset] << '\n';
-  the_stream.flags(orig_flags);
-  return the_stream.str();
+    r += std::format(out_fmt, offset_coeffs[i], ps_coeffs[i]);
+  r += std::format("CF_COEFFS\n");
+  for (auto i = 0LU; i < std::size(cf_coeffs); ++i)
+    r += std::format(out_fmt, cf_coeffs[i], ps_coeffs[i + offset]);
+  return r;
 }
 
 // estimate yields by evaluating the CF at given points
 [[nodiscard]] auto
-ContinuedFraction::extrapolate_distinct(const double max_value,
-                                        const double step_size) const
-  -> std::vector<double> {
+ContinuedFraction::extrapolate_distinct(
+  const double max_value, const double step_size) const -> std::vector<double> {
   std::vector<double> estimates;
   estimates.push_back(0);
   auto t = step_size;
@@ -331,12 +324,12 @@ ContinuedFraction::extrapolate_distinct(const double max_value,
 [[nodiscard]] auto
 check_yield_estimates_stability(const std::vector<double> &estimates) -> bool {
   // require estimates are non-negative and finite
-  for (const auto estimate : estimates)
-    if (!std::isfinite(estimate) || estimate < 0.0)
-      return false;
+  const auto badval = [](const auto x) { return !std::isfinite(x) || x < 0.0; };
+  if (std::ranges::any_of(estimates, badval))
+    return false;
 
   // require estimate to be increasing
-  for (std::size_t i = 1; i < std::size(estimates); ++i)
+  for (auto i = 1LU; i < std::size(estimates); ++i)
     if (estimates[i] < estimates[i - 1])
       return false;
 
