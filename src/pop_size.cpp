@@ -1,21 +1,17 @@
-/* Copyright (C) 2013-2024 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley and Andrew Smith
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see
- * <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "pop_size.hpp"
@@ -25,6 +21,7 @@
 #include "CLI11/CLI11.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -32,12 +29,13 @@
 #include <iostream>
 #include <iterator>
 #include <numeric>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 auto
-pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
+pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     static constexpr auto max_iter_per_bootstrap = 100;
     static constexpr auto default_max_extrap = 1000000000ul;
@@ -46,7 +44,7 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       "max count before zero is less than min required count (4)";
 
     std::string outfile;
-    std::string input_file_name;
+    std::string infile;
     std::string histogram_outfile;
 
     // NOLINTBEGIN(*-avoid-magic-numbers)
@@ -69,17 +67,19 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(pop_size::about_msg)};
+    CLI::App app{rlstrip(pop_size_about_msg)};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq pop_size [OPTIONS]");
     if (argc >= 2)
-      app.footer(rlstrip(pop_size::footer_msg));
+      app.footer(rlstrip(pop_size_footer_msg));
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", infile, "input file name")
       ->required()
-      ->check(CLI::ExistingFile);
+      ->option_text(" ")
+      ->check(CLI::ExistingFile)
+      // ->check(CLI::ReadPermission)
+      ;
     app.add_option("-o,--output", outfile, "output file")
       ->option_text("FILE");
     app.add_option("-e,--extrap", max_extrap, "maximum extrapolation");
@@ -95,38 +95,37 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // clang-format on
 
     if (argc < 3) {
-      // std::println("{}", app.help());
-      std::cout << app.help() << '\n';
+      std::println("{}", app.help());
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
 
-    const auto input_format = get_input_format_type(input_file_name);
+    const auto input_format = get_input_format_type(infile);
     if (is_unknown(input_format)) {
-      std::cerr << "unknown input format\n";
+      std::println("unknown input format");
       return EXIT_FAILURE;
     }
 
     if (verbose) {
-      std::cerr << "INPUT FORMAT: " << to_string(input_format) << '\n';
+      std::println("INPUT FORMAT: {}", to_string(input_format));
       if (is_bam(input_format) || is_bed(input_format))
-        std::cerr << "PAIRED END: " << std::boolalpha << paired_end << '\n';
+        std::println("PAIRED END: {}", paired_end);
     }
 
     const auto [n_reads, counts_hist] = [&] {
       switch (input_format) {
       case input_format_type::hist:
-        return load_histogram(input_file_name);
+        return load_histogram(infile);
       case input_format_type::counts:
-        return load_counts(input_file_name);
+        return load_counts(infile);
 #ifdef HAVE_HTSLIB
       case input_format_type::bam:
-        return paired_end ? load_counts_BAM_pe(n_threads, input_file_name)
-                          : load_counts_BAM_se(n_threads, input_file_name);
+        return paired_end ? load_counts_BAM_pe(n_threads, infile)
+                          : load_counts_BAM_se(n_threads, infile);
 #endif
       default:  // case input_format_type::vals:
-        return paired_end ? load_counts_bed_pe(input_file_name)
-                          : load_counts_bed_se(input_file_name);
+        return paired_end ? load_counts_bed_pe(infile)
+                          : load_counts_bed_se(infile);
       }
     }();
 
@@ -148,17 +147,24 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     const auto step_size =
       (max_extrap - distinct_reads) / static_cast<double>(n_desired_steps);
 
-    const std::size_t distinct_counts =
-      std::count_if(std::cbegin(counts_hist), std::cend(counts_hist),
-                    [](const double x) { return x > 0.0; });
+    const auto distinct_counts =
+      std::ranges::count_if(counts_hist, [](const auto x) { return x > 0.0; });
 
     if (verbose)
-      std::cerr << "TOTAL READS     = " << n_reads << '\n'
-                << "DISTINCT READS  = " << distinct_reads << '\n'
-                << "DISTINCT COUNTS = " << distinct_counts << '\n'
-                << "MAX COUNT       = " << max_observed_count << '\n'
-                << "COUNTS OF 1     = " << counts_hist[1] << '\n'
-                << "MAX TERMS       = " << orig_max_terms << '\n';
+      std::println("TOTAL READS     = {}"
+                   "DISTINCT READS  = {}"
+                   "DISTINCT COUNTS = {}"
+                   "MAX COUNT       = {}"
+                   "COUNTS OF 1     = {}"
+                   "MAX TERMS       = {}",
+                   n_reads,             //
+                   distinct_reads,      //
+                   distinct_counts,     //
+                   distinct_counts,     //
+                   max_observed_count,  //
+                   counts_hist[1],      //
+                   orig_max_terms       //
+      );
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
@@ -175,7 +181,7 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       throw std::runtime_error(min_required_counts_error_message);
 
     if (verbose)
-      std::cerr << "[ESTIMATING YIELD CURVE]\n";
+      std::println("[ESTIMATING YIELD CURVE]");
 
     std::vector<double> yield_estimates;
 
@@ -192,14 +198,16 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
         of.open(outfile.data());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-      out << "TOTAL_READS\tEXPECTED_DISTINCT\n";
-      out << 0 << '\t' << 0 << '\n';
-      for (auto i = 0u; i < std::size(yield_estimates); ++i)
-        out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
+      std::println(out, "TOTAL_READS\tEXPECTED_DISTINCT");
+      std::println(out, "0\t0");
+      for (auto i = 0LU; i < std::size(yield_estimates); ++i)
+        std::println(out, "{}\t{}",
+                     std::round(static_cast<double>(i + 1) * step_size),
+                     yield_estimates[i]);
     }
     else {
       if (verbose)
-        std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
+        std::println("[BOOTSTRAPPING HISTOGRAM]");
 
       const std::size_t max_iter = max_iter_per_bootstrap * n_bootstraps;
 
@@ -209,14 +217,13 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
                        max_iter, bootstrap_estimates);
 
       if (verbose)
-        std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
+        std::println("[COMPUTING CONFIDENCE INTERVALS]");
       // yield ci
       std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
-
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
       if (verbose)
-        std::cerr << "[WRITING OUTPUT]\n";
+        std::println("[WRITING OUTPUT]");
 
       std::ofstream of;
       if (!outfile.empty())
@@ -233,17 +240,18 @@ pop_size::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       const bool converged =
         (yield_estimates[n_ests] - yield_estimates[n_ests - 1] < 1.0);
 
-      out << "pop_size_estimate" << '\t' << "lower_ci" << '\t' << "upper_ci"
-          << '\n';
-      out << yield_estimates.back() << '\t' << yield_lower_ci_lognorm.back()
-          << '\t' << yield_upper_ci_lognorm.back();
+      std::println(out, "pop_size_estimate\t"
+                        "lower_ci\t"
+                        "upper_ci");
+      std::println(out, "{}\t{}\t{}", yield_estimates.back(),
+                   yield_lower_ci_lognorm.back(),
+                   yield_upper_ci_lognorm.back());
       if (!converged)
-        out << "\tnot_converged";
-      out << '\n';
+        std::println(out, "\tnot_converged");
     }
   }
   catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    std::println("{}", e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
