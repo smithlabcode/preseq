@@ -49,21 +49,23 @@ struct Interval6 {
   initialize(const char *, const char *) -> bool;
 
   auto
-  operator<(const Interval6 &rhs) const {
-    return (chrom < rhs.chrom ||
-            (chrom == rhs.chrom &&
-             (start < rhs.start || (start == rhs.start && stop < rhs.stop))));
-  }
-
-  auto
   operator<=>(const Interval6 &) const = default;
 };
 
 [[nodiscard]] inline auto
 to_string(const Interval6 &x) -> std::string {
-  return x.chrom + "\t" + std::to_string(x.start) + "\t" +
-         std::to_string(x.stop) + "\t" + x.name + "\t" +
-         std::to_string(x.score) + "\t" + std::string(1, x.strand);
+  return std::format("{}\t"
+                     "{}\t"
+                     "{}\t"
+                     "{}\t"
+                     "{}\t",
+                     x.chrom,                  //
+                     x.start,                  //
+                     x.stop,                   //
+                     x.name,                   //
+                     x.score,                  //
+                     std::string(1, x.strand)  //
+  );
 }
 
 template <> struct std::formatter<Interval6> : std::formatter<std::string> {
@@ -78,7 +80,7 @@ template <> struct std::formatter<Interval6> : std::formatter<std::string> {
 
 [[nodiscard]] inline auto
 size(const Interval6 &x) {
-  return x.stop > x.start ? x.stop - x.start : 0ul;
+  return x.stop > x.start ? x.stop - x.start : 0LU;
 }
 
 [[nodiscard]] auto
