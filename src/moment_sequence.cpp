@@ -31,40 +31,29 @@ LU_decomp(std::vector<std::vector<double>> &A, std::vector<int> &P) {
 
   P.resize(N + 1);
   std::ranges::generate_n(std::begin(P), std::ssize(P),
-                          [n{0}] mutable { return n++; });
+                          [n{0}]  // cppcheck-suppress[syntaxError]
+                          mutable { return n++; });
 
   for (auto i = 0LU; i < N; ++i) {
     double maxA{};
-    std::size_t imax = i;
+    std::size_t max_i = i;
 
     for (auto k = i; k < N; ++k) {
       auto absA = std::fabs(A[k][i]);
       if (absA > maxA) {
         maxA = absA;
-        imax = k;
+        max_i = k;
       }
     }
 
-    if (imax != i) {
-      // pivoting P
-      std::swap(P[i], P[imax]);
-      // std::size_t j = P[i];
-      // P[i] = P[imax];
-      // P[imax] = j;
-
-      // pivoting rows of A
-      std::swap(A[i], A[imax]);
-      // std::vector<double> ptr(A[i]);
-      // A[i] = A[imax];
-      // A[imax] = ptr;
-
-      // counting pivots starting from N (for determinant)
-      ++P[N];
+    if (max_i != i) {
+      std::swap(P[i], P[max_i]);  // pivoting P
+      std::swap(A[i], A[max_i]);  // pivoting rows of A
+      ++P[N];  // counting pivots starting from N (for determinant)
     }
 
     for (auto j = i + 1; j < N; ++j) {
       A[j][i] /= A[i][i];
-
       for (auto k = i + 1; k < N; ++k)
         A[j][k] -= A[j][i] * A[i][k];
     }
@@ -92,8 +81,8 @@ LU_determinant(const std::vector<std::vector<double>> &A,
 // ensure moment sequence is positive definite
 // truncate moment sequence to ensure pos def
 auto
-ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance)
-  -> std::size_t {
+ensure_pos_def_mom_seq(std::vector<double> &moments,
+                       const double tolerance) -> std::size_t {
   const std::size_t min_hankel_dim = 1;
   std::size_t hankel_dim = 2;
   if (std::size(moments) < 2 * hankel_dim) {
@@ -353,11 +342,8 @@ MomentSequence::lower_quadrature_rules(const std::size_t n_points,
   check_three_term_relation(a, b);
 
   // See Gautschi pgs 10-13,
-  // the nu here is the square of the off-diagonal
-  // of the Jacobi matrix
+  // the nu here is the square of the off-diagonal of the Jacobi matrix
   std::ranges::for_each(b, [](auto &b_val) { b_val = std::sqrt(b_val); });
-  // for (double &b_val : b)
-  //   b_val = std::sqrt(b_val);
 
   std::vector<double> eigenvec(std::size(a), 0.0);
   eigenvec[0] = 1.0;
