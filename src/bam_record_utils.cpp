@@ -15,7 +15,7 @@
 
 #include "bam_record_utils.hpp"
 
-#include <bamxx.hpp>
+#include "bamxx/bamxx.hpp"
 
 #include <htslib/sam.h>
 
@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <format>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
@@ -33,27 +34,6 @@
 #include <vector>
 
 // NOLINTBEGIN(*-pointer-arithmetic,*-narrowing-conversions,*-constant-array-index)
-
-struct error_with_code : public std::exception {
-  std::int64_t err{};    // error possibly from HTSlib
-  int the_errno{};       // ERRNO at time of construction
-  std::string msg;       // the message
-  std::string the_what;  // to report
-  error_with_code(const std::int64_t err, const std::string &msg) :
-    err{err}, the_errno{errno}, msg{msg} {
-    std::ostringstream oss;
-    // clang-format off
-    oss << "[error: " << err << "][" << "ERRNO: " << the_errno << "]"
-        << "[" << strerror(the_errno) << "][" << msg << "]";
-    // clang-format on
-    the_what = oss.str();
-  }
-  explicit error_with_code(const std::string &msg) : error_with_code(0, msg) {}
-  [[nodiscard]] auto
-  what() const noexcept -> const char * override {
-    return the_what.data();
-  }
-};
 
 // functions in place of undefd macro
 static inline auto
@@ -230,7 +210,7 @@ bam_set1_wrapper(bam1_t *bam, const std::size_t l_qname, const char *qname,
   if (data_len + l_aux > bam->m_data) {
     const int ret = sam_realloc_bam_data(bam, data_len + l_aux);
     if (ret < 0)
-      throw error_with_code(ret, "Failed to allocate memory for BAM record");
+      throw std::runtime_error("Failed to allocate memory for BAM record");
   }
   auto data_iter = bam->data;
 
@@ -269,12 +249,12 @@ fix_internal_softclip(const std::size_t n_cigar, std::uint32_t *cigar) {
   while (!cigar_eats_ref(*c_beg) && ++c_beg != c_end)
     ;
   if (c_beg == c_end)
-    throw error_with_code("cigar eats no ref");
+    throw std::runtime_error("cigar eats no ref");
 
   while (!cigar_eats_ref(*(c_end - 1)) && --c_end != c_beg)
     ;
   if (c_beg == c_end)
-    throw error_with_code("cigar eats no ref");
+    throw std::runtime_error("cigar eats no ref");
 
   for (auto c_itr = c_beg; c_itr != c_end; ++c_itr)
     if (bam_cigar_op(*c_itr) == BAM_CSOFT_CLIP)
@@ -298,7 +278,7 @@ fix_external_insertion(const std::size_t n_cigar, std::uint32_t *cigar) {
     *c_itr = to_softclip(*c_itr);
 
   if (c_itr == c_end)
-    throw error_with_code("cigar eats no ref");
+    throw std::runtime_error("cigar eats no ref");
 
   c_itr = cigar + n_cigar - 1;
   for (; !cigar_eats_ref(*c_itr) && c_itr != cigar; --c_itr)
@@ -529,7 +509,7 @@ flip_conversion(bam1_t *aln) {
   // ADS: don't like *(cv + 1) below, but no HTSlib function for it?
   auto cv = bam_aux_get(aln, "CV");
   if (!cv)
-    throw error_with_code("bam_aux_get failed for CV");
+    throw std::runtime_error("bam_aux_get failed for CV");
   *(cv + 1) = 'T';
 }
 
@@ -600,7 +580,7 @@ truncate_overlap(const bam1_t *a, const std::uint32_t overlap,
   // NOLINTEND(*-avoid-magic-numbers)
   // clang-format on
   if (ret < 0)
-    throw error_with_code(ret, "bam_set1_wrapper");
+    throw std::runtime_error("bam_set1_wrapper");
 
   const std::size_t n_bytes_to_copy = (c_seq_len + 1) / 2;  // compression
   std::copy_n(bam_get_seq(a), n_bytes_to_copy, bam_get_seq(c));
@@ -611,13 +591,13 @@ truncate_overlap(const bam1_t *a, const std::uint32_t overlap,
   // "_udpate" for "int" because it determines the right size
   ret = bam_aux_update_int(c, "NM", nm);
   if (ret < 0)
-    throw error_with_code(ret, "bam_aux_update_int");
+    throw std::runtime_error("bam_aux_update_int");
 
   const std::uint8_t conversion = bam_aux2A(bam_aux_get(a, "CV"));
   // "_append" for "char" because there is no corresponding update
   ret = bam_aux_append(c, "CV", 'A', 1, &conversion);
   if (ret < 0)
-    throw error_with_code(ret, "bam_aux_append");
+    throw std::runtime_error("bam_aux_append");
 
   return ret;
 }
@@ -707,7 +687,7 @@ merge_overlap(const bam1_t *a, const bam1_t *b, const std::uint32_t head,
   // NOLINTEND(*-avoid-magic-numbers)
   // clang-format on
   if (ret < 0)
-    throw error_with_code(ret, "bam_set1_wrapper in merge_overlap");
+    throw std::runtime_error("bam_set1_wrapper in merge_overlap");
   // Merge the sequences by bytes
   merge_by_byte(a, b, c);
 
@@ -716,13 +696,13 @@ merge_overlap(const bam1_t *a, const bam1_t *b, const std::uint32_t head,
     (bam_aux2i(bam_aux_get(a, "NM")) + bam_aux2i(bam_aux_get(b, "NM")));
   ret = bam_aux_update_int(c, "NM", nm);
   if (ret < 0)
-    throw error_with_code(ret, "bam_aux_update_int in merge_overlap");
+    throw std::runtime_error("bam_aux_update_int in merge_overlap");
 
   // add the tag for conversion
   const std::uint8_t cv = bam_aux2A(bam_aux_get(a, "CV"));
   ret = bam_aux_append(c, "CV", 'A', 1, &cv);
   if (ret < 0)
-    throw error_with_code(ret, "bam_aux_append in merge_overlap");
+    throw std::runtime_error("bam_aux_append in merge_overlap");
 
   return ret;
 }
@@ -786,7 +766,7 @@ merge_non_overlap(const bam1_t *a, const bam1_t *b, const std::uint32_t spacer,
   // NOLINTEND(*-avoid-magic-numbers)
   // clang-format on
   if (ret < 0)
-    throw error_with_code(ret, "bam_set1 in merge_non_overlap");
+    throw std::runtime_error("bam_set1 in merge_non_overlap");
 
   merge_by_byte(a, b, c);
 
@@ -796,13 +776,13 @@ merge_non_overlap(const bam1_t *a, const bam1_t *b, const std::uint32_t spacer,
   // "udpate" for "int" because it determines the right size
   ret = bam_aux_update_int(c, "NM", nm);
   if (ret < 0)
-    throw error_with_code(ret, "merge_non_overlap:bam_aux_update_int");
+    throw std::runtime_error("merge_non_overlap:bam_aux_update_int");
 
   const std::uint8_t cv = bam_aux2A(bam_aux_get(a, "CV"));
   // "append" for "char" because there is no corresponding update
   ret = bam_aux_append(c, "CV", 'A', 1, &cv);
   if (ret < 0)
-    throw error_with_code(ret, "merge_non_overlap:bam_aux_append");
+    throw std::runtime_error("merge_non_overlap:bam_aux_append");
 
   return ret;
 }
@@ -848,18 +828,18 @@ standardize_format(const std::string &input_format, bam1_t *aln) {
     // A/T rich: get the ZS tag value
     const auto zs_tag = bam_aux_get(aln, "ZS");
     if (!zs_tag)
-      throw error_with_code("bam_aux_get for ZS (invalid bsmap)");
+      throw std::runtime_error("bam_aux_get for ZS (invalid bsmap)");
     // ADS: test for errors on the line below
     const auto zs_tag_value = std::string(bam_aux2Z(zs_tag));
     if (zs_tag_value.empty())
-      throw error_with_code("empty ZS tag in bsmap format");
+      throw std::runtime_error("empty ZS tag in bsmap format");
     if (zs_tag_value[0] != '-' && zs_tag_value[0] != '+')
-      throw error_with_code("invalid ZS tag in bsmap format");
+      throw std::runtime_error("invalid ZS tag in bsmap format");
     const std::uint8_t cv = zs_tag_value[1] == '-' ? 'A' : 'T';
     // get the "mismatches" tag
     const auto nm_tag = bam_aux_get(aln, "NM");
     if (!nm_tag)
-      throw error_with_code("invalid NM tag in bsmap format");
+      throw std::runtime_error("invalid NM tag in bsmap format");
     const std::int64_t nm = bam_aux2i(nm_tag);
 
     // ADS: this should delete the aux data by truncating the used
@@ -871,13 +851,12 @@ standardize_format(const std::string &input_format, bam1_t *aln) {
     // though we just deleted all tags, it will add it back here
     err_code = bam_aux_update_int(aln, "NM", nm);
     if (err_code < 0)
-      throw error_with_code(err_code, "error setting NM in bsmap format");
+      throw std::runtime_error("error setting NM in bsmap format");
 
     // "append" for "char" because there is no corresponding update
     err_code = bam_aux_append(aln, "CV", 'A', 1, &cv);
     if (err_code < 0)
-      throw error_with_code(err_code,
-                            "error setting conversion in bsmap format");
+      throw std::runtime_error("error setting conversion in bsmap format");
 
     // reverse complement if needed
     if (bam_is_rev(aln))
@@ -891,12 +870,12 @@ standardize_format(const std::string &input_format, bam1_t *aln) {
     // A/T rich; get the XR tag value
     auto xr_tag = bam_aux_get(aln, "XR");
     if (!xr_tag)
-      throw error_with_code("bam_aux_get for XR (invalid bismark)");
+      throw std::runtime_error("bam_aux_get for XR (invalid bismark)");
     const std::uint8_t cv = std::string(bam_aux2Z(xr_tag)) == "GA" ? 'A' : 'T';
     // get the "mismatches" tag
     auto nm_tag = bam_aux_get(aln, "NM");
     if (!nm_tag)
-      throw error_with_code("bam_aux_get for NM (invalid bismark)");
+      throw std::runtime_error("bam_aux_get for NM (invalid bismark)");
     const std::int64_t nm = bam_aux2i(nm_tag);
 
     aln->l_data = bam_get_aux(aln) - aln->data;  // del aux (no data resize)
@@ -906,11 +885,11 @@ standardize_format(const std::string &input_format, bam1_t *aln) {
     // though we just deleted all tags, it will add it back here.
     err_code = bam_aux_update_int(aln, "NM", nm);
     if (err_code < 0)
-      throw error_with_code(err_code, "bam_aux_update_int");
+      throw std::runtime_error("bam_aux_update_int");
     // "append" for "char" because there is no corresponding update
     err_code = bam_aux_append(aln, "CV", 'A', 1, &cv);
     if (err_code < 0)
-      throw error_with_code(err_code, "bam_aux_append");
+      throw std::runtime_error("bam_aux_append");
 
     if (bam_is_rev(aln))
       revcomp_seq_by_byte_impl(aln);  // reverse complement if needed
@@ -939,7 +918,7 @@ void
 apply_cigar(const bamxx::bam_rec &aln, std::string &to_inflate,
             const char inflation_symbol) {
   std::string inflated_seq;
-  std::stringstream ss_cigar;
+  std::string cigar;
   std::size_t i = 0;
   auto to_inflate_beg = std::begin(to_inflate);
 
@@ -949,7 +928,8 @@ apply_cigar(const bamxx::bam_rec &aln, std::string &to_inflate,
   for (auto c_itr = beg_cig; c_itr != end_cig; ++c_itr) {
     const auto op = bam_cigar_op(*c_itr);
     const auto n = bam_cigar_oplen(*c_itr);
-    ss_cigar << n << op;
+    cigar += std::format("{}{}", n, op);
+    ;
 
     if (cigar_eats_ref(op) && cigar_eats_query(op)) {
       inflated_seq.append(to_inflate_beg + i, to_inflate_beg + i + n);
@@ -990,8 +970,8 @@ to_string(const bamxx::bam_header &hdr,
   kstring_t ks = {0, 0, nullptr};
   const int ret = sam_format1(hdr.h, aln.b, &ks);
   if (ret < 0)
-    throw error_with_code(ret, "Can't format record: " +
-                                 std::string(bam_get_qname(aln)));
+    throw std::runtime_error("Can't format record: " +
+                             std::string(bam_get_qname(aln)));
   std::string s(ks.s);
   ks_free(&ks);
   return s;

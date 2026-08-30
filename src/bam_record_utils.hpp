@@ -27,9 +27,9 @@
    means they should be system symbols.
 */
 
-#include <htslib/sam.h>
+#include "bamxx/bamxx.hpp"
 
-#include <bamxx.hpp>
+#include <htslib/sam.h>
 
 #include <cstddef>
 #include <cstdint>
