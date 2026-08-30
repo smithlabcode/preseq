@@ -38,6 +38,7 @@
 #include <iterator>
 #include <memory>  // IWYU pragma: keep
 #include <numeric>
+#include <print>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -47,20 +48,20 @@
 
 // bounding n_0
 auto
-bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
+bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
   try {
     const auto normalize =
-      [](auto &x) {  // cppcheck-suppress constParameterReference
-        const auto d = std::accumulate(std::cbegin(x), std::cend(x), 0.0);
-        std::transform(std::cbegin(x), std::cend(x), std::begin(x),
-                       [&](const auto y) { return y / d; });
+      [](auto &x) {  // cppcheck-suppress[constParameterReference]
+        const auto d = std::reduce(std::cbegin(x), std::cend(x));
+        std::ranges::transform(x, std::begin(x),
+                               [&](const auto y) { return y / d; });
       };
 
     bool verbose{false};
     bool paired_end{false};
     bool quick_mode{false};
 
-    std::string input_file_name;
+    std::string infile;
     std::string outfile;
     std::string histogram_outfile;
 
@@ -77,7 +78,7 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(about_msg)};
+    CLI::App app{rlstrip(bound_pop_about_msg)};
     argv = app.ensure_utf8(argv);
     app.formatter(std::make_shared<preseq_formatter>());
     app.usage("\nUsage: preseq bound_pop [OPTIONS]");
@@ -85,10 +86,12 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     //   app.footer(rlstrip(description));
 
     // clang-format off
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", infile, "input file name")
       ->required()
-      ->check(CLI::ExistingFile);
+      ->option_text(" ")
+      ->check(CLI::ExistingFile)
+      // ->check(CLI::ReadPermission)
+      ;
     app.add_option("-o,--output", outfile, "output file");
     app.add_option("-m,--max-points", max_num_points,
                    "maximum number of points in quadrature estimates");
@@ -102,31 +105,30 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     // clang-format on
 
     if (argc < 3) {
-      // std::println("{}", app.help());
-      std::cout << app.help() << '\n';
+      std::println("{}", app.help());
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
 
-    const auto input_format = get_input_format_type(input_file_name);
+    const auto input_format = get_input_format_type(infile);
     if (is_unknown(input_format)) {
-      std::cerr << "unknown input format\n";
+      std::println("unknown input format");
       return EXIT_FAILURE;
     }
 
     const auto [n_obs, counts_hist] = [&] {
       if (is_hist(input_format))
-        return load_histogram(input_file_name);
+        return load_histogram(infile);
       if (is_counts(input_format))
-        return load_counts(input_file_name);
+        return load_counts(infile);
 #ifdef HAVE_HTSLIB
       if (is_bam(input_format))
-        return paired_end ? load_counts_BAM_pe(n_threads, input_file_name)
-                          : load_counts_BAM_se(n_threads, input_file_name);
+        return paired_end ? load_counts_BAM_pe(n_threads, infile)
+                          : load_counts_BAM_se(n_threads, infile);
 #endif
       //  if (is_bed(input_format))
-      return paired_end ? load_counts_bed_pe(input_file_name)
-                        : load_counts_bed_se(input_file_name);
+      return paired_end ? load_counts_bed_pe(infile)
+                        : load_counts_bed_se(infile);
     }();
 
     const double distinct_obs =
@@ -224,7 +226,7 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
         };
         auto estimated_unobs =
           std::inner_product(std::cbegin(weights), std::cend(weights),
-                             std::cbegin(points), 0.0, std::plus<>(), term);
+                             std::cbegin(points), 0.0, std::plus{}, term);
         estimated_unobs = std::max(estimated_unobs, 0.0) + sampled_distinct;
 
         if (verbose)
@@ -265,10 +267,10 @@ bound_pop::main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     output["observed_moments"] = measure_moments;
     if (verbose && !quick_mode)
       output["bootstraps"] = bootstraps;
-    out << output.dump(4) << '\n';
+    std::println(out, "{}", output.dump(4));
   }
   catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    std::println("{}", e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

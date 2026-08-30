@@ -21,15 +21,11 @@
 #ifndef SRC_BOUND_POP_HPP_
 #define SRC_BOUND_POP_HPP_
 
-namespace bound_pop {
-
-const auto about_msg = R"(
+const auto bound_pop_about_msg = R"(
 Estimate a bound on the size of the population using the initial sample.
 )";
 
 auto
-main(int argc, char *argv[]) -> int;
-
-};  // namespace bound_pop
+bound_pop_main(int argc, char *argv[]) -> int;
 
 #endif  // SRC_BOUND_POP_HPP_
