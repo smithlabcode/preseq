@@ -1,19 +1,17 @@
 /* Copyright (C) 2013-2025 Andrew D. Smith and Timothy Daley
  *
- * Authors: Timothy Daley and Andrew Smith
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License along with
+ * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "lc_extrap.hpp"
@@ -22,6 +20,7 @@
 #include "load_data_for_complexity.hpp"
 
 #include "CLI11/CLI11.hpp"
+// #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -32,6 +31,7 @@
 #include <iterator>
 #include <memory>
 #include <numeric>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -39,7 +39,7 @@
 // NOLINTBEGIN(*-narrowing-conversions)
 
 auto
-lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
+lc_extrap_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
   try {
     static const std::size_t min_required_counts = 4;
     static const std::string min_required_counts_error_message =
@@ -70,20 +70,22 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(about_msg)};
+    CLI::App app{rlstrip(lc_extrap_about_msg)};
     argv = app.ensure_utf8(argv);
     app.formatter(std::make_shared<preseq_formatter>());
     app.usage("\nUsage: preseq lc_extrap [OPTIONS]");
     if (argc >= 3)
-      app.footer(rlstrip(footer_msg));
+      app.footer(rlstrip(lc_extrap_footer_msg));
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
-    app.add_option("-i,--input", input_file_name, "input file")
-      ->option_text("FILE")
+    app.add_option("INPUT", input_file_name,
+                   "input file name")
       ->required()
+      ->option_text(" ")
+      ->check(CLI::ExistingFile)
       // ->check(CLI::ReadPermission)
-      ->check(CLI::ExistingFile);
+      ;
     app.add_option("-o,--output", outfile, "output filename (directory must exist)")
       ->option_text("FILE")
       // ->check(CLI::WritePermission)
@@ -102,8 +104,7 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     // clang-format on
 
     if (argc < 3) {
-      // std::println("{}", app.help());
-      std::cout << app.help() << '\n';
+      std::println("{}", app.help());
       return EXIT_SUCCESS;
     }
     CLI11_PARSE(app, argc, argv);
@@ -112,14 +113,20 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
 
     const auto input_format = get_input_format_type(input_file_name);
     if (is_unknown(input_format)) {
-      std::cerr << "unknown input format\n";
+      // spdlog::error("unknown input format");
+      std::println("unknown input format");
       return EXIT_FAILURE;
     }
 
+    // if (verbose) {
+    //   spdlog::info("INPUT FORMAT: {}", to_string(input_format));
+    //   if (is_bam(input_format) || is_bed(input_format))
+    //     spdlog::info("PAIRED END: {}", paired_end);
+    // }
     if (verbose) {
-      std::cerr << "INPUT FORMAT: " << to_string(input_format) << '\n';
+      std::println("INPUT FORMAT: {}", to_string(input_format));
       if (is_bam(input_format) || is_bed(input_format))
-        std::cerr << "PAIRED END: " << std::boolalpha << paired_end << '\n';
+        std::println("PAIRED END: {}", paired_end);
     }
 
     const auto [n_reads, counts_hist] = [&] {
@@ -157,12 +164,18 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
                     [](const double x) { return x > 0.0; });
 
     if (verbose)
-      std::cerr << "TOTAL READS     = " << n_reads << '\n'
-                << "DISTINCT READS  = " << distinct_reads << '\n'
-                << "DISTINCT COUNTS = " << distinct_counts << '\n'
-                << "MAX COUNT       = " << max_observed_count << '\n'
-                << "COUNTS OF 1     = " << counts_hist[1] << '\n'
-                << "MAX TERMS       = " << orig_max_terms << '\n';
+      std::println("TOTAL READS     = {}"
+                   "DISTINCT READS  = {}"
+                   "DISTINCT COUNTS = {}"
+                   "MAX COUNT       = {}"
+                   "COUNTS OF 1     = {}"
+                   "MAX TERMS       = {}",
+                   n_reads,             //
+                   distinct_reads,      //
+                   distinct_counts,     //
+                   max_observed_count,  //
+                   counts_hist[1],      //
+                   orig_max_terms);
 
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
@@ -179,7 +192,7 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       throw std::runtime_error(min_required_counts_error_message);
 
     if (verbose)
-      std::cerr << "[ESTIMATING YIELD CURVE]\n";
+      std::println("[ESTIMATING YIELD CURVE]");
     std::vector<double> yield_estimates;
 
     if (single_estimate) {
@@ -195,15 +208,14 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       if (!out)
         throw std::runtime_error("failed to open output file: " + outfile);
 
-      out << "TOTAL_READS\tEXPECTED_DISTINCT\n";
-      out.setf(std::ios_base::fixed, std::ios_base::floatfield);
-      out << 0 << '\t' << 0 << '\n';
-      for (std::size_t i = 0; i < std::size(yield_estimates); ++i)
-        out << (i + 1) * step_size << '\t' << yield_estimates[i] << '\n';
+      std::println(out, "TOTAL_READS\tEXPECTED_DISTINCT");
+      std::println(out, "0\t0");
+      for (auto i = 0LU; i < std::size(yield_estimates); ++i)
+        std::println(out, "{}\t{}", (i + 1) * step_size, yield_estimates[i]);
     }
     else {
       if (verbose)
-        std::cerr << "[BOOTSTRAPPING HISTOGRAM]\n";
+        std::println("[BOOTSTRAPPING HISTOGRAM]");
 
       const std::size_t max_iter = 100 * n_bootstraps;
 
@@ -213,14 +225,14 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
                        max_iter, bootstrap_estimates);
 
       if (verbose)
-        std::cerr << "[COMPUTING CONFIDENCE INTERVALS]\n";
+        std::println("[COMPUTING CONFIDENCE INTERVALS]");
       // yield ci
       std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
       vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
                            yield_lower_ci_lognorm, yield_upper_ci_lognorm);
 
       if (verbose)
-        std::cerr << "[WRITING OUTPUT]\n";
+        std::println("[WRITING OUTPUT]");
 
       write_predicted_complexity_curve(outfile, c_level, step_size,
                                        yield_estimates, yield_lower_ci_lognorm,
@@ -228,7 +240,7 @@ lc_extrap::main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     }
   }
   catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    std::println("{}", e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

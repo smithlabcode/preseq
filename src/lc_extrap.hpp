@@ -21,13 +21,11 @@
 #ifndef SRC_LC_EXTRAP_HPP_
 #define SRC_LC_EXTRAP_HPP_
 
-namespace lc_extrap {
-
-constexpr auto about_msg = R"(
+constexpr auto lc_extrap_about_msg = R"(
 Estimate a complexity curve (e.g., for a sequencing library).
 )";
 
-constexpr auto footer_msg = R"(
+constexpr auto lc_extrap_footer_msg = R"(
 This is the approach described in Daley & Smith (2013). The method applies
 rational function approximation via continued fractions with the original goal
 of estimating the number of distinct reads that a sequencing library would
@@ -36,8 +34,6 @@ purposes since then.
 )";
 
 auto
-main(int argc, char *argv[]) -> int;
-
-};  // namespace lc_extrap
+lc_extrap_main(int argc, char *argv[]) -> int;
 
 #endif  // SRC_LC_EXTRAP_HPP_
