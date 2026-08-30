@@ -16,9 +16,18 @@
 
 #include "load_data_for_complexity.hpp"
 
+#include "Interval6.hpp"
+
+#ifdef HAVE_HTSLIB
+#include "bam_record_utils.hpp"
+#include "bamxx/bamxx.hpp"
+#include <htslib/sam.h>
+#endif
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <fstream>
 #include <functional>  // IWYU pragma: keep
 #include <iterator>
@@ -31,16 +40,6 @@
 #include <tuple>  // IWYU pragma: keep
 #include <utility>
 #include <vector>
-#include <format>
-
-#include "Interval6.hpp"
-
-#ifdef HAVE_HTSLIB
-#include <bamxx.hpp>
-#include <htslib/sam.h>
-
-#include "bam_record_utils.hpp"
-#endif
 
 // NOLINTBEGIN(*-narrowing-conversions)
 
@@ -108,7 +107,7 @@ get_input_format_type(const std::string &filename) -> input_format_type {
   {
     std::istringstream iss(line);
     if (iss >> val1)
-      return input_format_type::bed;
+      return input_format_type::counts;
   }
   return input_format_type::unknown;
 }
@@ -193,12 +192,13 @@ empty_pq(Interval6 &prev, std::size_t &current_count,
   const bool update_success =
     update_pe_duplicate_counts_hist(curr, prev, counts_hist, current_count);
   if (!update_success) {
-    std::ostringstream oss;
-    oss << "reads unsorted in: " << input_file_name << "\n"
-        << "prev = \t" << to_string(prev) << "\n"
-        << "curr = \t" << to_string(curr) << "\n"
-        << "Increase seg_len if in paired end mode";
-    throw std::runtime_error(oss.str());
+    const auto msg =
+      std::format("reads unsorted in: {}\n"
+                  "prev = \t{}\n"
+                  "curr = \t{}\n"
+                  "Increase seg_len if in paired end mode",
+                  input_file_name, to_string(prev), to_string(curr));
+    throw std::runtime_error(msg);
   }
   prev = curr;
 }
@@ -349,7 +349,7 @@ split_genomic_region(Interval6 interval, std::mt19937 &generator,
   interval.stop = interval.start + w;
 
   std::vector<Interval6> parts;
-  for (auto i = 0u; i < width(interval); i += bin_size) {
+  for (auto i = 0u; i < size(interval); i += bin_size) {
     const std::uint32_t curr_start = interval.start + i;
     const double curr_end = std::min(interval.stop, curr_start + bin_size);
     if (dist(generator) <= (curr_end - curr_start) / bin_size)
@@ -380,16 +380,19 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
 
   std::string line;
   while (std::getline(in, line)) {
-    const auto interval = Interval6(line);
-    const auto splits = split_genomic_region(interval, generator, bin_size);
+    Interval6 interval(line);
+    auto splits =
+      split_genomic_region(std::move(interval), generator, bin_size);
+    const auto n_splits = std::size(splits);
+    const auto last_split = splits.back();
 
     // add split intervals to the priority queue
-    for (const auto &i : splits)
-      pq.push(i);
+    for (auto &&i : splits)
+      pq.push(std::move(i));
 
-    if (std::size(splits) > 0) {
+    if (n_splits > 0) {
       // remove intervals from the priority queue
-      while (!pq.empty() && is_ready_to_pop(pq, splits.back(), max_width))
+      while (!pq.empty() && is_ready_to_pop(pq, last_split, max_width))
         empty_pq(prev, current_count, coverage_hist, pq, infile);
     }
     ++n_reads;
@@ -409,15 +412,7 @@ struct genomic_interval {
   hts_pos_t start{};
   hts_pos_t stop{};
   auto
-  operator<(const genomic_interval &rhs) const -> bool {
-    // clang-format off
-    return (tid < rhs.tid ||
-            (tid == rhs.tid &&
-             (start < rhs.start ||
-              (start == rhs.start &&
-               (stop < rhs.stop)))));
-    // clang-format on
-  }
+  operator<=>(const genomic_interval &) const = default;
 };
 
 struct aln_pos {
@@ -464,8 +459,8 @@ struct aln_pos_pair {
 
 template <typename T>
 [[nodiscard]] static inline auto
-round_position(const T x, const std::uint32_t bin_size, const double frac)
-  -> T {
+round_position(const T x, const std::uint32_t bin_size,
+               const double frac) -> T {
   // probabilisticly round read ends so they are at bin boundaries
   const double lo = (x / bin_size) * bin_size;
   const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
@@ -608,11 +603,10 @@ update_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the first mate
 // for each mapped read
 auto
-load_coverage_counts_BAM(const std::uint32_t n_threads,
-                         const std::string &inputfile, const std::uint32_t seed,
-                         const std::size_t bin_size,
-                         const std::size_t max_width)
-  -> std::tuple<std::size_t, std::vector<double>> {
+load_coverage_counts_BAM(
+  const std::uint32_t n_threads, const std::string &inputfile,
+  const std::uint32_t seed, const std::size_t bin_size,
+  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);
