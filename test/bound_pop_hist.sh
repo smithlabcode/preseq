@@ -6,7 +6,7 @@ infile=data/SRR1301329_1M_hist.txt
 outdir=bound_pop_hist_out
 if [[ -e "${infile}" ]]; then
     mkdir -p ${outdir}
-    ${prog} bound_pop -H -o ${outdir}/out.txt ${infile}
+    ${prog} bound_pop -o ${outdir}/out.txt ${infile}
     x=$(md5sum --ignore-missing -c test/md5sum.txt | \
             grep "${outdir}" | \
             grep -c "OK$")

@@ -6,7 +6,7 @@ infile=data/Shakespeare_vals.txt
 outdir=lc_extrap_vals_out
 if [[ -e "${infile}" ]]; then
     mkdir -p ${outdir}
-    ${prog} lc_extrap --vals -o ${outdir}/out.txt ${infile}
+    ${prog} lc_extrap -o ${outdir}/out.txt ${infile}
     x=$(md5sum --ignore-missing -c test/md5sum.txt | \
             grep "${outdir}" | \
             grep -c "OK$")
