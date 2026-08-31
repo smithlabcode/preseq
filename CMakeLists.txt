@@ -57,7 +57,6 @@ if(PRESEQ_TESTS)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(spdlog REQUIRED)
 
 if(USE_HTSLIB)
   find_package(HTSLIB 1.20 REQUIRED)
@@ -93,7 +92,6 @@ target_link_libraries(preseq PRIVATE
   bound_pop
   pop_size
 )
-target_link_libraries(preseq PRIVATE spdlog::spdlog_header_only)
 
 if(USE_HTSLIB)
   target_link_libraries(preseq PRIVATE
