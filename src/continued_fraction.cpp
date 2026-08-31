@@ -1,7 +1,4 @@
-/* Copyright (C) 2013-2026 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
- *
- * Authors: Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -146,9 +143,10 @@ truncate_degree(const std::size_t n_terms, ContinuedFraction &cf) {
   }
 }
 
-ContinuedFraction::ContinuedFraction(const std::vector<double> &ps_cf,
-                                     const int di, const std::size_t dg) :
-  ps_coeffs(ps_cf), diagonal_idx(di), degree(dg) {
+ContinuedFraction::ContinuedFraction(const std::vector<double> &ps_coeffs,
+                                     const int diagonal_idx,
+                                     const std::size_t degree) :
+  ps_coeffs{ps_coeffs}, diagonal_idx{diagonal_idx}, degree{degree} {
   if (diagonal_idx == 0)
     cf_coeffs = quotdiff_algorithm(ps_coeffs);
   else if (diagonal_idx > 0)
@@ -163,8 +161,11 @@ ContinuedFraction::ContinuedFraction(const std::vector<double> &ps_cf,
 ContinuedFraction::ContinuedFraction(const std::vector<double> &hist,
                                      const std::size_t max_terms) :
   degree{max_terms} {
-  for (std::size_t j = 1; j <= max_terms; ++j)
-    ps_coeffs.push_back(hist[j] * std::pow(-1.0, j + 1));
+  int sign = 1;
+  for (std::size_t j = 1; j <= max_terms; ++j) {
+    ps_coeffs.push_back(hist[j] * sign);
+    sign = -sign;
+  }
   cf_coeffs = quotdiff_algorithm(ps_coeffs);
 }
 

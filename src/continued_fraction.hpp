@@ -1,7 +1,4 @@
-/* Copyright (C) 2013-2026 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
- *
- * Authors: Andrew D. Smith and Timothy Daley
+/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
  *
  * This program is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -29,8 +26,8 @@
 struct ContinuedFraction {
   // Constructors
   ContinuedFraction() = default;
-  ContinuedFraction(const std::vector<double> &ps_cf, const int di,
-                    const std::size_t dg);
+  ContinuedFraction(const std::vector<double> &ps_coeffs, const int diagonal,
+                    const std::size_t degree);
   // Assumes diagonal is 0
   ContinuedFraction(const std::vector<double> &hist,
                     const std::size_t max_terms);
@@ -50,8 +47,8 @@ struct ContinuedFraction {
   // Evaluate the continued fraction estimating distinct along a curve from 0
   // to max_value
   [[nodiscard]] auto
-  extrapolate_distinct(const double max_value, const double step_size) const
-    -> std::vector<double>;
+  extrapolate_distinct(const double max_value,
+                       const double step_size) const -> std::vector<double>;
 
   [[nodiscard]] auto
   is_valid() const -> bool {
