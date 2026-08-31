@@ -18,7 +18,6 @@
 #ifndef SRC_INTERVAL6_HPP_
 #define SRC_INTERVAL6_HPP_
 
-#include <compare>
 #include <cstdint>
 #include <format>
 #include <iterator>
@@ -38,8 +37,8 @@ struct Interval6 {
   Interval6(const std::string &chrom, const std::uint32_t start,
             const std::uint32_t stop, const std::string &name,
             const double score, const char strand) :
-    chrom{chrom},
-    start{start}, stop{stop}, name{name}, score{score}, strand{strand} {}
+    chrom{chrom}, start{start}, stop{stop}, name{name}, score{score},
+    strand{strand} {}
 
   explicit Interval6(const std::string &line) {
     if (!initialize(line.data(), line.data() + std::size(line)))

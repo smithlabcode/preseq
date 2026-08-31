@@ -25,6 +25,7 @@
 #endif
 
 #include <algorithm>
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <format>

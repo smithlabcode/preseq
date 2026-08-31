@@ -22,6 +22,7 @@
 #include "CLI11/CLI11.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
