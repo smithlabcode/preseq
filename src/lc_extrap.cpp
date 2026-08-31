@@ -20,14 +20,12 @@
 #include "load_data_for_complexity.hpp"
 
 #include "CLI11/CLI11.hpp"
-// #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <memory>
 #include <numeric>
@@ -113,16 +111,10 @@ lc_extrap_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
 
     const auto input_format = get_input_format_type(input_file_name);
     if (is_unknown(input_format)) {
-      // spdlog::error("unknown input format");
       std::println("unknown input format");
       return EXIT_FAILURE;
     }
 
-    // if (verbose) {
-    //   spdlog::info("INPUT FORMAT: {}", to_string(input_format));
-    //   if (is_bam(input_format) || is_bed(input_format))
-    //     spdlog::info("PAIRED END: {}", paired_end);
-    // }
     if (verbose) {
       std::println("INPUT FORMAT: {}", to_string(input_format));
       if (is_bam(input_format) || is_bed(input_format))
