@@ -86,10 +86,17 @@ AC_CONFIG_FILES([Makefile])
 
 dnl make the test data files available in the build tree
 AC_CONFIG_LINKS([
-tests/md5sum.txt:tests/md5sum.txt
-tests/c_curve_input.hist:tests/data/c_curve_input.hist
-tests/lc_extrap_input.vals:tests/data/lc_extrap_input.vals
-tests/gc_extrap_input.bed:tests/data/gc_extrap_input.bed
+test/md5sum.txt:test/md5sum.txt
+test/lc_extrap_hist.test:test/lc_extrap_hist.sh
+test/gc_extrap_mr.test:test/gc_extrap_mr.sh
+test/bound_pop_hist.test:test/bound_pop_hist.sh
+test/c_curve_mr.test:test/c_curve_mr.sh
+test/lc_extrap_vals.test:test/lc_extrap_vals.sh
+data/SRR1003759_5M_subset.mr:data/SRR1003759_5M_subset.mr
+data/additional_data.txt:data/additional_data.txt
+data/Shakespeare_hist.txt:data/Shakespeare_hist.txt
+data/Shakespeare_vals.txt:data/Shakespeare_vals.txt
+data/SRR1301329_1M_hist.txt:data/SRR1301329_1M_hist.txt
 ])
 
 AC_OUTPUT
