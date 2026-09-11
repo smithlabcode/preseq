@@ -154,12 +154,12 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
       if (std::size(measure_moments) > 2 * max_num_points)
         measure_moments.resize(2 * max_num_points);
 
-      auto n_points = ensure_pos_def_mom_seq(measure_moments, tolerance);
+      auto n_points =
+        ensure_positive_definite_moment_sequence(measure_moments, tolerance);
       MomentSequence obs_mom_seq(measure_moments);
 
-      std::vector<double> points, weights;
-      obs_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter, points,
-                                         weights);
+      auto [points, weights] =
+        obs_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter);
       normalize(weights);
 
       const auto n_1 = counts_hist[1];
@@ -194,13 +194,13 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
           distinct_counts_hist.push_back(counts_hist[i]);
         }
 
-      for (auto i = 0u;
-           i < max_iter && std::size(quad_estimates) < n_bootstraps; ++i) {
+      const auto lim = std::min(max_iter, n_bootstraps);
+      for (auto i = 0u; i < lim; ++i) {
         std::vector<double> sample_hist;
         resample_hist(rng, counts_hist_distinct_counts, distinct_counts_hist,
                       sample_hist);
-        const double sampled_distinct = std::accumulate(
-          std::cbegin(sample_hist), std::cend(sample_hist), 0.0);
+        const double sampled_distinct =
+          std::reduce(std::cbegin(sample_hist), std::cend(sample_hist));
 
         // initialize moments, 0-th moment is 1
         std::vector<double> bootstrap_moments(1, 1.0);
@@ -209,15 +209,14 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
           bootstrap_moments.push_back(std::exp(lnfact(j + 3) +
                                                std::log(sample_hist[j + 2]) -
                                                std::log(sample_hist[1])));
-        const auto n_points = std::min(
-          ensure_pos_def_mom_seq(bootstrap_moments, tolerance), max_num_points);
+        const auto x = ensure_positive_definite_moment_sequence(
+          bootstrap_moments, tolerance);
+        const auto n_points = std::min(x, max_num_points);
 
         MomentSequence bootstrap_mom_seq(bootstrap_moments);
 
-        std::vector<double> points;
-        std::vector<double> weights;
-        bootstrap_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter,
-                                                 points, weights);
+        auto [points, weights] = bootstrap_mom_seq.lower_quadrature_rules(
+          n_points, tolerance, max_iter);
         normalize(weights);
 
         const auto n_1 = counts_hist[1];
@@ -232,8 +231,7 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
         if (verbose)
           bootstraps.push_back(nlohmann::json({
             {"bootstrapped_moments", bootstrap_moments},
-            {"alpha", bootstrap_mom_seq.alpha},
-            {"beta", bootstrap_mom_seq.alpha},
+            {"moment_sequence", nlohmann::json(bootstrap_mom_seq)},
             {"points", points},
             {"weights", weights},
             {"estimated_unobs", estimated_unobs},
