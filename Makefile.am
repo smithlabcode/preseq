@@ -31,21 +31,15 @@ EXTRA_DIST = \
 	LICENSE \
 	preseqR \
 	data \
-	docs \
-	tests/md5sum.txt \
-	tests/data/lc_extrap_input.vals \
-	tests/data/gc_extrap_input.bed \
-	tests/data/c_curve_input.hist \
-	tests/scripts/test_c_curve.test \
-	tests/scripts/test_gc_extrap.test \
-	tests/scripts/test_lc_extrap.test
+	docs
 
-TESTS = \
-	tests/scripts/test_c_curve.test \
-	tests/scripts/test_lc_extrap.test \
-	tests/scripts/test_gc_extrap.test
-
-TEST_EXTENSIONS = .test
+TESTS = test/lc_extrap_hist.sh \
+        test/gc_extrap_mr.sh \
+        test/bound_pop_hist.sh \
+        test/lc_extrap_vals.sh \
+        test/c_curve_mr.sh
+TEST_EXTENSIONS = .sh
+EXTRA_DIST += $(TESTS)
 
 bin_PROGRAMS = preseq
 
@@ -70,7 +64,8 @@ preseq_SOURCES = \
         src/Interval6.hpp \
         src/Interval6.cpp \
         src/moment_sequence.hpp \
-        src/moment_sequence.cpp
+        src/moment_sequence.cpp \
+        src/CLI11/CLI11.hpp
 
 if ENABLE_HTSLIB
 preseq_SOURCES += \
