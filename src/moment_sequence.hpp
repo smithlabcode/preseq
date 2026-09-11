@@ -17,43 +17,45 @@
 #ifndef SRC_MOMENT_SEQUENCE_HPP_
 #define SRC_MOMENT_SEQUENCE_HPP_
 
+#include "nlohmann/json.hpp"
+
 #include <cstddef>
 #include <vector>
 
 // test Hankel moment matrix to ensure the moment sequence is positive definite
 auto
-ensure_pos_def_mom_seq(std::vector<double> &moments, const double tolerance)
-  -> std::size_t;
+ensure_positive_definite_moment_sequence(std::vector<double> &moments,
+                                         const double tolerance) -> std::size_t;
 
-struct MomentSequence {
-  // Constructors
+class MomentSequence {
+public:
   MomentSequence() = default;
-  explicit MomentSequence(const std::vector<double> &obs_moms);
-
+  explicit MomentSequence(const std::vector<double> &observed_moments);
   MomentSequence(const std::vector<double> &alpha,
-                 const std::vector<double> &beta) :
-    alpha{alpha},
-    beta{beta} {};
+                 const std::vector<double> &beta) : alpha{alpha}, beta{beta} {};
 
+  // quadrature rules using QR on Jacobi matrix
+  [[nodiscard]] auto
+  lower_quadrature_rules(const std::size_t n_points, const double tolerance,
+                         const std::size_t max_iter)
+    -> std::tuple<std::vector<double>, std::vector<double>>;
+
+private:
   // Estimate 3-term recurrence
   // these will be removed from the header when they are tested
   void
-  unmodified_Chebyshev();
+  unmodified_chebyshev();
 
   void
-  full_3term_recurrence(std::vector<double> &full_alpha,
-                        std::vector<double> &full_beta);
-
-  // quadrature rules using QR on Jacobi matrix
-  auto
-  lower_quadrature_rules(const size_t n_points, const double tolerance,
-                         const size_t max_iter, std::vector<double> &points,
-                         std::vector<double> &weights) -> bool;
+  full_three_term_recurrence(std::vector<double> &full_alpha,
+                             std::vector<double> &full_beta);
 
   std::vector<double> moments;
   // 3-term recurrence
   std::vector<double> alpha;
   std::vector<double> beta;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(MomentSequence, moments, alpha, beta)
 };
 
 #endif  // SRC_MOMENT_SEQUENCE_HPP_
