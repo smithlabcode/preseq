@@ -1,7 +1,8 @@
 BasedOnStyle: LLVM
 ColumnLimit: 80
 IndentWidth: 2
-AlwaysBreakAfterReturnType: All
+BreakAfterReturnType: All
+AlignAfterOpenBracket: true
 ContinuationIndentWidth: 2
 ConstructorInitializerIndentWidth: 2
 BraceWrapping:
@@ -10,4 +11,7 @@ BraceWrapping:
 BreakBeforeBraces: Custom
 BreakConstructorInitializers: AfterColon
 SpacesBeforeTrailingComments: 2
-ReflowComments: false
+PackParameters:
+  BinPack: OnePerLine
+  BreakAfter: 0
+AllowShortFunctionsOnASingleLine: All
