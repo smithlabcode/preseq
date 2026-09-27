@@ -20,17 +20,15 @@
 #ifndef SRC_GC_EXTRAP_HPP_
 #define SRC_GC_EXTRAP_HPP_
 
-static constexpr auto gc_extrap_about_msg = R"(
-Estimate the size of the part of the genome to be covered by mapped reads.
-)";
+static constexpr auto gc_extrap_about_msg =
+  R"(Estimate the size of the part of the genome to be covered by mapped reads.)";
 
-static constexpr auto gc_extrap_footer_msg = R"(
-This approach is described in Daley & Smith (2014). The method is the same as
+static constexpr auto gc_extrap_footer_msg =
+  R"(This approach is described in Daley & Smith (2014). The method is the same as
 for lc_extrap: using rational function approximation to a power-series
 expansion for the number of "unobserved" bases in the initial sample. The
 gc_extrap method is adapted to deal with individual nucleotides rather than
-distinct reads.
-)";
+distinct reads.)";
 
 auto
 gc_extrap_main(int argc, char *argv[]) -> int;

@@ -18,7 +18,8 @@
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11/CLI11.hpp"
+#include <CLI11/CLI11.hpp>
+#include <libpreseq.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -67,11 +68,11 @@ pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(pop_size_about_msg)};
+    CLI::App app{pop_size_about_msg};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq pop_size [OPTIONS]");
     if (argc >= 2)
-      app.footer(rlstrip(pop_size_footer_msg));
+      app.footer(pop_size_footer_msg);
 
     // clang-format off
     app.add_option("INPUT", infile, "input file name")
@@ -170,7 +171,7 @@ pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       report_histogram(histogram_outfile, counts_hist);
 
     // check to make sure library is not overly saturated
-    const double two_fold_extrap = GoodToulmin2xExtrap(counts_hist);
+    const double two_fold_extrap = preseq::good_toulmin_2x(counts_hist);
     if (two_fold_extrap < 0.0)
       throw std::runtime_error(
         "Saturation expected at double initial sample size."
@@ -186,10 +187,12 @@ pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::vector<double> yield_estimates;
 
     if (single_estimate) {
-      const bool success = extrap_single_estimate(
-        verbose, allow_defects, counts_hist, orig_max_terms, diagonal,
-        step_size, max_extrap, yield_estimates);
-      if (!success)
+      const auto estimates =
+        preseq::extrapolate_once(counts_hist, orig_max_terms, diagonal,
+                                 allow_defects, step_size, max_extrap);
+      // allow_defects, counts_hist, orig_max_terms, diagonal,
+      //   step_size, max_extrap, yield_estimates);
+      if (estimates.empty())
         throw std::runtime_error(
           "single estimate failed, run full mode for estimates");
 
@@ -210,18 +213,25 @@ pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
         std::println("[BOOTSTRAPPING HISTOGRAM]");
 
       const std::size_t max_iter = max_iter_per_bootstrap * n_bootstraps;
-
-      std::vector<std::vector<double>> bootstrap_estimates;
-      extrap_bootstrap(verbose, allow_defects, seed, counts_hist, n_bootstraps,
-                       orig_max_terms, diagonal, step_size, max_extrap,
-                       max_iter, bootstrap_estimates);
-
+      const auto cfa = preseq::cfa_t{
+        .max_terms = orig_max_terms,
+        .diagonal = diagonal,
+        .allow_defects = allow_defects,
+        .rng_seed = seed,
+        .target_bootstraps = n_bootstraps,
+        .max_iterations = max_iter,
+        .step_size = step_size,
+        .max_extrap = max_extrap,
+      };
+      const auto bootstrap_estimates = extrapolate_bootstrap(cfa, counts_hist);
       if (verbose)
         std::println("[COMPUTING CONFIDENCE INTERVALS]");
       // yield ci
-      std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
-      vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
-                           yield_lower_ci_lognorm, yield_upper_ci_lognorm);
+      // std::vector<double> yield_upper_ci_lognorm, yield_lower_ci_lognorm;
+      // vector_median_and_ci(bootstrap_estimates, c_level, yield_estimates,
+      //                      yield_lower_ci_lognorm, yield_upper_ci_lognorm);
+      auto [medians, lower_ci_lognorms, upper_ci_lognorms] =
+        median_and_ci_md(bootstrap_estimates, c_level);
       if (verbose)
         std::println("[WRITING OUTPUT]");
 
@@ -244,8 +254,7 @@ pop_size_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
                         "lower_ci\t"
                         "upper_ci");
       std::println(out, "{}\t{}\t{}", yield_estimates.back(),
-                   yield_lower_ci_lognorm.back(),
-                   yield_upper_ci_lognorm.back());
+                   lower_ci_lognorms.back(), upper_ci_lognorms.back());
       if (!converged)
         std::println(out, "\tnot_converged");
     }

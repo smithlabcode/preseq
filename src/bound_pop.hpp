@@ -21,9 +21,8 @@
 #ifndef SRC_BOUND_POP_HPP_
 #define SRC_BOUND_POP_HPP_
 
-const auto bound_pop_about_msg = R"(
-Estimate a bound on the size of the population using the initial sample.
-)";
+const auto bound_pop_about_msg =
+  R"(Estimate a bound on the size of the population using the initial sample.)";
 
 auto
 bound_pop_main(int argc, char *argv[]) -> int;

@@ -1,37 +1,22 @@
-/* Copyright (C) 2013-2025 University of Southern California and
- *                         Andrew D. Smith and Timothy Daley
- *
- * Authors: Timothy Daley and Andrew Smith
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-License-Identifier: GPL-3.0; Copyright 2026 Andrew D Smith
 
 #include "bound_pop.hpp"
 
+#include "cli_common.hpp"
 #include "common.hpp"
-#include "lnfact.hpp"
 #include "load_data_for_complexity.hpp"
-#include "moment_sequence.hpp"
 
-#include "CLI11/CLI11.hpp"
-#include "nlohmann/json.hpp"
+#include <libpreseq.hpp>
+
+#include <CLI11/CLI11.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -78,12 +63,12 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(bound_pop_about_msg)};
+    CLI::App app{bound_pop_about_msg};
     argv = app.ensure_utf8(argv);
     app.formatter(std::make_shared<preseq_formatter>());
     app.usage("\nUsage: preseq bound_pop [OPTIONS]");
     // if (argc >= 3)
-    //   app.footer(rlstrip(description));
+    //   app.footer(description);
 
     // clang-format off
     app.add_option("INPUT", infile, "input file name")
@@ -134,16 +119,16 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     const double distinct_obs =
       std::accumulate(std::cbegin(counts_hist), std::cend(counts_hist), 0.0);
 
-    std::vector<double> measure_moments;
-    // mu_r = (r + 1)! n_{r+1} / n_1
-    for (auto i = 1u; i < std::size(counts_hist) && counts_hist[i]; ++i) {
-      const auto mm = std::exp(lnfact(i + 1) + std::log(counts_hist[i]) -
-                               std::log(counts_hist[1]));
-      if (!std::isfinite(mm))
-        break;
-      measure_moments.push_back(mm);
-    }
-
+    auto measure_moments = preseq::get_measure_moments(counts_hist);
+    // std::vector<double> measure_moments;
+    // // mu_r = (r + 1)! n_{r+1} / n_1
+    // for (auto i = 1u; i < std::size(counts_hist) && counts_hist[i]; ++i) {
+    //   const auto mm = std::exp(lnfact(i + 1) + std::log(counts_hist[i]) -
+    //                            std::log(counts_hist[1]));
+    //   if (!std::isfinite(mm))
+    //     break;
+    //   measure_moments.push_back(mm);
+    // }
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, counts_hist);
 
@@ -154,12 +139,13 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
       if (std::size(measure_moments) > 2 * max_num_points)
         measure_moments.resize(2 * max_num_points);
 
-      auto n_points =
-        ensure_positive_definite_moment_sequence(measure_moments, tolerance);
-      MomentSequence obs_mom_seq(measure_moments);
+      auto [n_points, pd_mom_seq] =
+        preseq::get_posdef_moment_sequence(measure_moments, tolerance);
+      preseq::moment_sequence_t obs_mom_seq(pd_mom_seq);
 
       auto [points, weights] =
         obs_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter);
+
       normalize(weights);
 
       const auto n_1 = counts_hist[1];
@@ -180,25 +166,11 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
     }
     else {
       // do bootstraps
+      std::mt19937 gen{seed};
       std::vector<double> quad_estimates;
-
-      std::mt19937 rng(seed);  // setup rng
-
-      // hist may be sparse, to speed up bootstrapping
-      // sample only from positive entries
-      std::vector<std::size_t> counts_hist_distinct_counts;
-      std::vector<double> distinct_counts_hist;
-      for (std::size_t i = 0; i < std::size(counts_hist); ++i)
-        if (counts_hist[i] > 0) {
-          counts_hist_distinct_counts.push_back(i);
-          distinct_counts_hist.push_back(counts_hist[i]);
-        }
-
       const auto lim = std::min(max_iter, n_bootstraps);
       for (auto i = 0u; i < lim; ++i) {
-        std::vector<double> sample_hist;
-        resample_hist(rng, counts_hist_distinct_counts, distinct_counts_hist,
-                      sample_hist);
+        auto sample_hist = preseq::resample_hist(gen, counts_hist);
         const double sampled_distinct =
           std::reduce(std::cbegin(sample_hist), std::cend(sample_hist));
 
@@ -209,14 +181,12 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
           bootstrap_moments.push_back(std::exp(lnfact(j + 3) +
                                                std::log(sample_hist[j + 2]) -
                                                std::log(sample_hist[1])));
-        const auto x = ensure_positive_definite_moment_sequence(
-          bootstrap_moments, tolerance);
-        const auto n_points = std::min(x, max_num_points);
+        auto [n_points, pd_mom_seq] =
+          preseq::get_posdef_moment_sequence(bootstrap_moments, tolerance);
 
-        MomentSequence bootstrap_mom_seq(bootstrap_moments);
-
-        auto [points, weights] = bootstrap_mom_seq.lower_quadrature_rules(
-          n_points, tolerance, max_iter);
+        preseq::moment_sequence_t obs_mom_seq(pd_mom_seq);
+        auto [points, weights] =
+          obs_mom_seq.lower_quadrature_rules(n_points, tolerance, max_iter);
         normalize(weights);
 
         const auto n_1 = counts_hist[1];
@@ -227,26 +197,20 @@ bound_pop_main(int argc, char *argv[]) -> int {  // NOLINT (*-avoid-c-arrays)
           std::inner_product(std::cbegin(weights), std::cend(weights),
                              std::cbegin(points), 0.0, std::plus{}, term);
         estimated_unobs = std::max(estimated_unobs, 0.0) + sampled_distinct;
-
         if (verbose)
           bootstraps.push_back(nlohmann::json({
             {"bootstrapped_moments", bootstrap_moments},
-            {"moment_sequence", nlohmann::json(bootstrap_mom_seq)},
+            {"moment_sequence", to_string(obs_mom_seq)},
             {"points", points},
             {"weights", weights},
             {"estimated_unobs", estimated_unobs},
           }));
-
         quad_estimates.push_back(estimated_unobs);
       }
-
-      double median_estimate{};
-      double lower_ci{};
-      double upper_ci{};
-      median_and_ci(quad_estimates, c_level, median_estimate, lower_ci,
-                    upper_ci);
+      const auto [median, lower_ci, upper_ci] =
+        median_and_ci(quad_estimates, c_level);
       output = {
-        {"median_estimated_unobs", median_estimate},
+        {"median_estimated_unobs", median},
         {"lower_ci", lower_ci},
         {"upper_ci", upper_ci},
       };

@@ -21,16 +21,14 @@
 #ifndef SRC_POP_SIZE_HPP_
 #define SRC_POP_SIZE_HPP_
 
-static constexpr auto pop_size_about_msg = R"(
-Estimate the population size using a small sample from the population.
-)";
+static constexpr auto pop_size_about_msg =
+  R"(Estimate the population size using a small sample from the population.)";
 
-static constexpr auto pop_size_footer_msg = R"(
-Estimate the total population size using the approach described in Daley &
-Smith (2013), extrapolating to very long range. Default parameters assume that
-the initial sample represents at least 1e-9 of the population, which is
-sufficient for every example application we have seen.
-)";
+static constexpr auto pop_size_footer_msg =
+  R"(Estimate the total population size using the approach described in Daley & Smith
+(2013), extrapolating to very long range. Default parameters assume that the
+initial sample represents at least 1e-9 of the population, which is sufficient
+for every example application we have seen.)";
 
 auto
 pop_size_main(int argc, char *argv[]) -> int;

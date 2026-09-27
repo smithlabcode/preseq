@@ -19,7 +19,8 @@
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11/CLI11.hpp"
+#include <CLI11/CLI11.hpp>
+#include <libpreseq.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -53,7 +54,7 @@ c_curve_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::uint32_t n_threads{1};
 #endif
 
-    CLI::App app{rlstrip(c_curve_about_msg)};
+    CLI::App app{c_curve_about_msg};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq c_curve [OPTIONS]");
     // if (argc >= 3)
@@ -115,18 +116,18 @@ c_curve_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
       std::ranges::count_if(counts_hist, [](const auto x) { return x > 0.0; });
 
     if (verbose)
-      std::println("TOTAL READS     = {}"
-                   "COUNTS_SUM      = {}"
-                   "DISTINCT READS  = {}"
-                   "DISTINCT COUNTS = {}"
-                   "MAX COUNT       = {}"
-                   "COUNTS OF 1     = {}",
-                   n_reads,             //
-                   total_reads,         //
-                   distinct_reads,      //
-                   distinct_counts,     //
-                   max_observed_count,  //
-                   counts_hist[1]       //
+      std::print("TOTAL READS     = {}\n"
+                 "COUNTS_SUM      = {}\n"
+                 "DISTINCT READS  = {}\n"
+                 "DISTINCT COUNTS = {}\n"
+                 "MAX COUNT       = {}\n"
+                 "COUNTS OF 1     = {}\n",
+                 n_reads,             //
+                 total_reads,         //
+                 distinct_reads,      //
+                 distinct_counts,     //
+                 max_observed_count,  //
+                 counts_hist[1]       //
       );
 
     if (!histogram_outfile.empty())
@@ -142,8 +143,8 @@ c_curve_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     std::println(out, "total_reads\tdistinct_reads");
     std::println(out, "0\t0");
     for (std::size_t i = step_size; i <= upper_limit; i += step_size) {
-      const auto n_expected =
-        interpolate_distinct(counts_hist, total_reads, distinct_reads, i);
+      const auto n_expected = preseq::interpolate_distinct(
+        counts_hist, total_reads, distinct_reads, i);
       std::println(out, "{}\t{}", i, std::round(n_expected));
     }
   }

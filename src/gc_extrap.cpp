@@ -19,7 +19,9 @@
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
-#include "CLI11/CLI11.hpp"
+#include <libpreseq.hpp>
+
+#include <CLI11/CLI11.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -115,11 +117,11 @@ gc_extrap_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     bool verbose{false};
     bool single_estimate{false};
 
-    CLI::App app{rlstrip(gc_extrap_about_msg)};
+    CLI::App app{gc_extrap_about_msg};
     argv = app.ensure_utf8(argv);
     app.usage("\nUsage: preseq gc_extrap [OPTIONS]");
     if (argc >= 3)
-      app.footer(rlstrip(gc_extrap_footer_msg));
+      app.footer(gc_extrap_footer_msg);
 
     // clang-format off
     app.set_help_flag("-h,--help", "print a detailed help message and exit");
@@ -191,54 +193,47 @@ gc_extrap_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     orig_max_terms = std::min(orig_max_terms, first_zero - 1);
 
     if (verbose)
-      std::println("TOTAL READS         = {}"
-                   "BASE STEP SIZE      = {}"
-                   "BIN STEP SIZE       = {}"
-                   "TOTAL BINS          = {}"
-                   "BINS PER READ       = {}"
-                   "DISTINCT BINS       = {}"
-                   "TOTAL BASES         = {}"
-                   "TOTAL COVERED BASES = {}"
-                   "MAX COVERAGE COUNT  = {}"
-                   "COUNTS OF 1         = {}",  //
-                   n_reads,                     //
-                   base_step_size,              //
-                   bin_step_size,               //
-                   total_bins,                  //
-                   avg_bins_per_read,           //
-                   distinct_bins,               //
-                   total_bins * bin_size,       //
-                   distinct_bins * bin_size,    //
-                   max_observed_count,          //
-                   coverage_hist[1]             //
+      std::print("TOTAL READS         = {}\n"
+                 "BASE STEP SIZE      = {}\n"
+                 "BIN STEP SIZE       = {}\n"
+                 "TOTAL BINS          = {}\n"
+                 "BINS PER READ       = {}\n"
+                 "DISTINCT BINS       = {}\n"
+                 "TOTAL BASES         = {}\n"
+                 "TOTAL COVERED BASES = {}\n"
+                 "MAX COVERAGE COUNT  = {}\n"
+                 "COUNTS OF 1         = {}\n",  //
+                 n_reads,                       //
+                 base_step_size,                //
+                 bin_step_size,                 //
+                 total_bins,                    //
+                 avg_bins_per_read,             //
+                 distinct_bins,                 //
+                 total_bins * bin_size,         //
+                 distinct_bins * bin_size,      //
+                 max_observed_count,            //
+                 coverage_hist[1]               //
       );
-
     if (!histogram_outfile.empty())
       report_histogram(histogram_outfile, coverage_hist);
-
     // catch if all reads are distinct
     if (orig_max_terms < min_required_counts)
       throw std::runtime_error("max count before zero is les than min required "
                                "count (4), sample not sufficiently deep or "
                                "duplicates removed");
-
     // check to make sure library is not overly saturated
-    const double two_fold_extrap = GoodToulmin2xExtrap(coverage_hist);
+    const double two_fold_extrap = preseq::good_toulmin_2x(coverage_hist);
     if (two_fold_extrap < 0.0)
       throw std::runtime_error("Library expected to saturate in doubling of "
                                "experiment size, unable to extrapolate");
-
     if (verbose)
       std::println("[ESTIMATING COVERAGE CURVE]");
-
-    std::vector<double> coverage_estimates;
-
     if (single_estimate) {
-      const auto success = extrap_single_estimate(
-        verbose, allow_defects, coverage_hist, orig_max_terms, diagonal,
-        bin_step_size, max_extrap / bin_size, coverage_estimates);
+      const auto coverage_estimates = preseq::extrapolate_once(
+        coverage_hist, orig_max_terms, diagonal, allow_defects, bin_step_size,
+        max_extrap / bin_size);
       // IF FAILURE, EXIT
-      if (!success)
+      if (coverage_estimates.empty())
         throw std::runtime_error(
           "Single estimate failed. Run in full mode for estimates");
 
@@ -247,28 +242,28 @@ gc_extrap_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
     else {
       if (verbose)
         std::println("[BOOTSTRAPPING HISTOGRAM]");
-
       const std::uint32_t max_iter = max_iter_per_bootstrap * n_bootstraps;
-
-      std::vector<std::vector<double>> bootstrap_estimates;
-      extrap_bootstrap(verbose, allow_defects, seed, coverage_hist,
-                       n_bootstraps, orig_max_terms, diagonal, bin_step_size,
-                       max_extrap / bin_size, max_iter, bootstrap_estimates);
-
+      const auto cfa = preseq::cfa_t{
+        .max_terms = orig_max_terms,
+        .diagonal = diagonal,
+        .allow_defects = allow_defects,
+        .rng_seed = seed,
+        .target_bootstraps = n_bootstraps,
+        .max_iterations = max_iter,
+        .step_size = bin_step_size,
+        .max_extrap = max_extrap / bin_size,
+      };
+      auto bootstrap_estimates =
+        preseq::extrapolate_bootstrap(cfa, coverage_hist);
       if (verbose)
         std::println("[COMPUTING CONFIDENCE INTERVALS]");
-      std::vector<double> coverage_upper_ci_lognorm;
-      std::vector<double> coverage_lower_ci_lognorm;
-      vector_median_and_ci(bootstrap_estimates, c_level, coverage_estimates,
-                           coverage_lower_ci_lognorm,
-                           coverage_upper_ci_lognorm);
-
+      auto [medians, lower_ci_lognorms, upper_ci_lognorms] =
+        median_and_ci_md(bootstrap_estimates, c_level);
       if (verbose)
         std::println("[WRITING OUTPUT]");
-
-      write_predicted_coverage_curve(
-        outfile, c_level, base_step_size, bin_size, coverage_estimates,
-        coverage_lower_ci_lognorm, coverage_upper_ci_lognorm);
+      write_predicted_coverage_curve(outfile, c_level, base_step_size, bin_size,
+                                     medians, lower_ci_lognorms,
+                                     upper_ci_lognorms);
     }
   }
   catch (const std::exception &e) {

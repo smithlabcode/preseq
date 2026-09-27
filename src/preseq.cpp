@@ -1,31 +1,16 @@
-/* preseq: a tool for analyzing sequencing library complexity
- *
- * Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
- *
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later
- * version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program. If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-License-Identifier: GPL-3.0; Copyright 2026 Andrew D Smith
 
 #include "bound_pop.hpp"
 #include "c_curve.hpp"
+#include "cli_common.hpp"
 #include "common.hpp"
 #include "gc_extrap.hpp"
 #include "lc_extrap.hpp"
 #include "pop_size.hpp"
 
-#include "CLI11/CLI11.hpp"
-
 #include <config.h>
+
+#include <CLI11/CLI11.hpp>
 
 #include <cstdlib>
 #include <iostream>
@@ -54,7 +39,7 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
   // if (argc >= 2)
   app.footer(description);
   // if (argc >= 3)
-  //   app.footer(rlstrip(footer_msg));
+  //   app.footer(footer_msg);
 
   app.require_subcommand(0, 1);
   app.allow_extras();
@@ -66,11 +51,11 @@ main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
 #ifdef INCLUDE_FULL_LICENSE_INFO
   app.add_flag("--licenses", print_licenses, "view licenses");
 #endif
-  const auto lc_extrap_cmd = app.add_subcommand("lc_extrap", rlstrip(lc_extrap_about_msg));
-  const auto gc_extrap_cmd = app.add_subcommand("gc_extrap", rlstrip(gc_extrap_about_msg));
-  const auto pop_size_cmd = app.add_subcommand("pop_size", rlstrip(pop_size_about_msg));
-  const auto bound_pop_cmd = app.add_subcommand("bound_pop", rlstrip(bound_pop_about_msg));
-  const auto c_curve_cmd = app.add_subcommand("c_curve", rlstrip(c_curve_about_msg));
+  const auto lc_extrap_cmd = app.add_subcommand("lc_extrap", lc_extrap_about_msg);
+  const auto gc_extrap_cmd = app.add_subcommand("gc_extrap", gc_extrap_about_msg);
+  const auto pop_size_cmd = app.add_subcommand("pop_size", pop_size_about_msg);
+  const auto bound_pop_cmd = app.add_subcommand("bound_pop", bound_pop_about_msg);
+  const auto c_curve_cmd = app.add_subcommand("c_curve", c_curve_about_msg);
   // clang-format on
 
   if (argc < 2) {
