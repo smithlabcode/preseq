@@ -1,16 +1,4 @@
-# Copyright (C) 2026 Andrew D Smith
-#
-# This program is free software: you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program. If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: GPL-3.0; Copyright 2026 Andrew D Smith
 
 # to find the version of cmake do
 # $ cmake --version
@@ -56,6 +44,7 @@ if(PRESEQ_TESTS)
   include(cmake/tests.cmake)
 endif()
 
+add_subdirectory(src/libpreseq)
 find_package(Threads REQUIRED)
 
 if(USE_HTSLIB)
@@ -64,33 +53,41 @@ if(USE_HTSLIB)
   add_subdirectory(src/bamxx)
 endif()
 
-add_library(common OBJECT src/common.cpp)
-add_library(Interval6 OBJECT src/Interval6.cpp)
-add_library(lc_extrap OBJECT src/lc_extrap.cpp)
-add_library(gc_extrap OBJECT src/gc_extrap.cpp)
-add_library(c_curve OBJECT src/c_curve.cpp)
-add_library(bound_pop OBJECT src/bound_pop.cpp)
-add_library(pop_size OBJECT src/pop_size.cpp)
-add_library(continued_fraction OBJECT src/continued_fraction.cpp)
-add_library(moment_sequence OBJECT src/moment_sequence.cpp)
-add_library(load_data_for_complexity OBJECT src/load_data_for_complexity.cpp)
+# header only libs in subdirs
+add_library(json INTERFACE)
+target_include_directories(json INTERFACE src)
+add_library(CLI11 INTERFACE)
+target_include_directories(CLI11 INTERFACE src)
 
-add_executable(preseq src/preseq.cpp)
-
-# ADS: below, for config.h
-target_include_directories(preseq PUBLIC ${CMAKE_BINARY_DIR})
-
-target_link_libraries(preseq PRIVATE
-  common
-  continued_fraction
-  moment_sequence
-  Interval6
-  load_data_for_complexity
+set(app_names
   lc_extrap
   gc_extrap
   c_curve
   bound_pop
   pop_size
+)
+set(obj_names
+  ${app_names}
+  load_data_for_complexity
+  common
+  Interval6
+)
+foreach(obj_name ${obj_names})
+  add_library(${obj_name} OBJECT src/${obj_name}.cpp)
+  target_include_directories(${obj_name} PUBLIC src)
+  target_link_libraries(${obj_name} PUBLIC libpreseq::libpreseq_static)
+endforeach()
+
+add_executable(preseq src/preseq.cpp)
+target_include_directories(preseq PUBLIC ${CMAKE_BINARY_DIR}) # for config.h
+target_link_libraries(preseq PUBLIC
+  common
+  Interval6
+  load_data_for_complexity
+  ${app_names}
+  libpreseq::libpreseq_shared
+  json
+  CLI11
 )
 
 if(USE_HTSLIB)
