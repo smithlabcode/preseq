@@ -1,3 +1,3 @@
-static const char *license_text = R"(
+static const auto license_text = R"(
 @LICENSE_TEXT@
 )";
