@@ -3,6 +3,8 @@
 #ifndef SRC_CLI_COMMON_HPP_
 #define SRC_CLI_COMMON_HPP_
 
+#define CLI11_ENABLE_EXTRA_VALIDATORS 1
+
 #include <CLI11/CLI11.hpp>
 
 #include <cctype>
@@ -18,10 +20,15 @@
 #include <vector>
 
 class preseq_formatter : public CLI::Formatter {
+  static constexpr auto total_output_width_ = 80;
+
 public:
+  preseq_formatter() : Formatter() {
+    CLI::FormatterBase::enable_default_flag_values_ = false;
+  }
   auto
   make_option_desc(const CLI::Option *opt) const -> std::string override {
-    static constexpr auto max_descr_width = 50;
+    const auto max_descr_width = right_column_width_;
     std::istringstream iss{opt->get_description()};
     const std::vector<std::string> words{
       std::istream_iterator<std::string>{iss}, {}};
@@ -40,6 +47,11 @@ public:
       width += std::size(words[i]);
     }
     return r;
+  }
+  auto
+  column_width(const std::size_t val) -> void {
+    column_width_ = val;
+    right_column_width_ = total_output_width_ - column_width_;
   }
 };
 
