@@ -67,7 +67,8 @@ is_sam_or_bam_format(const std::string &filename) -> bool;
 
 [[nodiscard]] auto
 load_coverage_counts(const std::string &input_file_name,
-                     const std::uint32_t seed, const std::size_t bin_size,
+                     const std::uint32_t seed,
+                     const std::size_t bin_size,
                      const std::size_t max_width)
   -> std::tuple<std::size_t, std::vector<double>>;
 
@@ -80,18 +81,7 @@ load_counts(const std::string &input_file_name)
   -> std::tuple<std::size_t, std::vector<double>>;
 
 [[nodiscard]] auto
-load_counts_bed_pe(const std::string &input_file_name)
-  -> std::tuple<std::size_t, std::vector<double>>;
-
-[[nodiscard]] auto
 load_counts_bed_se(const std::string &input_file_name)
-  -> std::tuple<std::size_t, std::vector<double>>;
-
-#ifdef HAVE_HTSLIB
-
-[[nodiscard]] auto
-load_counts_BAM_pe(const std::uint32_t n_threads,
-                   const std::string &input_file_name)
   -> std::tuple<std::size_t, std::vector<double>>;
 
 [[nodiscard]] auto
@@ -102,10 +92,9 @@ load_counts_BAM_se(const std::uint32_t n_threads,
 [[nodiscard]] auto
 load_coverage_counts_BAM(const std::uint32_t n_threads,
                          const std::string &input_file_name,
-                         const std::uint32_t seed, const std::size_t bin_size,
+                         const std::uint32_t seed,
+                         const std::size_t bin_size,
                          const std::size_t max_width)
   -> std::tuple<std::size_t, std::vector<double>>;
-
-#endif  // HAVE_HTSLIB
 
 #endif  // SRC_LOAD_DATA_FOR_COMPLEXITY_HPP_

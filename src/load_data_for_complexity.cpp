@@ -18,16 +18,15 @@
 
 #include "Interval6.hpp"
 
-#ifdef HAVE_HTSLIB
 #include "bam_record_utils.hpp"
 #include "bamxx/bamxx.hpp"
 #include <htslib/sam.h>
-#endif
 
 #include <algorithm>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <functional>  // IWYU pragma: keep
@@ -58,24 +57,21 @@ to_string(input_format_type t) -> std::string {
   default:  // case input_format_type::counts:
     return "UNKNOWN";
   }
-  return std::string();
+  return {};
 }
 
 [[nodiscard]] auto
 is_sam_or_bam_format(const std::string &filename) -> bool {
   // make sure the file can be opened at all
-  std::ifstream in(filename);
-  if (!in)
+  if (!std::filesystem::exists(filename))
     throw std::runtime_error("failed to open file: " + filename);
-#ifdef HAVE_HTSLIB
   // if the file can be opened and has a header, we can get reads from it
   bamxx::bam_in hts(filename);
   if (!hts)
     return false;
-  bamxx::bam_header hdr(hts);
+  const bamxx::bam_header hdr(hts);
   if (hdr)
     return true;
-#endif
   return false;
 }
 
@@ -120,7 +116,8 @@ width(const T &x) -> std::uint32_t {
 }
 
 static auto
-update_pe_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
+update_pe_duplicate_counts_hist(const Interval6 &curr,
+                                const Interval6 &prev,
                                 std::vector<double> &counts_hist,
                                 std::size_t &current_count) -> bool {
   // check if reads are sorted
@@ -145,7 +142,8 @@ update_pe_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
 }
 
 static void
-update_se_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
+update_se_duplicate_counts_hist(const Interval6 &curr,
+                                const Interval6 &prev,
                                 const std::string &input_file_name,
                                 std::vector<double> &counts_hist,
                                 std::size_t &current_count) {
@@ -165,26 +163,31 @@ update_se_duplicate_counts_hist(const Interval6 &curr, const Interval6 &prev,
     ++current_count;
 }
 
+namespace {
 struct interval_greater {
   auto
   operator()(const Interval6 &a, const Interval6 &b) const -> bool {
     return b < a;  // i.e. a > b
   }
 };
+};  // namespace
 
 using read_pq =
   std::priority_queue<Interval6, std::vector<Interval6>, interval_greater>;
 
 static auto
-is_ready_to_pop(const read_pq &pq, const Interval6 &interval,
+is_ready_to_pop(const read_pq &pq,
+                const Interval6 &interval,
                 const std::size_t max_width) -> bool {
   return pq.top().chrom != interval.chrom ||
          pq.top().stop + max_width < interval.start;
 }
 
 static void
-empty_pq(Interval6 &prev, std::size_t &current_count,
-         std::vector<double> &counts_hist, read_pq &read_pq,
+empty_pq(Interval6 &prev,
+         std::size_t &current_count,
+         std::vector<double> &counts_hist,
+         read_pq &read_pq,
          const std::string &input_file_name) {
   const auto curr = read_pq.top();
   read_pq.pop();
@@ -235,41 +238,42 @@ load_counts_bed_se(const std::string &input_file_name)
   return std::make_tuple(n_reads, std::move(counts_hist));
 }
 
-auto
-load_counts_bed_pe(const std::string &input_file_name)
-  -> std::tuple<std::size_t, std::vector<double>> {
-  std::vector<double> counts_hist(2, 0.0);
+// auto
+// load_counts_bed_pe(const std::string &input_file_name)
+//   -> std::tuple<std::size_t, std::vector<double>> {
+//   std::vector<double> counts_hist(2, 0.0);
 
-  std::ifstream in(input_file_name);
-  if (!in)
-    throw std::runtime_error("problem opening file: " + input_file_name);
+//   std::ifstream in(input_file_name);
+//   if (!in)
+//     throw std::runtime_error("problem opening file: " + input_file_name);
 
-  std::size_t n_reads{};
-  std::size_t current_count{};
+//   std::size_t n_reads{};
+//   std::size_t current_count{};
 
-  Interval6 prev;
-  std::string line;
+//   Interval6 prev;
+//   std::string line;
 
-  // read in file and compare each gr with the one before it
-  while (std::getline(in, line)) {
-    const auto curr = Interval6(line);
-    const bool update_success =
-      update_pe_duplicate_counts_hist(curr, prev, counts_hist, current_count);
-    if (!update_success)
+//   // read in file and compare each gr with the one before it
+//   while (std::getline(in, line)) {
+//     const auto curr = Interval6(line);
+//     const bool update_success =
+//       update_pe_duplicate_counts_hist(curr, prev, counts_hist,
+//       current_count);
+//     if (!update_success)
 
-      throw std::runtime_error("reads unsorted in " + input_file_name);
-    ++n_reads;
-    prev = curr;
-  }
+//       throw std::runtime_error("reads unsorted in " + input_file_name);
+//     ++n_reads;
+//     prev = curr;
+//   }
 
-  if (std::size(counts_hist) < current_count + 1)
-    counts_hist.resize(current_count + 1, 0.0);
+//   if (std::size(counts_hist) < current_count + 1)
+//     counts_hist.resize(current_count + 1, 0.0);
 
-  // to account for the last read compared to the one before it.
-  ++counts_hist[current_count];
+//   // to account for the last read compared to the one before it.
+//   ++counts_hist[current_count];
 
-  return std::make_tuple(n_reads, std::move(counts_hist));
-}
+//   return std::make_tuple(n_reads, std::move(counts_hist));
+// }
 
 [[nodiscard]] auto
 load_counts(const std::string &infile)
@@ -278,12 +282,12 @@ load_counts(const std::string &infile)
   if (!in)
     throw std::runtime_error("failed to open file: " + infile);
 
-  std::vector<double> vals((std::istream_iterator<double>(in)),
-                           std::istream_iterator<double>());
+  const std::vector<double> vals((std::istream_iterator<double>(in)),
+                                 std::istream_iterator<double>());
   if (vals.empty())
     return std::make_tuple(0, std::vector<double>{});
 
-  const auto max_val = *std::max_element(std::cbegin(vals), std::cend(vals));
+  const auto max_val = std::ranges::max(vals);
 
   std::vector<double> counts_hist(max_val + 1, 0.0);
   for (const auto v : vals)
@@ -337,7 +341,8 @@ load_histogram(const std::string &filename)
 // probabilistically split intervals into mutiple intervals of width
 // equal to bin_size
 [[nodiscard]] static auto
-split_genomic_region(Interval6 interval, std::mt19937 &generator,
+split_genomic_region(Interval6 interval,
+                     std::mt19937 &generator,
                      const std::uint32_t bin_size) -> std::vector<Interval6> {
   const auto frac = static_cast<double>(interval.start % bin_size) / bin_size;
   const auto w = width(interval);
@@ -361,8 +366,10 @@ split_genomic_region(Interval6 interval, std::mt19937 &generator,
 }
 
 [[nodiscard]] auto
-load_coverage_counts(const std::string &infile, const std::uint32_t seed,
-                     const std::size_t bin_size, const std::size_t max_width)
+load_coverage_counts(const std::string &infile,
+                     const std::uint32_t seed,
+                     const std::size_t bin_size,
+                     const std::size_t max_width)
   -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
@@ -406,8 +413,7 @@ load_coverage_counts(const std::string &infile, const std::uint32_t seed,
   return std::make_tuple(n_reads, std::move(coverage_hist));
 }
 
-#ifdef HAVE_HTSLIB
-
+namespace {
 struct genomic_interval {
   std::int32_t tid{-1};  // indicates uninitialized
   hts_pos_t start{};
@@ -457,11 +463,12 @@ struct aln_pos_pair {
            mpos != rhs.mpos;
   }
 };
+}  // namespace
 
 template <typename T>
 [[nodiscard]] static inline auto
-round_position(const T x, const std::uint32_t bin_size,
-               const double frac) -> T {
+round_position(const T x, const std::uint32_t bin_size, const double frac)
+  -> T {
   // probabilisticly round read ends so they are at bin boundaries
   const double lo = (x / bin_size) * bin_size;
   const double hi = ((x + bin_size - 1) / bin_size) * bin_size;
@@ -471,7 +478,8 @@ round_position(const T x, const std::uint32_t bin_size,
 // split a mapped read into multiple genomic intervals based on the number of
 // base pairs in each
 static auto
-split_genomic_interval(const genomic_interval &gi, std::mt19937 &generator,
+split_genomic_interval(const genomic_interval &gi,
+                       std::mt19937 &generator,
                        const hts_pos_t bin_size) -> std::vector<aln_pos> {
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
@@ -493,7 +501,8 @@ not_mapped(const bamxx::bam_rec &aln) -> bool {
 
 template <typename T>
 static inline void
-update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
+update_duplicate_counts_hist_BAM(const T &curr,
+                                 const T &prev,
                                  std::vector<double> &counts_hist,
                                  std::size_t &current_count) {
   if (prev != curr) {
@@ -509,6 +518,7 @@ update_duplicate_counts_hist_BAM(const T &curr, const T &prev,
     ++current_count;
 }
 
+namespace {
 template <typename aln_pos_t>
 auto
 load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile)
@@ -573,6 +583,7 @@ load_counts_BAM(const std::uint32_t n_threads, const std::string &inputfile)
 
   return std::make_tuple(n_reads, std::move(counts_hist));
 }
+}  // namespace
 
 [[nodiscard]] auto
 load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile)
@@ -580,15 +591,17 @@ load_counts_BAM_se(const std::uint32_t n_threads, const std::string &inputfile)
   return load_counts_BAM<aln_pos>(n_threads, inputfile);
 }
 
-[[nodiscard]] auto
-load_counts_BAM_pe(const std::uint32_t n_threads, const std::string &inputfile)
-  -> std::tuple<std::size_t, std::vector<double>> {
-  return load_counts_BAM<aln_pos_pair>(n_threads, inputfile);
-}
+// [[nodiscard]] auto
+// load_counts_BAM_pe(const std::uint32_t n_threads, const std::string
+// &inputfile)
+//   -> std::tuple<std::size_t, std::vector<double>> {
+//   return load_counts_BAM<aln_pos_pair>(n_threads, inputfile);
+// }
 
 template <class T>
 static void
-update_coverage_hist(const T &curr, const T &prev,
+update_coverage_hist(const T &curr,
+                     const T &prev,
                      std::vector<double> &counts_hist,
                      std::size_t &current_count) {
   if (curr != prev) {
@@ -604,10 +617,12 @@ update_coverage_hist(const T &curr, const T &prev,
 // ADS: don't care if mapped reads are SE or PE, we only need the first mate
 // for each mapped read
 auto
-load_coverage_counts_BAM(
-  const std::uint32_t n_threads, const std::string &inputfile,
-  const std::uint32_t seed, const std::size_t bin_size,
-  const std::size_t max_width) -> std::tuple<std::size_t, std::vector<double>> {
+load_coverage_counts_BAM(const std::uint32_t n_threads,
+                         const std::string &inputfile,
+                         const std::uint32_t seed,
+                         const std::size_t bin_size,
+                         const std::size_t max_width)
+  -> std::tuple<std::size_t, std::vector<double>> {
   std::mt19937 generator(seed);
 
   bamxx::bam_tpool tp(n_threads);
@@ -650,7 +665,11 @@ load_coverage_counts_BAM(
       continue;  // check that read is mapped
 
     const hts_pos_t len = rlen_from_cigar(aln);
-    const genomic_interval curr{get_tid(aln), get_pos(aln), get_pos(aln) + len};
+    const genomic_interval curr{
+      .tid = get_tid(aln),
+      .start = get_pos(aln),
+      .stop = (get_pos(aln) + len),
+    };
 
     if (curr.tid != prev.tid) {
       if (chroms_seen[curr.tid])
@@ -696,7 +715,5 @@ load_coverage_counts_BAM(
   }
   return std::make_tuple(n_reads, std::move(coverage_hist));
 }
-
-#endif  // HAVE_HTSLIB
 
 // NOLINTEND(*-narrowing-conversions)
