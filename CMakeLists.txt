@@ -35,6 +35,9 @@ add_compile_options(
   -Wfatal-errors
 )
 
+file(READ data/LICENSE LICENSE_TEXT)
+configure_file(data/LICENSES.inc.in license.h @ONLY)
+
 if(STATIC_ANALYSIS)
   include(cmake/static_analysis.cmake)
 endif()
@@ -47,11 +50,9 @@ endif()
 add_subdirectory(src/libpreseq)
 find_package(Threads REQUIRED)
 
-if(USE_HTSLIB)
-  find_package(HTSLIB 1.20 REQUIRED)
-  add_compile_definitions(HAVE_HTSLIB)
-  add_subdirectory(src/bamxx)
-endif()
+find_package(ZLIB REQUIRED)
+find_package(HTSLIB 1.20 REQUIRED)
+add_subdirectory(src/bamxx)
 
 # header only libs in subdirs
 add_library(json INTERFACE)
@@ -88,11 +89,7 @@ target_link_libraries(preseq PUBLIC
   libpreseq::libpreseq_shared
   json
   CLI11
+  bamxx
+  HTSLIB::HTSLIB
+  ZLIB::ZLIB
 )
-
-if(USE_HTSLIB)
-  target_link_libraries(preseq PRIVATE
-    bamxx
-    HTSLIB::HTSLIB
-  )
-endif()
