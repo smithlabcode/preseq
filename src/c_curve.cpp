@@ -1,21 +1,8 @@
-/* Copyright (C) 2013-2026 Andrew D. Smith and Timothy Daley
- *
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later
- * version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program. If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-License-Identifier: GPL-3.0; Copyright 2026 Andrew D Smith
 
 #include "c_curve.hpp"
 
+#include "cli_common.hpp"
 #include "common.hpp"
 #include "load_data_for_complexity.hpp"
 
@@ -26,11 +13,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <exception>
+#include <format>
 #include <fstream>
+#include <functional>
 #include <iterator>
+#include <memory>
 #include <numeric>
 #include <print>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -38,120 +28,124 @@
 // NOLINTBEGIN(*-narrowing-conversions)
 
 auto
-c_curve_main(int argc, char *argv[]) -> int {  // NOLINT(*-avoid-c-arrays)
-  try {
-    std::uint32_t seed = 408;  // NOLINT(*-avoid-magic-numbers)
-    double step_size = 1e6;    // NOLINT(*-avoid-magic-numbers)
+c_curve_main(const std::span<char *> args) -> int {
+  static constexpr auto cmd_name = "c_curve";
+  static constexpr auto n_points_default = 100;
 
-    std::string outfile;
-    std::string infile;
-    std::string histogram_outfile;
+  const int argc = std::ssize(args);
+  auto argv = std::data(args);
 
-    bool verbose{};
-    bool paired_end{};
+  double step_size{};
+  std::string outfile;
+  std::string infile;
+  bool verbose{};
 
-#ifdef HAVE_HTSLIB
-    std::uint32_t n_threads{1};
-#endif
+  std::uint32_t n_threads{1};
+  std::uint32_t n_points{n_points_default};
 
-    CLI::App app{c_curve_about_msg};
-    argv = app.ensure_utf8(argv);
-    app.usage("\nUsage: preseq c_curve [OPTIONS]");
-    // if (argc >= 3)
-    //   app.footer(description);
+  CLI::App app{c_curve_about_msg};
+  argv = app.ensure_utf8(argv);
+  app.failure_message(
+    [&](const CLI::App *a, const CLI::Error &b) -> std::string {
+      return std::format("preseq command: {}\n", cmd_name) +
+             CLI::FailureMessage::simple(a, b);
+    });
+  app.usage(std::format("Usage: preseq {} [OPTIONS]", cmd_name));
+  if (argc >= 2)
+    app.footer(" ");  // DESCRIPTION
 
-    // clang-format off
-    app.add_option("INPUT", infile, "input file name")
-      ->required()
-      ->option_text(" ")
-      ->check(CLI::ExistingFile)
-      // ->check(CLI::ReadPermission)
-      ;
-    app.add_option("-o,--output", outfile, "yield output file")
-      ->required()
-      ->option_text("FILE");
-    app.add_option("-s,--step", step_size, "step size in extrapolations")
-      ->default_val(step_size);
-    app.add_option("-r,--seed", seed, "seed for random number generator")
-      ->default_val(seed);
-    app.add_flag("-p,--paired-end", paired_end, "input is paired end read file");
-    app.add_flag("-v,--verbose", verbose, "print more info");
-    // clang-format on
+  // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
+  app.formatter(std::make_shared<preseq_formatter>());
+  app.get_formatter()->column_width(22);
+  app.get_formatter()->long_option_alignment_ratio(0.2);
+  // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
-    if (argc < 3) {
-      std::println("{}", app.help());
-      return EXIT_SUCCESS;
-    }
-    CLI11_PARSE(app, argc, argv);
+  // clang-format off
+  app.add_option("INPUT", infile, "input file (hist/BED/BAM/SAM/values)")
+    ->required()
+    ->option_text("FILE")
+    ->check(CLI::ExistingFile);
+  app.add_option("-o,--output", outfile, "Output file. Two columns, has header.")
+    ->required()
+    ->option_text("FILE");
+  const auto step_size_opt =
+    app.add_option("-s,--step", step_size,
+                   "Step size. Must be smaller than data size.")
+    ->option_text("FLOAT");
+  app.add_option("-p,--points", n_points,
+                 "Number of interpolation points. Excludes step size.")
+    ->option_text("INT")
+    ->excludes(step_size_opt);
+  app.add_flag("-v,--verbose", verbose, "print more info about the data");
+  // clang-format on
 
-    const auto input_format = get_input_format_type(infile);
-    if (is_unknown(input_format)) {
-      std::println("unknown input format");
-      return EXIT_FAILURE;
-    }
-
-    const auto [n_reads, counts_hist] = [&] {
-      switch (input_format) {
-      case input_format_type::hist:
-        return load_histogram(infile);
-      case input_format_type::counts:
-        return load_counts(infile);
-#ifdef HAVE_HTSLIB
-      case input_format_type::bam:
-        return paired_end ? load_counts_BAM_pe(n_threads, infile)
-                          : load_counts_BAM_se(n_threads, infile);
-#endif
-      default:  // case input_format_type::vals:
-        return paired_end ? load_counts_bed_pe(infile)
-                          : load_counts_bed_se(infile);
-      }
-    }();
-
-    const auto max_observed_count = std::size(counts_hist) - 1;
-    const auto distinct_reads =
-      std::reduce(std::cbegin(counts_hist), std::cend(counts_hist));
-
-    const auto total_reads = get_counts_from_hist(counts_hist);
-    const auto distinct_counts =
-      std::ranges::count_if(counts_hist, [](const auto x) { return x > 0.0; });
-
-    if (verbose)
-      std::print("TOTAL READS     = {}\n"
-                 "COUNTS_SUM      = {}\n"
-                 "DISTINCT READS  = {}\n"
-                 "DISTINCT COUNTS = {}\n"
-                 "MAX COUNT       = {}\n"
-                 "COUNTS OF 1     = {}\n",
-                 n_reads,             //
-                 total_reads,         //
-                 distinct_reads,      //
-                 distinct_counts,     //
-                 max_observed_count,  //
-                 counts_hist[1]       //
-      );
-
-    if (!histogram_outfile.empty())
-      report_histogram(histogram_outfile, counts_hist);
-
-    // set upper limit equal to number of molecules
-    const std::size_t upper_limit = n_reads;
-
-    std::ofstream out(outfile);
-    if (!out)
-      throw std::runtime_error("failed to open output file: " + outfile);
-
-    std::println(out, "total_reads\tdistinct_reads");
-    std::println(out, "0\t0");
-    for (std::size_t i = step_size; i <= upper_limit; i += step_size) {
-      const auto n_expected = preseq::interpolate_distinct(
-        counts_hist, total_reads, distinct_reads, i);
-      std::println(out, "{}\t{}", i, std::round(n_expected));
-    }
+  if (argc == 1) {
+    std::println("{}", app.help());
+    return EXIT_SUCCESS;
   }
-  catch (const std::exception &e) {
-    std::println("{}", e.what());
+  CLI11_PARSE(app, argc, argv);
+
+  const auto input_format = get_input_format_type(infile);
+  if (is_unknown(input_format)) {
+    std::println("unknown input format");
     return EXIT_FAILURE;
   }
+
+  const auto [n_reads, counts_hist] = [&] {
+    switch (input_format) {
+    case input_format_type::hist:
+      return load_histogram(infile);
+    case input_format_type::counts:
+      return load_counts(infile);
+    case input_format_type::bam:
+      return load_counts_BAM_se(n_threads, infile);
+    default:  // case input_format_type::vals:
+      return load_counts_bed_se(infile);
+    }
+  }();
+
+  const auto max_observed_count = std::size(counts_hist) - 1;
+  const auto n_distinct =
+    std::reduce(std::cbegin(counts_hist), std::cend(counts_hist));
+  const auto n_total = get_counts_from_hist(counts_hist);
+  const auto gt0 = [](const auto c) { return c > 0.0; };
+  const auto distinct_counts = std::ranges::count_if(counts_hist, gt0);
+  if (step_size > 0)
+    n_points =
+      static_cast<std::uint32_t>(static_cast<std::uint64_t>(n_total) /
+                                 static_cast<std::uint64_t>(step_size));
+  if (verbose)
+    std::print("TOTAL READS     = {}\n"
+               "COUNTS_SUM      = {}\n"
+               "DISTINCT READS  = {}\n"
+               "DISTINCT COUNTS = {}\n"
+               "MAX COUNT       = {}\n"
+               "COUNTS OF 1     = {}\n"
+               "N POINTS        = {}\n",
+               n_reads,             //
+               n_total,             //
+               n_distinct,          //
+               distinct_counts,     //
+               max_observed_count,  //
+               counts_hist[1],      //
+               n_points             //
+    );
+
+  if (n_points < 2) {
+    std::println("too few interpolation points; change step size");
+    return EXIT_FAILURE;
+  }
+
+  const auto interps = preseq::interpolate_distinct(counts_hist, n_points);
+  std::ofstream out(outfile);
+  if (!out)
+    throw std::runtime_error("failed to open output file: " + outfile);
+  std::println(out, "{}\t{}", "n_total", "n_distinct");
+  std::println(out, "{}\t{}", 0, 0);
+  std::ranges::for_each(interps, [&](const auto i) {
+    std::println(out, "{}\t{}", std::round(i.first), std::round(i.second));
+  });
+
   return EXIT_SUCCESS;
 }
 

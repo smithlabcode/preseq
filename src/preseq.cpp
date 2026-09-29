@@ -9,6 +9,7 @@
 #include "pop_size.hpp"
 
 #include <config.h>
+#include <license.h>
 
 #include <CLI11/CLI11.hpp>
 
@@ -16,82 +17,70 @@
 #include <iostream>
 #include <memory>
 #include <print>
+#include <span>
 #include <string>
 
-#ifdef INCLUDE_FULL_LICENSE_INFO
-#include <license.h>
-#endif
-
-const auto description = R"(
-Extrapolate the complexity of a library. This is the approach described in
-Daley & Smith (2013). The method applies rational function approximation via
-continued fractions with the original goal of estimating the number of
-distinct reads that a sequencing library would yield upon deeper sequencing.
-This method has been used for many different purposes since then.
+const auto description =
+  R"(Estimate complexity characteristics of a DNA sequencing library.
+Preseq includes several commands. The lc_extrap command is the most
+general and can be used for applications outside of DNA sequencing.
 )";
 
 int
 main(int argc, char *argv[]) {  // NOLINT(*-c-arrays)
-  CLI::App app{"preseq: a tool for analyzing sequencing library complexity"};
-  argv = app.ensure_utf8(argv);
-  app.formatter(std::make_shared<preseq_formatter>());
-  app.usage("\nUsage: preseq command [OPTIONS]");
-  // if (argc >= 2)
-  app.footer(description);
-  // if (argc >= 3)
-  //   app.footer(footer_msg);
+  try {
 
-  app.require_subcommand(0, 1);
-  app.allow_extras();
+    const std::span args(argv, argc);
 
-  bool print_version{};
+    CLI::App app{"preseq: analyze DNA sequencing library complexity"};
+    argv = app.ensure_utf8(argv);
+    app.usage("Usage: preseq command [OPTIONS]");
+    if (argc >= 2)
+      app.footer(description);
 
-  // clang-format off
-  app.add_flag("--version", print_version, "output version information and exit");
-#ifdef INCLUDE_FULL_LICENSE_INFO
-  app.add_flag("--licenses", print_licenses, "view licenses");
-#endif
-  const auto lc_extrap_cmd = app.add_subcommand("lc_extrap", lc_extrap_about_msg);
-  const auto gc_extrap_cmd = app.add_subcommand("gc_extrap", gc_extrap_about_msg);
-  const auto pop_size_cmd = app.add_subcommand("pop_size", pop_size_about_msg);
-  const auto bound_pop_cmd = app.add_subcommand("bound_pop", bound_pop_about_msg);
-  const auto c_curve_cmd = app.add_subcommand("c_curve", c_curve_about_msg);
-  // clang-format on
+    // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
+    app.formatter(std::make_shared<preseq_formatter>());
+    app.get_formatter()->column_width(16);
+    app.get_formatter()->long_option_alignment_ratio(0.2);
+    // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 
-  if (argc < 2) {
-    std::println("{}", app.help());
-    return EXIT_SUCCESS;
+    app.require_subcommand(0, 1);
+    app.allow_extras();
+    app.set_help_flag("");
+    // clang-format off
+    app.add_subcommand("lc_extrap", lc_extrap_about_msg)
+      ->callback([&]{lc_extrap_main(args.subspan(1));});
+    app.add_subcommand("c_curve", c_curve_about_msg)
+      ->callback([&]{c_curve_main(args.subspan(1));});
+    app.add_subcommand("gc_extrap", gc_extrap_about_msg)
+      ->callback([&]{gc_extrap_main(args.subspan(1));});
+    app.add_subcommand("pop_size", pop_size_about_msg)
+      ->callback([&]{pop_size_main(args.subspan(1));});
+    app.add_subcommand("bound_pop", bound_pop_about_msg)
+      ->callback([&]{bound_pop_main(args.subspan(1));});
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+    app.set_version_flag("--version", VERSION, "Print program version");
+    app.add_flag("--license", [&](auto) {
+    std::print("{}", license_text); throw CLI::Success(); },
+      "Print full license")
+      ->callback_priority(CLI::CallbackPriority::PreRequirementsCheck);
+    // clang-format on
+
+    CLI11_PARSE(app, std::ssize(args), std::data(args));
+    if (std::ssize(args) == 1) {
+      std::println("{}", app.help());
+      return EXIT_SUCCESS;
+    }
+
+    if (!app.get_subcommands().empty())
+      return EXIT_SUCCESS;
+
+    std::println("unrecognized command: {}", args[1]);
+    return EXIT_FAILURE;
   }
-  CLI11_PARSE(app, argc, argv);
-
-  if (print_version) {
-    std::println("{}", VERSION);
-    return EXIT_SUCCESS;
+  catch (const std::exception &e) {
+    std::println("{}", e.what());
+    return EXIT_FAILURE;
   }
-
-#ifdef INCLUDE_FULL_LICENSE_INFO
-  if (view_licenses) {
-    std::println("{}", license_text);
-    return EXIT_SUCCESS;
-  }
-#endif
-
-  if (app.got_subcommand(lc_extrap_cmd))
-    return lc_extrap_main(argc - 1, argv + 1);
-
-  if (app.got_subcommand(gc_extrap_cmd))
-    return gc_extrap_main(argc - 1, argv + 1);
-
-  if (app.got_subcommand(c_curve_cmd))
-    return c_curve_main(argc - 1, argv + 1);
-
-  if (app.got_subcommand(pop_size_cmd))
-    return pop_size_main(argc - 1, argv + 1);
-
-  if (app.got_subcommand(bound_pop_cmd))
-    return bound_pop_main(argc - 1, argv + 1);
-
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-  std::println(std::cerr, "unrecognized command: {}", argv[1]);
   return EXIT_SUCCESS;
 }
