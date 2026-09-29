@@ -13,10 +13,16 @@
 #include <numeric>
 #include <print>
 #include <random>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+[[nodiscard]] inline constexpr auto
+positive_integer(const double x) -> bool {
+  return std::nearbyint(x) == x;
+}
 
 [[nodiscard]] auto
 median_and_ci(const std::span<const double> values, const double ci_level)
@@ -28,56 +34,34 @@ median_and_ci_md(const std::span<const std::vector<double>> values,
   -> std::tuple<std::vector<double>, std::vector<double>, std::vector<double>>;
 
 void
-write_predicted_complexity_curve(
-  const std::string &outfile,
-  const double c_level,
-  const double step_size,
-  const std::vector<double> &yield_estimates,
-  const std::vector<double> &yield_lower_ci_lognorm,
-  const std::vector<double> &yield_upper_ci_lognorm);
+write_complexity_curve(const std::string &outfile,
+                       const std::span<const std::string> header,
+                       const std::span<const double> points,
+                       const std::span<const double> estimates,
+                       const std::span<const double> lower_ci_lognorm,
+                       const std::span<const double> upper_ci_lognorm);
+
+void
+write_complexity_curve(const std::string &outfile,
+                       const std::span<const std::string> header,
+                       const std::span<const double> points,
+                       const std::span<const double> estimates);
 
 template <typename T>
 [[nodiscard]] auto
 get_counts_from_hist(const std::vector<T> &h) -> T {
   T c = 0.0;
-  for (auto i = 0u; i < std::size(h); ++i)
+  for (auto i = 0U; i < std::size(h); ++i)
     c += i * h[i];
   return c;
-}
-
-template <typename uint_type>
-void
-multinomial(std::mt19937 &gen,
-            const std::span<const double> mult_probs,
-            uint_type trials,
-            std::vector<uint_type> &result) {
-  using binom_dist = std::binomial_distribution<uint_type>;
-
-  result.clear();
-  result.resize(std::size(mult_probs));
-
-  double remaining_prob =
-    std::reduce(std::cbegin(mult_probs), std::cend(mult_probs));
-
-  auto r = std::begin(result);
-  auto p = std::begin(mult_probs);
-  while (p != std::end(mult_probs)) {  // iterate to sample for each category
-    *r = binom_dist(trials, (*p) / remaining_prob)(gen);  // take the sample
-
-    remaining_prob -= *p++;  // update remaining probability mass
-    trials -= *r++;          // update remaining trials needed
-  }
-
-  if (trials > 0)
-    throw std::runtime_error("multinomial sampling failed");
 }
 
 [[nodiscard]] auto
 format_histogram(const auto &h) -> std::string {
   std::string s;
-  for (auto i = 0u; i < std::size(h); ++i)
+  for (auto i = 0U; i < std::size(h); ++i)
     if (h[i] > 0)
-      s += std::format("{}\t{}", i, static_cast<std::uint32_t>(h[i]));
+      s += std::format("{}\t{}\n", i, static_cast<std::uint32_t>(h[i]));
   return s;
 }
 
@@ -86,7 +70,7 @@ report_histogram(const std::string &outfile, const auto &h) -> void {
   std::ofstream out(outfile);
   if (!out)
     throw std::runtime_error("failed to open output file: " + outfile);
-  std::print("{}", format_histogram(h));
+  std::print(out, "{}", format_histogram(h));
 }
 
 #endif  // SRC_COMMON_HPP_
