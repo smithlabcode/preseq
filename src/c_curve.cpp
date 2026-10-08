@@ -136,7 +136,10 @@ c_curve_main(const std::span<char *> args) -> int {
     return EXIT_FAILURE;
   }
 
-  const auto interps = preseq::interpolate_distinct(counts_hist, n_points);
+  const auto interps =
+    step_size_opt->empty()
+      ? preseq::interpolate_distinct_points(counts_hist, n_points)
+      : preseq::interpolate_distinct_step(counts_hist, step_size);
   std::ofstream out(outfile);
   if (!out)
     throw std::runtime_error("failed to open output file: " + outfile);
