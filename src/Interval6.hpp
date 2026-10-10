@@ -34,9 +34,12 @@ struct Interval6 {
   char strand{};
 
   Interval6() = default;
-  Interval6(const std::string &chrom, const std::uint32_t start,
-            const std::uint32_t stop, const std::string &name,
-            const double score, const char strand) :
+  Interval6(const std::string &chrom,
+            const std::uint32_t start,
+            const std::uint32_t stop,
+            const std::string &name,
+            const double score,
+            const char strand) :
     chrom{chrom}, start{start}, stop{stop}, name{name}, score{score},
     strand{strand} {}
 
@@ -46,6 +49,11 @@ struct Interval6 {
   }
   auto
   initialize(const char *, const char *) -> bool;
+
+  [[nodiscard]] auto
+  size() const -> std::size_t {
+    return stop - start;
+  }
 
   auto
   operator<=>(const Interval6 &) const = default;
